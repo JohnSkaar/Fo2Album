@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Minimale rettigheter for hovedvinduet. Ingen HTTP-, shell- eller filsystem-plugins; mappetilgang kommer i M1 via egne kommandoer.",
+  "description": "Minimale rettigheter for hovedvinduet: kjernefunksjoner og mappevelger. Ingen HTTP-, shell- eller filsystem-plugins; filer leses bare av Rust-kjernen.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "dialog:allow-open"]
 }

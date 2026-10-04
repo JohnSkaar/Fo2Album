@@ -2,7 +2,12 @@
 //!
 //! ```text
 //! p2a bench [--antall 1000] [--bredde 2048] [--mappe STI]
+//! p2a demo --data STI [--antall 200]
 //! ```
+//!
+//! `demo` lager syntetiske bilder fordelt på «Dropbox» og «iCloud» (med noen dubletter og
+//! et bilde uten dato) og en kryptert lagring med nøkkel i fil, slik appen bruker på Linux
+//! under utvikling. Start så appen med `P2A_DATA_DIR=STI`.
 //!
 //! `bench` lager syntetiske bilder (ikke medregnet i tiden), leser dem inn i en kryptert
 //! katalog og skriver tid per fase. Mål: 10 000 bilder analysert på under 20 minutter på
@@ -16,14 +21,18 @@ use p2a_core::config::DedupConfig;
 use p2a_core::SourceKind;
 use p2a_ingest::pipeline::{ingest_all, Phase};
 use p2a_ingest::synth::{encode_jpeg, insert_exif, pattern, tiff, ExifSpec};
-use p2a_store::{MemoryKeyStore, Store};
+use p2a_store::{FileKeyStore, MemoryKeyStore, Store};
 use rayon::prelude::*;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("bench") => bench(&args[1..]),
-        _ => Err("Bruk: p2a bench [--antall N] [--bredde PX] [--mappe STI]".to_string()),
+        Some("demo") => demo(&args[1..]),
+        _ => Err(
+            "Bruk: p2a bench [--antall N] [--bredde PX] [--mappe STI] | p2a demo --data STI [--antall N]"
+                .to_string(),
+        ),
     };
     if let Err(e) = result {
         eprintln!("{e}");
@@ -140,4 +149,61 @@ fn generate(dir: &Path, count: u32, width: u32, height: u32) -> Result<u64, Stri
         })
         .collect();
     Ok(sizes.iter().sum())
+}
+
+fn demo(args: &[String]) -> Result<(), String> {
+    let data = PathBuf::from(flag(args, "--data").ok_or("mangler --data STI")?);
+    let count: u32 = flag(args, "--antall")
+        .map_or(Ok(200), |v| v.parse())
+        .map_err(|_| "ugyldig --antall")?;
+    let lib = data.join("demobilder");
+    let (dropbox, icloud) = (
+        lib.join("Dropbox/Camera Uploads"),
+        lib.join("iCloud Photos"),
+    );
+    std::fs::create_dir_all(&dropbox).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&icloud).map_err(|e| e.to_string())?;
+    (0..count).into_par_iter().for_each(|i| {
+        let year = if i % 5 == 0 { 2010 } else { 2011 };
+        let (month, day) = (1 + (i * 7) % 12, 1 + (i * 3) % 28);
+        let taken = format!(
+            "{year}:{month:02}:{day:02} {:02}:{:02}:00",
+            8 + i % 12,
+            i % 60
+        );
+        let spec = ExifSpec {
+            taken: Some(&taken),
+            make: Some("Apple"),
+            ..Default::default()
+        };
+        let (w, h) = if i % 4 == 0 { (900, 1200) } else { (1200, 900) };
+        let jpeg = insert_exif(&encode_jpeg(&pattern(w, h, i), 85), &tiff(&spec));
+        let dir = if i % 2 == 0 { &dropbox } else { &icloud };
+        std::fs::write(dir.join(format!("IMG_{i:04}.JPG")), &jpeg).expect("skrive");
+        if i % 9 == 0 {
+            // Samme bilde i begge kilder.
+            std::fs::write(icloud.join(format!("kopi_{i:04}.JPG")), &jpeg).expect("skrive");
+        }
+    });
+    std::fs::write(
+        dropbox.join("ukjent.jpg"),
+        encode_jpeg(&pattern(800, 600, 9999), 85),
+    )
+    .map_err(|e| e.to_string())?;
+
+    let keys = FileKeyStore::in_dir(&data);
+    let (store, recovery) = Store::create(&data, &keys).map_err(|e| e.to_string())?;
+    store
+        .add_source(SourceKind::Dropbox, &dropbox, "Camera Uploads")
+        .map_err(|e| e.to_string())?;
+    store
+        .add_source(SourceKind::Icloud, &icloud, "iCloud Photos")
+        .map_err(|e| e.to_string())?;
+    println!("Demodata i {}", data.display());
+    println!(
+        "Gjenopprettingsnøkkel: {}",
+        recovery.display_code().as_str()
+    );
+    println!("Start appen med: P2A_DATA_DIR={} pnpm dev", data.display());
+    Ok(())
 }

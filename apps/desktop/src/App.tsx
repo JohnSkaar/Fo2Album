@@ -1,31 +1,298 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  api,
+  erKommandofeil,
+  type Aar,
+  type Bilde,
+  type Forslag,
+  type Fremdrift,
+  type Innlesingsrapport,
+  type Kilde,
+  type KildeType,
+  type Sammendrag,
+} from "./api";
+import { ConfirmDialog } from "./components/ConfirmDialog";
+import { PickScreen } from "./components/PickScreen";
+import { RecoverScreen } from "./components/RecoverScreen";
+import { RecoveryKeyScreen } from "./components/RecoveryKeyScreen";
 import { Sidebar } from "./components/Sidebar";
 import { StartScreen } from "./components/StartScreen";
 import { Toast } from "./components/Toast";
-import { tekster } from "./tekster";
+import { Welcome } from "./components/Welcome";
+import { feiltekst, tekster } from "./tekster";
 
-const TOAST_MS = 2600;
+const TOAST_MS = 3200;
+/** Hvor ofte rutenettet oppdateres mens bilder leses inn. */
+const LIVE_REFRESH_MS = 3000;
+
+type Fase =
+  | { type: "laster" }
+  | { type: "velkommen" }
+  | { type: "nokkel"; kode: string }
+  | { type: "gjenopprett"; feil: string | null }
+  | { type: "klar" }
+  | { type: "feil"; melding: string };
+
+/** Standardår: forrige kalenderår, ellers året med flest bilder (PRODUCT.md, steg 2). */
+export function standardAar(aar: Aar[], naa = new Date()): number | null {
+  if (aar.length === 0) return null;
+  const forrige = naa.getFullYear() - 1;
+  if (aar.some((a) => a.year === forrige)) return forrige;
+  return aar.reduce((best, a) => (a.count > best.count ? a : best)).year;
+}
 
 export function App() {
+  const [fase, setFase] = useState<Fase>({ type: "laster" });
+  const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(null), TOAST_MS);
+  const [kilder, setKilder] = useState<Kilde[]>([]);
+  const [forslag, setForslag] = useState<Forslag[] | null>(null);
+  const [aar, setAar] = useState<Aar[]>([]);
+  const [valgtAar, setValgtAar] = useState<number | null>(null);
+  const [bilder, setBilder] = useState<Bilde[]>([]);
+  const [sammendrag, setSammendrag] = useState<Sammendrag | null>(null);
+  const [fremdrift, setFremdrift] = useState<Fremdrift | null>(null);
+  const [rapport, setRapport] = useState<Innlesingsrapport | null>(null);
+  const [bekreftSlett, setBekreftSlett] = useState(false);
+  // Valgt år leses av lastKatalog, som ikke skal lages på nytt hver gang året endres.
+  const valgtAarRef = useRef<number | null>(null);
+  useEffect(() => {
+    valgtAarRef.current = valgtAar;
+  }, [valgtAar]);
+
+  const visMelding = useCallback((m: string) => {
+    setToast(m);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
   }, []);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
-  // Mappevalg kommer i M1.
-  const comingSoon = () => showToast(tekster.melding.kommerSnart);
+  // ---------- Oppstart ----------
+  useEffect(() => {
+    let avbrutt = false;
+    (async () => {
+      try {
+        const status = await api.lagringStatus();
+        if (avbrutt) return;
+        if (status === "tom") return setFase({ type: "velkommen" });
+        if (status === "trenger_gjenoppretting")
+          return setFase({ type: "gjenopprett", feil: null });
+        if (status === "laast") await api.aapneLagring();
+        if (!avbrutt) setFase({ type: "klar" });
+      } catch (e) {
+        if (avbrutt) return;
+        if (erKommandofeil(e) && e.kode === "trenger_gjenoppretting") {
+          setFase({ type: "gjenopprett", feil: null });
+        } else {
+          setFase({ type: "feil", melding: feiltekst(e) });
+        }
+      }
+    })();
+    return () => {
+      avbrutt = true;
+    };
+  }, []);
+
+  // ---------- Katalog ----------
+  const lastKatalog = useCallback(async () => {
+    const [k, s, a] = await Promise.all([api.kilder(), api.sammendrag(), api.aar()]);
+    setKilder(k);
+    setSammendrag(s);
+    setAar(a);
+    const year =
+      valgtAarRef.current !== null && a.some((x) => x.year === valgtAarRef.current)
+        ? valgtAarRef.current
+        : standardAar(a);
+    setValgtAar(year);
+    setBilder(year === null ? [] : await api.bilderIAar(year));
+  }, []);
+
+  const startInnlesing = useCallback(async () => {
+    try {
+      await api.startInnlesing();
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  }, [visMelding]);
+
+  useEffect(() => {
+    if (fase.type !== "klar") return;
+    let sistOppdatert = 0;
+    const lyttere = [
+      api.paFremdrift((p) => {
+        setFremdrift(p);
+        const naa = Date.now();
+        if (p.phase === "leser" && naa - sistOppdatert > LIVE_REFRESH_MS) {
+          sistOppdatert = naa;
+          void lastKatalog();
+        }
+      }),
+      api.paFerdig((r) => {
+        setFremdrift(null);
+        setRapport(r.report);
+        if (r.report?.cancelled) visMelding(tekster.innlesing.stoppet);
+        else if (r.report) visMelding(tekster.innlesing.ferdig(r.report.new_photos));
+        else visMelding(tekster.feil.ukjent ?? "");
+        void lastKatalog();
+      }),
+    ];
+    (async () => {
+      await lastKatalog();
+      // Ved oppstart: les inn det som er endret i mappene siden sist (raskt, inkrementelt).
+      if ((await api.kilder()).length > 0 && !(await api.innlesingPagar())) await startInnlesing();
+    })().catch((e) => visMelding(feiltekst(e)));
+    return () => {
+      lyttere.forEach((l) => void l.then((stopp) => stopp()));
+    };
+  }, [fase.type, lastKatalog, startInnlesing, visMelding]);
+
+  const velgAar = async (y: number) => {
+    setValgtAar(y);
+    setBilder(await api.bilderIAar(y));
+  };
+
+  // ---------- Handlinger ----------
+  const opprett = async () => {
+    setBusy(true);
+    try {
+      setFase({ type: "nokkel", kode: await api.opprettLagring() });
+    } catch (e) {
+      visMelding(feiltekst(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const gjenopprett = async (kode: string) => {
+    setBusy(true);
+    try {
+      await api.gjenopprett(kode);
+      setFase({ type: "klar" });
+    } catch (e) {
+      setFase({ type: "gjenopprett", feil: feiltekst(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const leggTil = async (path: string, kind?: KildeType) => {
+    try {
+      await api.leggTilKilde(path, kind);
+      const navn = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+      visMelding(tekster.melding.kildeLagtTil(navn));
+      await lastKatalog();
+      await startInnlesing();
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
+  const velgMappe = async (kind?: KildeType) => {
+    const path = await api.velgMappe();
+    if (path) await leggTil(path, kind);
+  };
+
+  const finnForslag = async () => {
+    try {
+      setForslag(await api.forslag());
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
+  const fjernKilde = async (k: Kilde) => {
+    try {
+      await api.fjernKilde(k.id);
+      visMelding(tekster.melding.kildeFjernet(k.label));
+      await lastKatalog();
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
+  const slettAlt = async () => {
+    setBekreftSlett(false);
+    try {
+      await api.slettAlleData();
+      setKilder([]);
+      setAar([]);
+      setBilder([]);
+      setSammendrag(null);
+      setRapport(null);
+      setForslag(null);
+      setValgtAar(null);
+      setFase({ type: "velkommen" });
+      visMelding(tekster.slett.ferdig);
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
+  // ---------- Visning ----------
+  let innhold: React.ReactNode = null;
+  switch (fase.type) {
+    case "velkommen":
+      innhold = <Welcome onStart={opprett} busy={busy} />;
+      break;
+    case "nokkel":
+      innhold = <RecoveryKeyScreen code={fase.kode} onDone={() => setFase({ type: "klar" })} />;
+      break;
+    case "gjenopprett":
+      innhold = <RecoverScreen onSubmit={gjenopprett} error={fase.feil} busy={busy} />;
+      break;
+    case "feil":
+      innhold = (
+        <p className="empty" role="alert">
+          {fase.melding}
+        </p>
+      );
+      break;
+    case "klar":
+      innhold =
+        kilder.length === 0 ? (
+          <StartScreen
+            onPickSource={(k) => void velgMappe(k)}
+            onFindSuggestions={() => void finnForslag()}
+            onAddSuggestion={(f) => void leggTil(f.path, f.kind)}
+            suggestions={forslag}
+          />
+        ) : (
+          <PickScreen
+            years={aar}
+            year={valgtAar}
+            onYear={(y) => void velgAar(y)}
+            photos={bilder}
+            summary={sammendrag}
+            progress={fremdrift}
+            report={rapport}
+            onCancel={() => void api.avbrytInnlesing()}
+            thumbUrl={api.miniatyrUrl}
+          />
+        );
+      break;
+  }
 
   return (
     <div className="app">
-      <Sidebar onAddFolder={comingSoon} />
-      <main className="main">
-        <StartScreen onPickSource={comingSoon} />
-      </main>
+      <Sidebar
+        sources={kilder}
+        locked={fase.type !== "klar"}
+        onAddFolder={() => void velgMappe()}
+        onRemoveSource={(k) => void fjernKilde(k)}
+        onDeleteAll={() => setBekreftSlett(true)}
+      />
+      <main className="main">{innhold}</main>
+      <ConfirmDialog
+        open={bekreftSlett}
+        title={tekster.slett.tittel}
+        text={tekster.slett.tekst}
+        confirmLabel={tekster.slett.bekreft}
+        cancelLabel={tekster.slett.avbryt}
+        onConfirm={() => void slettAlt()}
+        onCancel={() => setBekreftSlett(false)}
+      />
       <Toast message={toast} />
     </div>
   );

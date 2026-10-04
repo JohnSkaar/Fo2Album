@@ -40,7 +40,8 @@ prototype/           ← klikkbar HTML-prototype (referanse for flyt og UI, ikke
 website/             ← markedsside for pho2album.no (statisk, Netlify)
 eval/RESULTS.md      ← logg over evalueringskjøringer
 apps/desktop/        ← Tauri-appen: src-tauri/ (Rust) + src/ (React). All UI-tekst i src/tekster.ts
-crates/p2a-*/        ← Rust-kjernen (core, ingest, store) og policy-tester
+crates/p2a-*/        ← Rust-kjernen: core (domene, dubletter), store (kryptert lagring),
+                       ingest (skanning, EXIF, dekoding), heic (ImageIO/WIC), cli (verktøy), policy (tester)
 scripts/             ← byggesjekker og røyktest
 ```
 
@@ -53,6 +54,9 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace       # inkluderer «ingen nettverk»-testen (crates/p2a-policy)
 cargo deny check             # lisenser og forbudte pakker
+cargo run --release -p p2a-cli -- bench --antall 1000 --bredde 4032   # ytelsesmåling
+cargo run -p p2a-cli -- demo --data /tmp/p2a-demo                     # testdata, så:
+P2A_DATA_DIR=/tmp/p2a-demo pnpm dev                                   # appen med testdataene
 ```
 
 ## Arbeidsmåte

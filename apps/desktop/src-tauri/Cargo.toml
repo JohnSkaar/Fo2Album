@@ -16,9 +16,21 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
 serde.workspace = true
 serde_json.workspace = true
 p2a-core.workspace = true
+p2a-ingest = { path = "../../../crates/p2a-ingest" }
+p2a-store.workspace = true
+zeroize = "1"
+
+# Hovednøkkelen ligger i operativsystemets nøkkelring (Nøkkelring på Mac, Credential
+# Manager på Windows). Se docs/ARCHITECTURE.md, «Personvern og sikkerhet».
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native"] }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

@@ -90,7 +90,11 @@ mod tests {
                 [(x * 255 / w) as u8, (y * 255 / h) as u8, 128]
             })
             .collect();
-        match encode_for_tests(w, h, &rgb) {
+        let encoded = encode_for_tests(w, h, &rgb);
+        if cfg!(target_os = "macos") {
+            assert!(encoded.is_some(), "ImageIO skal kunne kode HEIC på Mac");
+        }
+        match encoded {
             Some(heic) => {
                 assert_eq!(&heic[4..8], b"ftyp", "ser ut som en HEIF-fil");
                 let d = decode(&heic, 600).expect("dekode HEIC på Mac");

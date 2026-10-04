@@ -324,6 +324,12 @@ fn heic_is_decoded_where_the_platform_can() {
     // Ekte HEIC der plattformen kan kode det (Mac); ellers en ugyldig HEIC-fil.
     let heic = p2a_heic::encode_for_tests(img.width(), img.height(), img.as_raw());
     let can_decode = heic.is_some();
+    if cfg!(target_os = "macos") {
+        assert!(
+            can_decode,
+            "ImageIO skal kunne kode HEIC på Mac, ellers er ikke dekodingen testet"
+        );
+    }
     write(
         lib.path(),
         "IMG_20110302_081500.HEIC",

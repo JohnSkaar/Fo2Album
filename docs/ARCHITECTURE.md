@@ -49,7 +49,9 @@
 apps/desktop/          Tauri-app: src-tauri/ (Rust-skall) + src/ (React)
 crates/p2a-core/       domenetyper, poengsetting, utvalg, sideoppsett (ren, ingen I/O)
 crates/p2a-ingest/     kilder, skanning, EXIF, dekoding, hashing, dubletter
-crates/p2a-store/      SQLite-katalog, miniatyr-cache, «Slett alle data»
+crates/p2a-store/      kryptert lagring (SQLCipher), katalog, familieprofil, miniatyrer, «Slett alle data»
+crates/p2a-heic/       HEIC via ImageIO (Mac) og WIC (Windows); eneste pakke med unsafe (FFI)
+crates/p2a-cli/        utviklerverktøy: `p2a bench` (ytelse), `p2a demo` (testdata); evaluering i M2
 crates/p2a-policy/     tester som håndhever prinsippene (ingen nettverk i analysekoden)
 scripts/               byggesjekker (ingen eksterne ressurser, røyktest)
 ```
@@ -58,7 +60,7 @@ scripts/               byggesjekker (ingen eksterne ressurser, røyktest)
 
 1. `crates/p2a-policy/tests/no_network.rs` går gjennom avhengighetstreet til alle `p2a-*`-pakker og feiler ved HTTP-klienter, sockets eller TLS (og `tokio` med `net`), og ved bruk av `std::net` i kildekoden. Nye `p2a-*`-pakker dekkes automatisk.
 2. `deny.toml` forbyr de samme pakkene i hele workspacet (cargo-deny i CI). Bestilling (M7) får en egen pakke, `p2a-order`, som eneste unntak.
-3. Tauri: ingen HTTP-, shell- eller fs-plugins; capabilities er bare `core:default`. CSP: `default-src 'self'`, `connect-src` bare til IPC.
+3. Tauri: ingen HTTP-, shell- eller fs-plugins; capabilities er bare `core:default` og `dialog:allow-open` (mappevelgeren). CSP: `default-src 'self'`, `connect-src` bare til IPC, `img-src` bare til `miniatyr:`-protokollen, som dekrypterer miniatyrer i minnet.
 4. Grensesnittet: ESLint forbyr `fetch`, `XMLHttpRequest`, `WebSocket` og `EventSource`, og `scripts/check-no-remote.mjs` feiler bygget hvis HTML/CSS/JS refererer til noe på nettet.
 
 ## Lisenser

@@ -31,7 +31,7 @@ pub use catalog::{
     CatalogSummary, FileEntry, FileToRead, PhotoSummary, ReadOutcome, Source, SyncReport,
 };
 pub use crypto::MasterKey;
-pub use keystore::{KeyStore, KeyStoreError, MemoryKeyStore};
+pub use keystore::{FileKeyStore, KeyStore, KeyStoreError, MemoryKeyStore};
 pub use profile::{Comment, NewComment, Person};
 pub use recovery::{RecoveryKey, RecoveryParseError};
 
