@@ -78,6 +78,8 @@ Føringer fra eierens andre runde (4. oktober 2026):
 36. Foreslå å kombinere 2, 3 og 4 dager til én historie under gjennomgangen.
 37. Revideringen må være rask: marker mange bilder, sider og dager samtidig, og utfør med ett trykk (fjern, nedprioriter, opprioriter, fjern sidene og bildene i dem osv.).
 
+38. Startsiden forblir kildesiden etter at en mappe er valgt: samme førstebilde, med «Lagt til» og «Lag utkast» under kortene, så flere kilder kan legges til først. Ingen årstall øverst; året velges i et felt («Album for»/«År», standard året med flest bilder). Albumutkastet viser bare gjennomgangen i sju punkter når den er startet, og deretter utkastet. Gjort i prototypen og appen.
+
 Status 36–37: gjort i prototypen. Kjernen: `DraftHints::merged_events`, `Draft::merge_suggestions`, `Decision::Opp`, `Action::Opp`/`SlaaSammen`. Appen viser ikke forslagene og markeringen ennå.
 
 Status 35: gjort i prototypen, appen og kjernen (`DraftHints::album_pages`: skalaen som gir nærmest ønsket sidetall, 0,2–3,0; flere sider gir plass til en større andel av bildene).

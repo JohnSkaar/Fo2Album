@@ -156,9 +156,11 @@ describe("velg bilder", () => {
     ]);
     render(<App />);
 
+    // Med kilder, men uten utkast: startsiden står, med kildene og «Lag utkast».
     expect(
-      await screen.findByRole("heading", { level: 1, name: "Familiealbum 2011" }),
+      await screen.findByRole("heading", { level: 1, name: tekster.start.tittel }),
     ).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: tekster.utkast.lag })).toBeInTheDocument();
     expect(mock.aapneLagring).toHaveBeenCalled();
     await waitFor(() => expect(mock.startInnlesing).toHaveBeenCalled());
 

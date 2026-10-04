@@ -1,11 +1,7 @@
 import { useMemo, useState } from "react";
 import type {
-  Aar,
   Analysefase,
-  Fremdrift,
   Handling,
-  Kilde,
-  KildeType,
   Laert,
   Side,
   Svar,
@@ -14,7 +10,6 @@ import type {
   UtkastHendelse,
 } from "../api";
 import { pris, prisvalg } from "../pris";
-import { Kildekort } from "./StartScreen";
 import { datoTekst, fmt, tekster } from "../tekster";
 import { datoSpenn, HVORFOR_VALG, oppdaterSider, spoerOmHvorfor } from "../utkast";
 
@@ -25,33 +20,6 @@ const FASER: Analysefase[] = ["henter", "hendelser", "serier", "velger", "begrun
 
 type Valgt = { id: string; included: boolean; event: number };
 type Spørsmål = { feedbackId: number; action: Handling };
-
-function Aarvelger({
-  years,
-  year,
-  onYear,
-}: {
-  years: Aar[];
-  year: number | null;
-  onYear: (y: number) => void;
-}) {
-  if (years.length < 2) return null;
-  return (
-    <div className="chips" role="group" aria-label={tekster.bilder.aarEtikett}>
-      {years.map((y) => (
-        <button
-          key={y.year}
-          type="button"
-          className="chip"
-          aria-pressed={y.year === year}
-          onClick={() => onYear(y.year)}
-        >
-          {y.year} <span className="chip__count">{fmt(y.count)}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function Analyse({ fase }: { fase: Analysefase }) {
   const naa = fase === "venter" ? -1 : FASER.indexOf(fase);
@@ -317,29 +285,19 @@ function Laerdommer({ l }: { l: Laert }) {
 }
 
 export function DraftScreen({
-  years,
   year,
-  onYear,
   draft,
-  sources,
-  onPickSource,
   phase,
-  ingest,
   onMake,
   onSize,
   onChoose,
   onAnswer,
   thumbUrl,
 }: {
-  years: Aar[];
+  /** Året albumet lages for (til tittelen mens gjennomgangen pågår). */
   year: number | null;
-  onYear: (y: number) => void;
   draft: Utkast | null;
-  /** Bildekildene som er lagt til; flere kan legges til før utkastet lages. */
-  sources: Kilde[];
-  onPickSource: (kilde: KildeType) => void;
   phase: Analysefase | null;
-  ingest: Fremdrift | null;
   onMake: () => void;
   /** Lager utkastet på nytt med et sidetak (`null` = hele historien). */
   onSize: (sidetak: number | null) => void;
@@ -375,42 +333,8 @@ export function DraftScreen({
     );
   }
 
-  if (!draft) {
-    return (
-      <section className="pick" aria-labelledby="utkast-tittel">
-        <h1 id="utkast-tittel" className="head__title">
-          {year ? t.tittel(year) : tekster.nav.albumutkast}
-        </h1>
-        <div className="intro">
-          <h2 className="intro__h">{t.flereKilder}</h2>
-          <p className="intro__note">{t.flereKilderTekst}</p>
-          <ul className="intro__sources" aria-label={t.kilderLagtTil}>
-            {sources.map((k) => (
-              <li key={k.id}>
-                {k.label} <span className="count">· {tekster.kilder[k.kind].navn}</span>
-              </li>
-            ))}
-          </ul>
-          <Kildekort onPickSource={onPickSource} />
-        </div>
-        <Aarvelger years={years} year={year} onYear={onYear} />
-        <div className="intro">
-          <p className="intro__lead">{t.ingress}</p>
-          <p className="intro__note">{t.tid}</p>
-          {ingest && <p className="intro__note">{t.venterInnlesing}</p>}
-          <button
-            type="button"
-            className="btn btn--primary btn--lg"
-            onClick={onMake}
-            disabled={year === null}
-          >
-            {t.lag}
-          </button>
-          {year === null && <p className="intro__note">{t.ingenBilder}</p>}
-        </div>
-      </section>
-    );
-  }
+  // Albumutkastet vises bare når gjennomgangen er i gang eller ferdig (startsiden lager det).
+  if (!draft) return null;
 
   const handling = async (action: Handling, id: string, other?: string) => {
     setValgt(null);
@@ -462,7 +386,6 @@ export function DraftScreen({
           {t.nyttUtkast}
         </button>
       </div>
-      <Aarvelger years={years} year={year} onYear={onYear} />
       <Pris draft={draft} onSize={onSize} />
       <p className="draft__help">{t.hjelp}</p>
       <Laerdommer l={draft.learned} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Forslag, KildeType } from "../api";
+import type { Aar, Forslag, Fremdrift, Kilde, KildeType } from "../api";
 import { tekster } from "../tekster";
 import { Icon, type IconName } from "./Icon";
 
@@ -36,12 +36,25 @@ export function StartScreen({
   onFindSuggestions,
   onAddSuggestion,
   suggestions,
+  sources = [],
+  years = [],
+  year = null,
+  onYear,
+  ingest = null,
+  onMake,
 }: {
   onPickSource: (kilde: KildeType) => void;
   onFindSuggestions: () => void;
   onAddSuggestion: (f: Forslag) => void;
   /** `null` til brukeren har bedt om forslag (samtykke). */
   suggestions: Forslag[] | null;
+  /** Kildene som er lagt til. Når det finnes noen, vises «Lag utkast» under kortene. */
+  sources?: Kilde[];
+  years?: Aar[];
+  year?: number | null;
+  onYear?: (y: number) => void;
+  ingest?: Fremdrift | null;
+  onMake?: () => void;
 }) {
   const [added, setAdded] = useState<Set<string>>(new Set());
   return (
@@ -51,6 +64,49 @@ export function StartScreen({
       </h1>
       <p className="start__lead">{tekster.start.ingress}</p>
       <Kildekort onPickSource={onPickSource} />
+
+      {sources.length > 0 && (
+        <div className="added" aria-live="polite">
+          <b>{tekster.utkast.kilderLagtTil}</b>
+          <ul className="intro__sources" aria-label={tekster.utkast.kilderLagtTil}>
+            {sources.map((k) => (
+              <li key={k.id}>
+                {k.label} <span className="count">· {tekster.kilder[k.kind].navn}</span>
+              </li>
+            ))}
+          </ul>
+          {ingest && <p className="start__help">{tekster.utkast.venterInnlesing}</p>}
+          <p className="start__help">
+            <b>{tekster.utkast.flereKilder}</b> {tekster.utkast.flereKilderTekst}
+          </p>
+          <div className="added__row">
+            {years.length > 1 && onYear && (
+              <label className="added__year">
+                {tekster.utkast.aar}
+                <select
+                  className="input"
+                  value={year ?? ""}
+                  onChange={(e) => onYear(Number(e.target.value))}
+                >
+                  {years.map((y) => (
+                    <option key={y.year} value={y.year}>
+                      {tekster.utkast.aarValg(y.year, y.count)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button
+              type="button"
+              className="btn btn--primary btn--lg"
+              onClick={onMake}
+              disabled={year === null}
+            >
+              {tekster.utkast.lag}
+            </button>
+          </div>
+        </div>
+      )}
 
       {suggestions === null ? (
         <div className="suggest">

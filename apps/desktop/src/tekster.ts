@@ -119,7 +119,9 @@ export const tekster = {
     flereKilder: "Har dere bilder flere steder?",
     flereKilderTekst:
       "Legg til alle kildene før du lager utkastet: mobilen til begge foreldrene, Dropbox, iCloud, Google Disk og mapper på PC-en. Appen blander dem og fjerner dubletter.",
-    kilderLagtTil: "Bildekilder som er lagt til",
+    kilderLagtTil: "Lagt til",
+    aar: "Album for",
+    aarValg: (aar: number, n: number) => `${aar} (${antall(n, "bilde", "bilder")})`,
     lag: "Lag utkast",
     venterInnlesing:
       "Appen henter fortsatt bilder fra maskinen. Utkastet tar med alle bildene når den er ferdig.",

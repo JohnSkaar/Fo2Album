@@ -307,23 +307,26 @@ export function App() {
       break;
     case "klar":
       innhold =
-        kilder.length === 0 ? (
+        // Startsiden forblir kildesiden til «Lag utkast» trykkes; albumutkastet vises først
+        // når gjennomgangen er i gang.
+        kilder.length === 0 || (visning === "utkast" && !utkast && !analyse) ? (
           <StartScreen
             onPickSource={(k) => void velgMappe(k)}
             onFindSuggestions={() => void finnForslag()}
             onAddSuggestion={(f) => void leggTil(f.path, f.kind)}
             suggestions={forslag}
-          />
-        ) : visning === "utkast" ? (
-          <DraftScreen
+            sources={kilder}
             years={aar}
             year={valgtAar}
             onYear={(y) => void velgAar(y)}
-            draft={utkast}
-            sources={kilder}
-            onPickSource={(k) => void velgMappe(k)}
-            phase={analyse}
             ingest={fremdrift}
+            onMake={() => void lagUtkast()}
+          />
+        ) : visning === "utkast" ? (
+          <DraftScreen
+            year={valgtAar}
+            draft={utkast}
+            phase={analyse}
             onMake={() => void lagUtkast()}
             onSize={(sidetak) => void lagUtkast(sidetak)}
             onChoose={velgBilde}
