@@ -8,13 +8,15 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use p2a_core::{ContentHash, DateSource, PhotoMeta, TakenAt};
+use p2a_core::config::DedupConfig;
+use p2a_core::{dedup, ContentHash, DateSource, PhotoMeta, TakenAt};
 use p2a_store::{
     CatalogSummary, FileEntry, FileToRead, ReadOutcome, Store, StoreError, SyncReport,
 };
 use rayon::prelude::*;
 
-use crate::{dates, exif, hash, scan};
+use crate::decode::{self, DecodeError};
+use crate::{dates, exif, hash, phash, scan};
 
 /// Antall filer per runde. Styrer hvor ofte fremdrift rapporteres og data lagres.
 const BATCH: usize = 64;
@@ -62,11 +64,14 @@ pub enum IngestError {
 /// Det som kommer ut av å analysere en ny fil.
 struct Analyzed {
     meta: PhotoMeta,
+    /// JPEG-miniatyr, krypteres før den lagres. `None` hvis formatet ikke kan dekodes ennå.
+    thumbnail: Option<Vec<u8>>,
 }
 
 /// Leser alle kildene i katalogen.
 pub fn ingest_all(
     store: &mut Store,
+    dedup_cfg: &DedupConfig,
     cancel: &AtomicBool,
     progress: &mut dyn FnMut(Progress),
 ) -> Result<IngestReport, IngestError> {
@@ -170,6 +175,12 @@ pub fn ingest_all(
             outcomes.push((file_id, outcome));
         }
         store.record_reads(&outcomes)?;
+        for (h, a) in &analyzed {
+            if let Some(thumb) = a.as_ref().and_then(|a| a.thumbnail.as_deref()) {
+                store.put_thumbnail(h, thumb)?;
+                store.set_has_thumbnail(h)?;
+            }
+        }
     }
     progress(Progress {
         phase: Phase::Leser,
@@ -177,11 +188,28 @@ pub fn ingest_all(
         total,
     });
 
+    // 3. Transkodede dubletter, på tvers av alle kilder.
+    if !report.cancelled {
+        progress(Progress {
+            phase: Phase::Dubletter,
+            done: 0,
+            total: 1,
+        });
+        let candidates = store.phash_candidates()?;
+        let pairs = dedup::find_near_duplicates(&candidates, dedup_cfg);
+        store.set_near_duplicates(&pairs)?;
+        progress(Progress {
+            phase: Phase::Dubletter,
+            done: 1,
+            total: 1,
+        });
+    }
+
     report.summary = store.summary()?;
     Ok(report)
 }
 
-/// Leser metadata fra en ny fil. `None` hvis filen ikke er et bilde vi kan bruke.
+/// Leser metadata, dekoder, lager miniatyr og pHash. `None` hvis filen er skadet.
 fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
     let name = path.file_name()?.to_string_lossy().to_string();
     let exif = exif::read_file(path);
@@ -198,7 +226,18 @@ fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
         meta.width = e.width;
         meta.height = e.height;
     }
-    Some(Analyzed { meta })
+    let thumbnail = match decode::decode_file(path, meta.format.as_deref(), meta.orientation) {
+        Ok(decoded) => {
+            // Mål etter rotering, så stående og liggende bilder får riktig form i albumet.
+            meta.width = Some(decoded.width);
+            meta.height = Some(decoded.height);
+            meta.phash = Some(phash::phash(&decoded.image));
+            Some(decode::thumbnail_jpeg(&decoded))
+        }
+        Err(DecodeError::Unsupported) => None,
+        Err(DecodeError::Corrupt(_) | DecodeError::Io(_)) => return None,
+    };
+    Some(Analyzed { meta, thumbnail })
 }
 
 fn format_of(name: &str) -> Option<&'static str> {

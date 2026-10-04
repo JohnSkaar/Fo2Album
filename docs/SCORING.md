@@ -278,7 +278,8 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
 | Navn | Start | Beskrivelse |
 |---|---|---|
 | burst_seconds | 20 | Maks tid mellom bilder i serie |
-| near_dup_hamming | 6 | pHash-terskel for transkodede dubletter |
+| near_dup_hamming | 6 | pHash-terskel for transkodede dubletter (begge har EXIF-tid, og tiden er innen ±2 s) |
+| near_dup_hamming_without_time | 4 | Strengere pHash-terskel når minst ett bilde mangler EXIF-tid (f.eks. WhatsApp-kopier) |
 | rarity_alpha / tau | 1.2 / 8 | Sjeldenhetsbonus |
 | min_p (barn, kjerne, besteforeldre, venn) | 6, 6, 2, 1 | Dekningskrav |
 | λ_month, λ_event, λ_person, λ_type, λ_red | 0.6, 0.8, 1.0, 0.4, 2.0 | Målfunksjon |

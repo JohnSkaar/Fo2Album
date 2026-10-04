@@ -3,6 +3,7 @@
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
+use p2a_core::config::DedupConfig;
 use p2a_core::{DateSource, SourceKind};
 use p2a_ingest::pipeline::{ingest_all, Phase, Progress};
 use p2a_ingest::synth::{jpeg, ExifSpec};
@@ -54,9 +55,12 @@ fn two_sources_with_exact_duplicates() {
         .unwrap();
 
     let mut phases = Vec::new();
-    let report = ingest_all(&mut store, &AtomicBool::new(false), &mut |p: Progress| {
-        phases.push(p.phase)
-    })
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |p: Progress| phases.push(p.phase),
+    )
     .unwrap();
 
     assert!(phases.contains(&Phase::Skanner) && phases.contains(&Phase::Leser));
@@ -87,13 +91,25 @@ fn two_sources_with_exact_duplicates() {
     assert!(store.years().unwrap().contains(&(2011, 2)));
 
     // Ny kjøring uten endringer: ingenting leses.
-    let again = ingest_all(&mut store, &AtomicBool::new(false), &mut |_| {}).unwrap();
+    let again = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
     assert_eq!((again.added, again.changed, again.read), (0, 0, 0));
     assert_eq!(again.summary, report.summary);
 
     // Julebildet slettes i iCloud: filen og bildet forsvinner fra katalogen.
     std::fs::remove_file(icloud.join("IMG_0002.JPG")).unwrap();
-    let after = ingest_all(&mut store, &AtomicBool::new(false), &mut |_| {}).unwrap();
+    let after = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
     assert_eq!(after.removed, 1);
     assert_eq!(after.summary.photos, 3);
     assert_eq!(store.photos_in_year(2011).unwrap().len(), 1);
@@ -122,7 +138,13 @@ fn missing_source_is_reported_not_deleted() {
             "Ekstern disk",
         )
         .unwrap();
-    let report = ingest_all(&mut store, &AtomicBool::new(false), &mut |_| {}).unwrap();
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
     assert_eq!(report.missing_sources, vec!["Ekstern disk".to_string()]);
     assert_eq!(store.sources().unwrap().len(), 1);
 }
@@ -143,10 +165,151 @@ fn cancel_stops_before_reading() {
     store
         .add_source(SourceKind::Pc, lib.path(), "Bilder")
         .unwrap();
-    let report = ingest_all(&mut store, &AtomicBool::new(true), &mut |_| {}).unwrap();
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(true),
+        &mut |_| {},
+    )
+    .unwrap();
     assert!(report.cancelled);
     assert_eq!(report.read, 0);
     // Neste kjøring fortsetter der den slapp.
-    let report = ingest_all(&mut store, &AtomicBool::new(false), &mut |_| {}).unwrap();
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
     assert_eq!((report.read, report.summary.photos), (10, 10));
+}
+
+#[test]
+fn transcoded_copies_corrupt_files_and_thumbnails() {
+    use image::imageops::FilterType;
+    use p2a_ingest::synth::{encode_jpeg, insert_exif, pattern, tiff};
+
+    let lib = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let icloud = lib.path().join("iCloud Photos");
+    let dropbox = lib.path().join("Dropbox");
+
+    // Original i høy oppløsning med EXIF.
+    let scene = pattern(1600, 1200, 42);
+    let exif = |t| {
+        tiff(&ExifSpec {
+            taken: Some(t),
+            make: Some("Apple"),
+            ..Default::default()
+        })
+    };
+    write(
+        &icloud,
+        "IMG_0100.JPG",
+        &insert_exif(&encode_jpeg(&scene, 92), &exif("2011:03:02 08:15:00")),
+    );
+    // Samme bilde sendt på WhatsApp: nedskalert, komprimert, uten EXIF.
+    let small = image::imageops::resize(&scene, 800, 600, FilterType::Triangle);
+    write(
+        &dropbox,
+        "WhatsApp Image 2011-03-02 at 09.00.00.jpeg",
+        &encode_jpeg(&small, 70),
+    );
+    // Neste bilde i serien, 5 s senere: ligner, men er et annet øyeblikk.
+    let next = pattern(1600, 1200, 43);
+    write(
+        &icloud,
+        "IMG_0101.JPG",
+        &insert_exif(&encode_jpeg(&next, 92), &exif("2011:03:02 08:15:05")),
+    );
+    // Stående bilde (orientering 6).
+    let portrait = tiff(&ExifSpec {
+        taken: Some("2011:03:03 10:00:00"),
+        orientation: Some(6),
+        ..Default::default()
+    });
+    write(
+        &icloud,
+        "IMG_0102.JPG",
+        &insert_exif(&encode_jpeg(&pattern(800, 600, 44), 90), &portrait),
+    );
+    // Skadet fil.
+    write(&dropbox, "IMG_0999.JPG", b"ikke et bilde");
+
+    let keys = MemoryKeyStore::default();
+    let (mut store, _) = Store::create(data.path(), &keys).unwrap();
+    store
+        .add_source(SourceKind::Icloud, &icloud, "iCloud")
+        .unwrap();
+    store
+        .add_source(SourceKind::Dropbox, &dropbox, "Dropbox")
+        .unwrap();
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
+
+    assert_eq!(report.unreadable, 1);
+    assert_eq!(report.summary.unreadable, 1);
+    assert_eq!(
+        report.summary.near_duplicates, 1,
+        "WhatsApp-kopien skal kjennes igjen"
+    );
+    assert_eq!(
+        report.summary.photos, 3,
+        "original, seriebilde og stående bilde"
+    );
+
+    let photos = store.photos_in_year(2011).unwrap();
+    let original = &photos[0];
+    assert_eq!(
+        original.width,
+        Some(1600),
+        "originalen i høyest oppløsning beholdes"
+    );
+    assert_eq!(
+        original.sources,
+        vec![SourceKind::Dropbox, SourceKind::Icloud],
+        "kildene til kopien regnes med"
+    );
+    assert_eq!(
+        photos[1].width,
+        Some(1600),
+        "seriebildet er ikke en dublett"
+    );
+    let p = &photos[2];
+    assert_eq!(
+        (p.width, p.height),
+        (Some(600), Some(800)),
+        "mål etter rotering"
+    );
+
+    // Miniatyrene finnes, er krypterte på disken og dekrypteres til gyldig JPEG.
+    for photo in &photos {
+        assert!(photo.has_thumbnail);
+        let bytes = store.get_thumbnail(&photo.hash).unwrap().unwrap();
+        let img = image::load_from_memory(&bytes).unwrap();
+        assert!(img.width() <= 400 && img.height() <= 400);
+    }
+    let thumb = image::load_from_memory(&store.get_thumbnail(&p.hash).unwrap().unwrap()).unwrap();
+    assert!(
+        thumb.height() > thumb.width(),
+        "miniatyren av det stående bildet er stående"
+    );
+
+    // Fjernes originalen, blir WhatsApp-kopien det beste bildet igjen.
+    std::fs::remove_file(icloud.join("IMG_0100.JPG")).unwrap();
+    let after = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
+    assert_eq!(after.summary.near_duplicates, 0);
+    assert_eq!(after.summary.photos, 3);
 }

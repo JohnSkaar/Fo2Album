@@ -19,27 +19,51 @@ pub struct ExifSpec<'a> {
     pub gps: Option<(f64, f64)>,
 }
 
-/// Et deterministisk bilde: myke fargeflater og noen skarpe kanter, styrt av `seed`.
+/// Et deterministisk, fotoaktig bilde styrt av `seed`: en himmel-/bakkegradient med
+/// noen myke fargeflekker («motiver») og litt skarp tekstur. Ulike frø gir tydelig ulike
+/// bilder; samme frø i ulik størrelse gir samme bilde.
 pub fn pattern(width: u32, height: u32, seed: u32) -> RgbImage {
-    let s = seed.wrapping_mul(2_654_435_761);
-    let (r0, g0, b0) = (
-        (s & 0xff) as f32,
-        ((s >> 8) & 0xff) as f32,
-        ((s >> 16) & 0xff) as f32,
-    );
-    let stripe = 3 + (s >> 24) % 7;
+    let mut state = seed.wrapping_mul(2_654_435_761).wrapping_add(0x9E37_79B9) | 1;
+    let mut rnd = move || {
+        // xorshift32
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        (state as f32) / (u32::MAX as f32)
+    };
+    let sky = [rnd() * 255.0, rnd() * 255.0, rnd() * 255.0];
+    let ground = [rnd() * 255.0, rnd() * 255.0, rnd() * 255.0];
+    let horizon = 0.3 + rnd() * 0.4;
+    let blobs: Vec<([f32; 2], f32, [f32; 3])> = (0..6)
+        .map(|_| {
+            (
+                [rnd(), rnd()],
+                0.05 + rnd() * 0.2,
+                [rnd() * 255.0, rnd() * 255.0, rnd() * 255.0],
+            )
+        })
+        .collect();
     ImageBuffer::from_fn(width, height, |x, y| {
         let fx = x as f32 / width.max(1) as f32;
         let fy = y as f32 / height.max(1) as f32;
-        let edge = if (x / (width / stripe).max(1) + y / (height / 4).max(1)) % 2 == 0 {
-            40.0
-        } else {
-            0.0
-        };
+        let t = ((fy - horizon) * 8.0).clamp(-1.0, 1.0) * 0.5 + 0.5;
+        let mut c = [0.0f32; 3];
+        for i in 0..3 {
+            c[i] = sky[i] * (1.0 - t) + ground[i] * t;
+        }
+        for (pos, r, col) in &blobs {
+            let d2 = (fx - pos[0]).powi(2) + (fy - pos[1]).powi(2);
+            let w = (-d2 / (r * r)).exp();
+            for i in 0..3 {
+                c[i] = c[i] * (1.0 - w) + col[i] * w;
+            }
+        }
+        // Fin tekstur (høy frekvens), som skarphetsmål senere kan se.
+        let texture = if (x / 3 + y / 3) % 2 == 0 { 6.0 } else { -6.0 };
         Rgb([
-            (r0 * (1.0 - fx) + 255.0 * fx * 0.5 + edge).min(255.0) as u8,
-            (g0 * (1.0 - fy) + 128.0 * fy + edge).min(255.0) as u8,
-            (b0 * 0.5 + 100.0 * fx * fy + edge).min(255.0) as u8,
+            (c[0] + texture).clamp(0.0, 255.0) as u8,
+            (c[1] + texture).clamp(0.0, 255.0) as u8,
+            (c[2] + texture).clamp(0.0, 255.0) as u8,
         ])
     })
 }

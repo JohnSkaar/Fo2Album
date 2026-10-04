@@ -1,0 +1,22 @@
+[package]
+name = "p2a-cli"
+description = "Kommandolinjeverktøy for utviklere: ytelsesmåling nå, evaluering (M2) senere."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "p2a"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+p2a-core.workspace = true
+p2a-ingest = { path = "../p2a-ingest" }
+p2a-store.workspace = true
+rayon = "1"
+tempfile = "3"

@@ -3,6 +3,8 @@
 //! Denne pakken er ren og deterministisk. Den gjør ingen I/O og har aldri
 //! nettverkstilgang (håndheves av `p2a-policy` og `deny.toml`).
 
+pub mod config;
+pub mod dedup;
 pub mod model;
 
 pub use model::{

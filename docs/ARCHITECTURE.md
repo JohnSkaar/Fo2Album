@@ -79,6 +79,10 @@ Sjekkes automatisk av `cargo deny check licenses` (tillatte lisenser står i `de
 | OpenSSL 3 (bare Windows, via `openssl-sys`/`openssl-src`) | Kryptobackend for SQLCipher | Apache-2.0 | Lisensteksten må følge med appen |
 | `chacha20poly1305`, `hkdf`, `sha2`, `zeroize`, `getrandom` (RustCrypto) | Kryptering av miniatyrer og nøkkelfil | MIT OR Apache-2.0 | |
 | `keyring` | Nøkkelring på Mac og Windows (app-skallet) | MIT OR Apache-2.0 | |
+| `image`, `jpeg-decoder` | Dekoding av JPEG, PNG og WebP; miniatyrer | MIT OR Apache-2.0 | |
+| `kamadak-exif` | EXIF fra JPEG, HEIC, PNG og WebP | BSD-2-Clause | |
+| `blake3` | Innholdshash | CC0-1.0 OR Apache-2.0 | |
+| `walkdir`, `rayon`, `regex` | Skanning, parallell lesing, datoer i filnavn | MIT OR Apache-2.0 / Unlicense OR MIT | |
 
 Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 
@@ -125,6 +129,7 @@ Noter valgt modell, versjon, lisens og kilde i en tabell her når det er bestemt
 - Trinnvis: (1) metadata og hash for alt (raskt) → (2) miniatyrer og billige funksjoner → (3) tunge modeller bare på kandidater (etter dubletter og grov filtrering).
 - Alt cachet på innholdshash; avbryt og gjenoppta.
 - Kjør analyse i bakgrunnstråder; UI skal aldri fryse.
+- **Målt (M1, 4. oktober 2026):** innlesing (hash, EXIF, dekoding, miniatyr, pHash, dubletter) av syntetiske 12 MP JPEG-er: **20 ms per bilde med 4 tråder**, dvs. ca. 3,3 min for 10 000 bilder. 2048 × 1536: ca. 9 ms per bilde. JPEG dekodes direkte i 1/4 størrelse (`jpeg-decoder`), som kuttet tiden fra 48 ms. Merk: filene lå i diskbufferen; ekte bibliotek på SSD legger til lesetid (ca. 30 GB for 10 000 bilder à 3 MB). Kjør selv med `cargo run --release -p p2a-cli -- bench --antall 1000 --bredde 4032`.
 
 ## Personvern i koden
 

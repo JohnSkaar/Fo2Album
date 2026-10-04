@@ -12,6 +12,7 @@ workspace = true
 [dependencies]
 blake3 = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+jpeg-decoder = { version = "0.3", default-features = false }
 kamadak-exif = "0.6"
 p2a-core.workspace = true
 p2a-store = { version = "0.1.0", path = "../p2a-store" }
@@ -22,4 +23,5 @@ thiserror = "2"
 walkdir = "2"
 
 [dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 tempfile = "3"

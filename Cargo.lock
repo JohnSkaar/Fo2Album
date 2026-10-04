@@ -1824,6 +1824,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jpeg-decoder"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00810f1d8b74be64b13dbf3db89ac67740615d6c891f0e7b6179326533011a07"
+
+[[package]]
 name = "js-sys"
 version = "0.3.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2382,6 +2388,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
+name = "p2a-cli"
+version = "0.1.0"
+dependencies = [
+ "p2a-core",
+ "p2a-ingest",
+ "p2a-store",
+ "rayon",
+ "tempfile",
+]
+
+[[package]]
 name = "p2a-core"
 version = "0.1.0"
 
@@ -2391,6 +2408,7 @@ version = "0.1.0"
 dependencies = [
  "blake3",
  "image",
+ "jpeg-decoder",
  "kamadak-exif",
  "p2a-core",
  "p2a-store",

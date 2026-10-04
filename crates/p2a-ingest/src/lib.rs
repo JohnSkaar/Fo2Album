@@ -4,8 +4,10 @@
 //! nettverkstilgang (håndheves av `p2a-policy` og `deny.toml`).
 
 pub mod dates;
+pub mod decode;
 pub mod exif;
 pub mod hash;
+pub mod phash;
 pub mod pipeline;
 pub mod scan;
 pub mod sources;
