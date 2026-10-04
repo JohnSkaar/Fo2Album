@@ -49,14 +49,31 @@ Nye føringer (4. oktober 2026, fra dåpsalbumet):
 15. **Pris regnes ut automatisk, i trinn** (foreløpig 4 kr per side, trinn på 50 sider), og alternativene vises.
 16. **Dåpsmønsteret**: seremonien åpner, fadderne får ett portrett hver (de står ved døpefonten), gjestene i portrettgallerier til slutt. Slike læringer (hvem som er fadder) skal familieprofilen ta med seg.
 
+Føringer etter at eieren prøvde prototypen (4. oktober 2026):
+
+17. Albumnavnet følger året («Familiealbum 2011» for 2011-bildene).
+18. Første analysesteg heter «Henter miniatyrbilder og måler kvalitet».
+19. Maks ca. 500 bilder per album (foreløpig; eieren spør trykkeriene). Heller mange bilder enn få.
+20. For mange «meningsløse» gjenstander: ting uten personer skal bort hvis de ikke er estetisk viktige.
+21. Rask opprydding: marker mange bilder, fjern hele dager og sider, ta andre inn.
+22. Albumforslaget må komme tydeligere fram (større sider øverst, helskjerm med ett klikk inn og ett ut). Med og ikke med vises like store.
+23. Bildemeny i albumet: ta bort, fremhev mer, ta med men demp, endre utsnitt.
+24. Merke for bilder som kan være uskarpe; skarphetsmålet bommet.
+25. Hele motivet skal være med; forhåndsvisningen viser hele bildet. Enkle rammevalg med symboler (kvadratisk, liggende, to delt vannrett/loddrett, tre, fire kvadratiske/liggende …).
+26. Alle bilder kan vises stort med en rask vurdering og en merknad om at det er en forhåndsvisning.
+
+Status: 17–26 er gjort i **prototypen**. I Rust-kjernen er algoritmedelen gjort (17–20, 24: personer via hudtoner, ting bare når de er flotte, skarphet på motivet rangert mot året, maks 500, fremhev/demp i oppsettet). Appens grensesnitt har albumnavn, uskarphetsmerke og like store bilder uten beskjæring; **markering av mange, fjern dag/side, bildemeny, rammevalg, helskjerm og stor visning er ikke bygd i appen ennå** (se neste steg).
+
 ## Åpne spørsmål til eieren
 
-1. **Pristrinnene:** eksempelet ditt (350 sider = 1 400 kr, 300 sider = 1 000 kr) passer ikke helt med 4 kr per side (300 sider blir 1 200 kr). Nå er prisen 4 kr per side i trinn på 50 sider. Skal trinnene ha egne priser (f.eks. en fast pris per trinn med rabatt nedover)? Tabellen ligger i `apps/desktop/src/pris.ts` og øverst i prototypen.
+1. **Øvre grense for antall bilder** hos trykkeriene (nå 500, `max_photos` i `select/draft.rs` og `CFG.maxPhotos` i prototypen).
+1b. **Pristrinnene:** eksempelet ditt (350 sider = 1 400 kr, 300 sider = 1 000 kr) passer ikke helt med 4 kr per side (300 sider blir 1 200 kr). Nå er prisen 4 kr per side i trinn på 50 sider. Skal trinnene ha egne priser (f.eks. en fast pris per trinn med rabatt nedover)? Tabellen ligger i `apps/desktop/src/pris.ts` og øverst i prototypen.
 2. **Alternativ B for maskinbytte:** ende-til-ende-kryptert kopi hos oss (bryter prinsippet om at bare trykk-PDF forlater maskinen). Anbefalt: vent; bruk lokal kryptert sikkerhetskopi. Se ARCHITECTURE.md, «Identitet, historikk og bytte av maskin».
 3. **Minimum OS** (macOS 12, Windows 10 22H2/11) er arbeidshypotese, ikke bekreftet.
 
 ## Neste steg
 
+0a. **Bygg prototypens nye utkastskjerm i appen** når eieren er fornøyd med flyten: markering av mange, fjern dag/side, bildemeny (fremhev/demp/utsnitt), rammevalg med symboler, helskjerm og stor visning. Kjernen og lagringen støtter allerede fremhev/demp (`Decision`, `Action`). Rammer og utsnitt må lagres i `p2a-store` (ny tabell per side).
 0. **Eieren prøver den nye flyten** i prototypen (`prototype/fo2album-prototype.html`, Chrome/Edge): legg til en mappe, trykk «Lag utkast», bytt noen bilder og svar på «Hvorfor?». Hva læringen har fanget opp, lagres bare i nettleseren (`localStorage`, nøkkel `fo2album-laering`).
 1. **Eieren kjører evalueringen lokalt** (album-PDF-ene på ca. 260 MB skal ikke lastes opp noe sted): `p2a les-inn`, `p2a eval lag-gullsett --pdf … --aar 2010 --navn familie-2010` for 2006–2010, så `p2a eval kjor --resultater eval/RESULTS.md`. Se `eval/LES-MEG.md`. Be om oppsummeringslinjene (treffprosent) og om kontrollsiden ser riktig ut. Er treffprosenten lav, kan BookSmart-PDF-ene ha bildene lagt inn annerledes (f.eks. hele sider som ett bilde); da trengs et lite utdrag.
 2. **M3 (bildekvalitet):** det hendelsesstyrte utkastet finnes nå (`select::draft`), og `p2a eval kjor` måler det ved siden av utgangspunktet (rad «… (utkast)»). Neste: bedre Q_tech og estetikk, og kalibrere `pages_per_sqrt_photo`/`photos_per_page` mot gullsettet (familiens album har ca. 4–5 bilder per side). Kjent svakhet: prototypens skarphetsmål går i metning (straffer uskarphet svakt).

@@ -14,18 +14,23 @@ fn decision_str(d: Decision) -> &'static str {
     match d {
         Decision::Med => "lagt_til",
         Decision::IkkeMed => "fjernet",
+        Decision::Fremhev => "fremhevet",
+        Decision::Demp => "dempet",
     }
 }
 
 fn quality(r: &rusqlite::Row, at: usize) -> rusqlite::Result<Option<BasicQuality>> {
-    Ok(match (r.get(at)?, r.get(at + 1)?, r.get(at + 2)?) {
-        (Some(sharp), Some(exposure), Some(color)) => Some(BasicQuality {
-            sharp,
-            exposure,
-            color,
-        }),
-        _ => None,
-    })
+    Ok(
+        match (r.get(at)?, r.get(at + 1)?, r.get(at + 2)?, r.get(at + 3)?) {
+            (Some(sharp), Some(exposure), Some(color), Some(skin)) => Some(BasicQuality {
+                sharp,
+                exposure,
+                color,
+                skin,
+            }),
+            _ => None,
+        },
+    )
 }
 
 impl Store {
@@ -59,6 +64,8 @@ impl Store {
         let rows = stmt.query_map([album_year], |r| {
             let d = match r.get::<_, String>(1)?.as_str() {
                 "lagt_til" => Decision::Med,
+                "fremhevet" => Decision::Fremhev,
+                "dempet" => Decision::Demp,
                 _ => Decision::IkkeMed,
             };
             Ok((hash_from(r.get(0)?)?, d))
@@ -104,8 +111,8 @@ impl Store {
     pub fn feedback_log(&self) -> Result<Vec<Feedback>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT f.action, f.reason,
-                    a.q_sharp, a.q_exposure, a.q_color,
-                    b.q_sharp, b.q_exposure, b.q_color
+                    a.q_sharp, a.q_exposure, a.q_color, a.q_skin,
+                    b.q_sharp, b.q_exposure, b.q_color, b.q_skin
              FROM feedback f
              LEFT JOIN photos a ON a.content_hash = f.content_hash
              LEFT JOIN photos b ON b.content_hash = f.other_hash
@@ -117,9 +124,10 @@ impl Store {
                 .get::<_, Option<String>>(1)?
                 .and_then(|s| s.parse::<FeedbackReason>().ok());
             let first = quality(r, 2)?;
-            let second = quality(r, 5)?;
+            let second = quality(r, 6)?;
             let (added, removed) = match action {
-                Action::TaMed => (first, None),
+                Action::TaMed | Action::Fremhev | Action::Demp => (first, None),
+                Action::FjernDag => (None, None),
                 Action::TaBort => (None, first),
                 Action::Bytt => (first, second),
             };

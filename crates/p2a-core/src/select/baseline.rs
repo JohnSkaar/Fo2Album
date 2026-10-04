@@ -162,6 +162,7 @@ mod tests {
             sharp,
             exposure: 0.8,
             color: 0.5,
+            skin: 0.0,
         });
         p
     }

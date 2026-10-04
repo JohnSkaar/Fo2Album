@@ -268,8 +268,8 @@ impl Store {
                     tx.execute(
                         "INSERT OR IGNORE INTO photos (content_hash, format, width, height,
                             orientation, taken_at, taken_offset, date_source, camera_make,
-                            camera_model, gps_lat, gps_lon, phash, q_sharp, q_exposure, q_color)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                            camera_model, gps_lat, gps_lon, phash, q_sharp, q_exposure, q_color, q_skin)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
                         params![
                             &p.hash.0[..],
                             p.format,
@@ -287,6 +287,7 @@ impl Store {
                             p.quality.map(|q| q.sharp),
                             p.quality.map(|q| q.exposure),
                             p.quality.map(|q| q.color),
+                            p.quality.map(|q| q.skin),
                         ],
                     )?;
                     tx.execute(
@@ -331,7 +332,7 @@ impl Store {
         let sql = format!(
             "SELECT content_hash, phash, taken_at, taken_offset, date_source, width, height,
                     camera_make, camera_model, format, orientation, gps_lat, gps_lon,
-                    q_sharp, q_exposure, q_color
+                    q_sharp, q_exposure, q_color, q_skin
              FROM photos {filter}"
         );
         let mut stmt = self.conn.prepare(&sql)?;
@@ -355,11 +356,12 @@ impl Store {
                 (Some(a), Some(b)) => Some((a, b)),
                 _ => None,
             };
-            p.quality = match (r.get(13)?, r.get(14)?, r.get(15)?) {
-                (Some(sharp), Some(exposure), Some(color)) => Some(BasicQuality {
+            p.quality = match (r.get(13)?, r.get(14)?, r.get(15)?, r.get(16)?) {
+                (Some(sharp), Some(exposure), Some(color), Some(skin)) => Some(BasicQuality {
                     sharp,
                     exposure,
                     color,
+                    skin,
                 }),
                 _ => None,
             };
@@ -398,8 +400,9 @@ impl Store {
         let tx = self.conn.transaction()?;
         for (h, q) in items {
             tx.execute(
-                "UPDATE photos SET q_sharp = ?2, q_exposure = ?3, q_color = ?4 WHERE content_hash = ?1",
-                params![&h.0[..], q.sharp, q.exposure, q.color],
+                "UPDATE photos SET q_sharp = ?2, q_exposure = ?3, q_color = ?4, q_skin = ?5
+                 WHERE content_hash = ?1",
+                params![&h.0[..], q.sharp, q.exposure, q.color, q.skin],
             )?;
         }
         tx.commit()?;

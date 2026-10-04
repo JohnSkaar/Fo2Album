@@ -402,6 +402,8 @@ pub struct BasicQuality {
     pub exposure: f32,
     /// Fargerikhet (Hasler og Süsstrunk).
     pub color: f32,
+    /// Andel piksler med hudtoner: en grov stedfortreder for personer til M4.
+    pub skin: f32,
 }
 
 impl BasicQuality {

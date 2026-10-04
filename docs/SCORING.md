@@ -141,7 +141,14 @@ E_e = norm( 0.35·log(1 + antall bilder)            // hvor mye ble fotografert
 4. Hendelser får **kapittelplass**: viktige hendelser får flere sider; hverdager samles i månedsoppslag.
 5. **Hver hendelse er med (hardt krav, eierens føring 4. oktober 2026).** Albumet er historien om året, fortalt hendelse for hendelse: hvert treffpunkt eller besøk får **minst én side**, og flere jo mer som er fotografert: `sider ≈ 0,6 · √(antall bilder)`, maks 16 (`pages_per_sqrt_photo`, `event_max_pages`). 40 bilder gir 4 sider, 120 gir 7, 300 gir 10. **Store historier får stor plass i første utkast**; brukeren kan velge et mindre album (sidetak, se §7 «Pris»). Hendelser med færre enn `event_min_photos` (start 3) bilder samles i «hverdager» per måned. Albumets lengde følger av hendelsene, ikke av et fast sidetall.
 
-   Implementert i `crates/p2a-core/src/select/draft.rs` (første versjon, uten personer og sted).
+   Implementert i `crates/p2a-core/src/select/draft.rs` (første versjon, uten ansikter og sted). Albumet har høyst `max_photos` (start 500) bilder; sidetak og bildetak krymper alle historiene likt (i steg på 5 %), og hver hendelse beholder minst én side.
+
+   **Foreløpige regler til M3/M4 (eierens føring 4. oktober 2026: «for mye meningsløse gjenstander»):**
+   - *Personer først.* Til ansiktsgjenkjenningen kommer, er andelen hudtoner (`skin` ≥ 0,02) en grov stedfortreder for «personer i bildet». Bilder med personer får +0,2 i poeng.
+   - *Ting er med bare når de er flotte.* Et bilde uten personer kommer bare med hvis estetikken (`0,4·farge + 0,3·lys + 0,3·skarphet`) er blant årets beste 10 % (`mood_percentile`, lærbar), og da høyst ett per hendelse, aldri alene på en side. Ellers: «Ingen personer, og ikke et spesielt flott bilde».
+   - *Turer i naturen.* Har under 25 % av bildene i en hendelse personer, er naturen historien: da holder det å være over middels.
+   - *Skarphet mot resten av året.* Skarphet måles på motivet (Laplace-varians i 4 × 4 ruter, den nest skarpeste ruten teller, så uskarp bakgrunn ikke straffes) og rangeres mot årets bilder. Blant de svakeste 20 % og under 0,55 regnes som uskarpt og merkes i grensesnittet.
+   - *Brukerens «fremhev» og «demp»* går foran: fremhevet får egen side, dempet aldri.
 
 ---
 
@@ -209,7 +216,8 @@ Kvadratrot-leddene gjør funksjonen submodulær (avtagende utbytte), så **gråd
   | For mange herfra / Mangler noe herfra | bilder per hendelse −/+ 4 % |
   | Viktig øyeblikk / Viktig person | kvalitet teller mindre (−0,03 / −0,02) |
   | Fint bilde / Skarpere | farge +0,03 / skarphet +0,03 |
-  | Liker det ikke / Skal ikke i albumet | huskes, endrer ingen vekter |
+  | Bare en ting, ingen personer / Fin stemning | ting må være flottere / mindre flotte for å komme med (`mood_percentile` +0,02 / −0,03) |
+  | Liker det ikke / Skal ikke i albumet / Ikke viktig for oss (dag) | huskes, endrer ingen vekter |
   | Ingen svar | svake signaler: ta med/ta bort ±1 % bilder per hendelse; bytte til et mye uskarpere bilde betyr at øyeblikket teller mer |
 
   Det appen har lært vises med ord («Øyeblikket betyr mer enn om bildet er perfekt»). Loggen gjelder alle år, så neste års utkast starter med det appen har lært.
@@ -233,6 +241,8 @@ Hvert valgt bilde får en **sidevekt** som avgjør plassen det får:
 **Uskarpe, men viktige bilder** får mindre plass, der uskarpheten synes mindre: `Q_tech < 0.5` gir aldri helside, og `Q_tech < 0.35` gir et felt i rutenett. Brukeren kan alltid gjøre bildet større. Senere: regn ut hvor stor uskarpheten blir på trykk (i mm) for feltstørrelsen, i stedet for faste terskler.
 
 **Sider per historie (hendelse):** minst 1, og flere jo mer som er fotografert (§4.2 punkt 5). Grensen på 4 sider er fjernet (eierens føring 4. oktober 2026, dåpen): store historier får stor plass i første utkast, og brukeren styrer størrelsen med sidetaket.
+
+**Hele motivet med (eierens føring).** Standardoppsettet beskjærer ikke: bildene legges i rader med sin egen form («automatisk»). Helside fyller rammen bare for stående bilder; et liggende bilde på helside går kant til kant i bredden. Brukeren kan velge rammer som fyller feltet, og endre utsnitt.
 
 **Oppsett av en historie (implementert, `crates/p2a-core/src/layout.rs`):** om lag 40 % av sidene får ett bilde (de beste), resten rutenett med 2–12 bilder i tidsrekkefølge. Enkeltbildene **veksler mellom helside uten marg og ett bilde med luft rundt**, så albumet puster. Store historier (3+ sider) **åpner med et enkeltbilde** på helside. Bilder med lav kvalitet får aldri helside.
 

@@ -42,13 +42,29 @@ fn columns(n: usize) -> u8 {
     }
 }
 
+/// Om et bilde kan stå alene på en side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Single {
+    Free,
+    /// Brukeren har fremhevet bildet: egen side.
+    Must,
+    /// Dempet, eller en ting uten personer: aldri alene på en side.
+    Never,
+}
+
 /// Fordeler bildene (i tidsrekkefølge, med kvalitet 0–1) på `pages` sider.
 pub fn story(quality: &[f32], pages: usize) -> Vec<Page> {
+    story_with(quality, &vec![Single::Free; quality.len()], pages)
+}
+
+/// Som `story`, men med brukerens og algoritmens krav om hvilke bilder som kan stå alene.
+pub fn story_with(quality: &[f32], single: &[Single], pages: usize) -> Vec<Page> {
     let n = quality.len();
     if n == 0 {
         return Vec::new();
     }
-    let pages = pages.clamp(1, n);
+    let must = single.iter().filter(|&&s| s == Single::Must).count();
+    let pages = pages.max(must + usize::from(n > must)).clamp(1, n);
     if pages == 1 {
         let kind = if n == 1 {
             PageKind::Luft
@@ -64,23 +80,34 @@ pub fn story(quality: &[f32], pages: usize) -> Vec<Page> {
     }
 
     // Antall enkeltbilder: rundt 40 %, men nok til at hvert rutenett får minst to bilder.
-    let singles = if pages == n {
+    let wanted = if pages == n {
         n
     } else {
         ((pages as f32 * SINGLE_SHARE).round() as usize)
             .max((2 * pages).saturating_sub(n))
             .clamp(1, pages - 1)
-    };
-    let mut order: Vec<usize> = (0..n).collect();
-    order.sort_by(|&a, &b| quality[b].total_cmp(&quality[a]).then(a.cmp(&b)));
+    }
+    .max(must);
+    let mut order: Vec<usize> = (0..n).filter(|&i| single[i] != Single::Never).collect();
+    order.sort_by(|&a, &b| {
+        (single[b] == Single::Must)
+            .cmp(&(single[a] == Single::Must))
+            .then(quality[b].total_cmp(&quality[a]))
+            .then(a.cmp(&b))
+    });
     let mut is_single = vec![false; n];
-    for &i in order.iter().take(singles) {
+    for &i in order.iter().take(wanted) {
         is_single[i] = true;
     }
+    let singles = is_single.iter().filter(|&&s| s).count();
 
     // Resten deles i like store rutenett, i tidsrekkefølge.
     let rest: Vec<usize> = (0..n).filter(|&i| !is_single[i]).collect();
-    let grids = pages - singles;
+    let grids = if rest.is_empty() {
+        0
+    } else {
+        pages.saturating_sub(singles).max(1)
+    };
     let mut out: Vec<Page> = (0..n)
         .filter(|&i| is_single[i])
         .map(|i| Page {
@@ -183,5 +210,18 @@ mod tests {
     fn is_deterministic() {
         let q: Vec<f32> = (0..30).map(|i| ((i * 13) % 17) as f32 / 17.0).collect();
         assert_eq!(story(&q, 7), story(&q, 7));
+    }
+
+    #[test]
+    fn emphasized_photos_get_their_own_page_and_things_never_do() {
+        let q = vec![0.9, 0.8, 0.3, 0.7, 0.6, 0.5, 0.4, 0.95];
+        let mut single = vec![Single::Free; 8];
+        single[2] = Single::Must;
+        single[7] = Single::Never;
+        let pages = story_with(&q, &single, 4);
+        let alone = |i: usize| pages.iter().any(|p| p.photos == vec![i]);
+        assert!(alone(2), "fremhevet bilde står alene: {pages:?}");
+        assert!(!alone(7), "en ting står aldri alene: {pages:?}");
+        assert_eq!(all_photos(&pages), (0..8).collect::<Vec<_>>());
     }
 }

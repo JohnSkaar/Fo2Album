@@ -121,7 +121,7 @@ export const tekster = {
     ingenBilder: "Ingen bilder fra dette året ennå.",
     analyseTittel: "Lager utkastet …",
     faser: {
-      venter: "Venter til alle bildene er hentet fra maskinen",
+      venter: "Henter miniatyrbilder og måler kvalitet",
       henter: "Henter årets bilder",
       hendelser: "Finner hendelsene i året",
       serier: "Finner serier og bilder som ligner hverandre",
@@ -147,6 +147,8 @@ export const tekster = {
     byttMedLignende: "Bytt med bildet som er med",
     byttHjelp: "Eller klikk et bilde i den andre kolonnen for å bytte.",
     lukk: "Lukk",
+    uskarpt: "Uskarpt?",
+    uskarptHjelp: "Kan være uskarpt, sammenlignet med resten av årets bilder",
     bildeEtikett: (dato: string, med: boolean) => `Bilde fra ${dato}, ${med ? "med" : "ikke med"}`,
     nyttUtkast: "Lag nytt utkast med det du har lært appen",
     lagtTil: "Bildet er med",
@@ -189,6 +191,8 @@ export const tekster = {
         return "Viser en annen del av dagen";
       case "god_kvalitet":
         return "Skarpt og godt lys";
+      case "stemningsbilde":
+        return "Et flott stemningsbilde";
       case "valgt_bort_av_deg":
         return "Du tok det bort";
       case "samme_serie":
@@ -201,6 +205,10 @@ export const tekster = {
         return "For mørkt eller for lyst";
       case "skjermbilde":
         return "Ser ut som et skjermbilde";
+      case "gjenstand":
+        return "Ingen personer, og ikke et spesielt flott bilde";
+      case "en_stemning_holder":
+        return "Ett stemningsbilde herfra er nok";
       case "ikke_plass":
         return `Ikke plass: ${antall(n, "bedre bilde", "bedre bilder")} herfra er med`;
     }
@@ -224,6 +232,9 @@ export const tekster = {
       fint_bilde: "Fint bilde",
       mangler_herfra: "Mangler noe herfra",
       skarpere: "Skarpere",
+      gjenstand: "Bare en ting, ingen personer",
+      uviktig_dag: "Ikke viktig for oss",
+      stemning: "Fin stemning",
     } satisfies Record<Svar, string>,
   },
   laert: {
@@ -241,6 +252,9 @@ export const tekster = {
       faerre_like_bilder: "Dere vil ikke ha bilder som ligner hverandre.",
       flere_fra_hver_hendelse: "Dere vil ha flere bilder fra hver hendelse.",
       faerre_fra_hver_hendelse: "Dere vil ha færre bilder fra hver hendelse.",
+      ting_bare_naar_flotte:
+        "Bilder av ting uten personer skal bare med når de er virkelig flotte.",
+      liker_stemningsbilder: "Dere liker stemningsbilder uten personer.",
     } satisfies Record<Laerdom, string>,
   },
   innlesing: {

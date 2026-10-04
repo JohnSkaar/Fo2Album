@@ -212,6 +212,7 @@ describe("albumutkast", () => {
         included: true,
         reason: { kode: "beste_i_serie", antall: 4 },
         related: null,
+        blurry: false,
         hasThumbnail: true,
         width: 4032,
         height: 3024,
@@ -223,6 +224,7 @@ describe("albumutkast", () => {
         included: false,
         reason: { kode: "samme_serie", antall: 4 },
         related: h("a"),
+        blurry: true,
         hasThumbnail: true,
         width: 4032,
         height: 3024,
@@ -234,6 +236,7 @@ describe("albumutkast", () => {
         included: false,
         reason: { kode: "ikke_plass", antall: 1 },
         related: h("a"),
+        blurry: true,
         hasThumbnail: true,
         width: 4032,
         height: 3024,
@@ -261,6 +264,7 @@ describe("albumutkast", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Beste bilde i en serie på 4")).toBeInTheDocument();
     expect(screen.getByText("Et bedre bilde fra samme øyeblikk er med")).toBeInTheDocument();
+    expect(screen.getAllByText(tekster.utkast.uskarpt)).toHaveLength(2);
     expect(screen.getByText(/Albumet er nå på 312 sider og koster 1\s400 kr/)).toBeInTheDocument();
 
     // Mindre album: utkastet lages på nytt med sidetak.

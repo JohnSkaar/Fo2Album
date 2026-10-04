@@ -83,12 +83,15 @@ export type Begrunnelseskode =
   | "beste_i_serie"
   | "annen_del_av_hendelsen"
   | "god_kvalitet"
+  | "stemningsbilde"
   | "valgt_bort_av_deg"
   | "samme_serie"
   | "nesten_likt"
   | "uskarpt"
   | "morkt_eller_utbrent"
   | "skjermbilde"
+  | "gjenstand"
+  | "en_stemning_holder"
   | "ikke_plass";
 
 export interface Begrunnelse {
@@ -103,6 +106,8 @@ export interface UtkastBilde {
   event: number;
   included: boolean;
   reason: Begrunnelse;
+  /** Uskarpt sammenlignet med resten av årets bilder. */
+  blurry: boolean;
   /** Bildet dette henger sammen med (samme serie, likt, eller nærmest i tid). */
   related: string | null;
   hasThumbnail: boolean;
@@ -138,7 +143,9 @@ export type Laerdom =
   | "kvalitet_fremfor_oyeblikk"
   | "faerre_like_bilder"
   | "flere_fra_hver_hendelse"
-  | "faerre_fra_hver_hendelse";
+  | "faerre_fra_hver_hendelse"
+  | "ting_bare_naar_flotte"
+  | "liker_stemningsbilder";
 
 export interface Laert {
   lessons: Laerdom[];
@@ -173,7 +180,10 @@ export type Svar =
   | "viktig_person"
   | "fint_bilde"
   | "mangler_herfra"
-  | "skarpere";
+  | "skarpere"
+  | "gjenstand"
+  | "uviktig_dag"
+  | "stemning";
 
 /** Feil fra Rust-kjernen: en stabil kode og en teknisk melding. */
 export interface Kommandofeil {

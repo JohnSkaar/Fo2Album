@@ -129,6 +129,12 @@ const MIGRATIONS: &[&str] = &[
         UNIQUE (person_id, kind, other_id)
     );
     "#,
+    // 4: hudtoner (stedfortreder for personer til M4) og skarphet målt på motivet. Alle
+    // kvalitetsmål regnes ut på nytt ved neste innlesing.
+    r#"
+    ALTER TABLE photos ADD COLUMN q_skin REAL;
+    UPDATE photos SET q_sharp = NULL, q_exposure = NULL, q_color = NULL;
+    "#,
 ];
 
 pub const CURRENT_VERSION: i64 = MIGRATIONS.len() as i64;

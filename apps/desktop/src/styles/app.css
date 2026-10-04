@@ -739,7 +739,7 @@ h3 {
 }
 .ev__cols {
   display: grid;
-  grid-template-columns: 3fr 2fr;
+  grid-template-columns: 1fr 1fr;
   gap: var(--spacing-lg);
 }
 .ev__col--out {
@@ -759,9 +759,12 @@ h3 {
 .grid--draft {
   grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
 }
+/* Med og ikke med vises like store, med hele bildet (ingen beskjæring). */
 .grid--small {
-  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   margin-bottom: var(--spacing-sm);
+}
+.dcard .th img {
+  object-fit: contain;
 }
 .dcard {
   display: flex;
@@ -782,9 +785,6 @@ h3 {
 }
 .dcard[aria-pressed="true"] .th {
   outline-color: var(--color-border-brand);
-}
-.dcard--small .th {
-  opacity: 0.85;
 }
 .dcard__why {
   font-size: 12px;

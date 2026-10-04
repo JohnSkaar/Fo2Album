@@ -7,8 +7,16 @@ import { maaneder } from "./tekster";
 
 /** Svarene appen tilbyr på «Hvorfor?», per handling. Teksten ligger i tekster.ts. */
 export const HVORFOR_VALG: Record<Handling, Svar[]> = {
-  ta_bort: ["uskarpt", "daarlig_lys", "for_likt", "for_mange_herfra", "liker_ikke", "privat"],
-  ta_med: ["viktig_oyeblikk", "viktig_person", "fint_bilde", "mangler_herfra"],
+  ta_bort: [
+    "gjenstand",
+    "uskarpt",
+    "daarlig_lys",
+    "for_likt",
+    "for_mange_herfra",
+    "liker_ikke",
+    "privat",
+  ],
+  ta_med: ["viktig_oyeblikk", "viktig_person", "fint_bilde", "stemning", "mangler_herfra"],
   bytt: ["skarpere", "viktig_oyeblikk", "viktig_person", "fint_bilde", "for_likt", "liker_ikke"],
 };
 

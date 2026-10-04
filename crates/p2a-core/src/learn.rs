@@ -17,6 +17,12 @@ pub enum Action {
     TaBort,
     /// Byttet ut ett bilde med et annet.
     Bytt,
+    /// Ga bildet mer plass (egen side).
+    Fremhev,
+    /// Med, men mindre plass.
+    Demp,
+    /// Tok bort en hel dag (hendelse).
+    FjernDag,
 }
 
 impl Action {
@@ -25,6 +31,9 @@ impl Action {
             Action::TaMed => "ta_med",
             Action::TaBort => "ta_bort",
             Action::Bytt => "bytt",
+            Action::Fremhev => "fremhev",
+            Action::Demp => "demp",
+            Action::FjernDag => "fjern_dag",
         }
     }
 }
@@ -36,6 +45,9 @@ impl FromStr for Action {
             "ta_med" => Action::TaMed,
             "ta_bort" => Action::TaBort,
             "bytt" => Action::Bytt,
+            "fremhev" => Action::Fremhev,
+            "demp" => Action::Demp,
+            "fjern_dag" => Action::FjernDag,
             _ => return Err(UnknownValue(s.to_string())),
         })
     }
@@ -51,16 +63,22 @@ pub enum FeedbackReason {
     ForMangeHerfra,
     LikerIkke,
     Privat,
+    /// «Bare en ting, ingen personer.»
+    Gjenstand,
+    /// En hel dag som ikke er viktig.
+    UviktigDag,
     // Når et bilde tas med eller byttes inn.
     ViktigOyeblikk,
     ViktigPerson,
     FintBilde,
     ManglerHerfra,
     Skarpere,
+    /// «Fin stemning» (et bilde uten personer).
+    Stemning,
 }
 
 impl FeedbackReason {
-    pub const ALL: [FeedbackReason; 11] = [
+    pub const ALL: [FeedbackReason; 14] = [
         FeedbackReason::Uskarpt,
         FeedbackReason::DaarligLys,
         FeedbackReason::ForLikt,
@@ -72,6 +90,9 @@ impl FeedbackReason {
         FeedbackReason::FintBilde,
         FeedbackReason::ManglerHerfra,
         FeedbackReason::Skarpere,
+        FeedbackReason::Gjenstand,
+        FeedbackReason::UviktigDag,
+        FeedbackReason::Stemning,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -87,6 +108,9 @@ impl FeedbackReason {
             FeedbackReason::FintBilde => "fint_bilde",
             FeedbackReason::ManglerHerfra => "mangler_herfra",
             FeedbackReason::Skarpere => "skarpere",
+            FeedbackReason::Gjenstand => "gjenstand",
+            FeedbackReason::UviktigDag => "uviktig_dag",
+            FeedbackReason::Stemning => "stemning",
         }
     }
 }
@@ -125,6 +149,8 @@ pub struct Preferences {
     pub event_density: f32,
     /// Maks pHash-avstand for «nesten likt». Høyere = flere bilder regnes som like.
     pub similar_hamming: f32,
+    /// Bilder uten personer må være blant de beste (1 − dette) for å komme med.
+    pub mood_percentile: f32,
 }
 
 impl Default for Preferences {
@@ -136,6 +162,7 @@ impl Default for Preferences {
             quality_importance: 0.75,
             event_density: 1.0,
             similar_hamming: 10.0,
+            mood_percentile: 0.9,
         }
     }
 }
@@ -151,6 +178,8 @@ pub enum Lesson {
     FaerreLikeBilder,
     FlereFraHverHendelse,
     FaerreFraHverHendelse,
+    TingBareNaarFlotte,
+    LikerStemningsbilder,
 }
 
 /// Hvor stor endring som må til før den nevnes som noe appen har lært.
@@ -191,6 +220,12 @@ impl Preferences {
         if d.event_density - self.event_density >= LESSON_MIN {
             out.push(Lesson::FaerreFraHverHendelse);
         }
+        if self.mood_percentile - d.mood_percentile >= 0.04 {
+            out.push(Lesson::TingBareNaarFlotte);
+        }
+        if d.mood_percentile - self.mood_percentile >= LESSON_MIN {
+            out.push(Lesson::LikerStemningsbilder);
+        }
         out
     }
 }
@@ -216,12 +251,17 @@ pub fn learn(log: &[Feedback]) -> Preferences {
             Some(FeedbackReason::ViktigPerson) => p.quality_importance -= 0.02,
             Some(FeedbackReason::FintBilde) => p.w_color += 0.03,
             Some(FeedbackReason::Skarpere) => p.w_sharp += 0.03,
+            Some(FeedbackReason::Gjenstand) => p.mood_percentile += 0.02,
+            Some(FeedbackReason::Stemning) => p.mood_percentile -= 0.03,
             // Huskes og vises igjen, men endrer ingen vekter.
-            Some(FeedbackReason::LikerIkke | FeedbackReason::Privat) => {}
+            Some(
+                FeedbackReason::LikerIkke | FeedbackReason::Privat | FeedbackReason::UviktigDag,
+            ) => {}
             None => match f.action {
                 // Uten svar: bare svake signaler fra selve handlingen.
                 Action::TaMed => p.event_density += 0.01,
                 Action::TaBort => p.event_density -= 0.01,
+                Action::Fremhev | Action::Demp | Action::FjernDag => {}
                 Action::Bytt => {
                     if let (Some(a), Some(r)) = (f.added, f.removed) {
                         if a.sharp + IMPLICIT_SHARP_GAP < r.sharp {
@@ -239,6 +279,7 @@ pub fn learn(log: &[Feedback]) -> Preferences {
         p.quality_importance = p.quality_importance.clamp(0.4, 0.95);
         p.event_density = p.event_density.clamp(0.6, 1.6);
         p.similar_hamming = p.similar_hamming.clamp(6.0, 16.0);
+        p.mood_percentile = p.mood_percentile.clamp(0.7, 0.99);
     }
     p
 }
@@ -294,6 +335,7 @@ mod tests {
             sharp,
             exposure: 0.8,
             color: 0.5,
+            skin: 0.1,
         };
         let swap = Feedback {
             action: Action::Bytt,

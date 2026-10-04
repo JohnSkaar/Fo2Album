@@ -415,6 +415,9 @@ impl From<Reason> for ReasonDto {
             Reason::BesteISerie { antall } => ("beste_i_serie", Some(antall)),
             Reason::AnnenDelAvHendelsen => ("annen_del_av_hendelsen", None),
             Reason::GodKvalitet => ("god_kvalitet", None),
+            Reason::Stemningsbilde => ("stemningsbilde", None),
+            Reason::Gjenstand => ("gjenstand", None),
+            Reason::EnStemningHolder => ("en_stemning_holder", None),
             Reason::ValgtBortAvDeg => ("valgt_bort_av_deg", None),
             Reason::SammeSerie { antall } => ("samme_serie", Some(antall)),
             Reason::NestenLikt => ("nesten_likt", None),
@@ -435,6 +438,8 @@ pub struct DraftPhotoDto {
     event: usize,
     included: bool,
     reason: ReasonDto,
+    /// Uskarpt sammenlignet med resten av året.
+    blurry: bool,
     related: Option<String>,
     has_thumbnail: bool,
     width: Option<u32>,
@@ -497,6 +502,8 @@ fn lesson_code(l: Lesson) -> &'static str {
         Lesson::FaerreLikeBilder => "faerre_like_bilder",
         Lesson::FlereFraHverHendelse => "flere_fra_hver_hendelse",
         Lesson::FaerreFraHverHendelse => "faerre_fra_hver_hendelse",
+        Lesson::TingBareNaarFlotte => "ting_bare_naar_flotte",
+        Lesson::LikerStemningsbilder => "liker_stemningsbilder",
     }
 }
 
@@ -597,6 +604,7 @@ fn draft_for(
                     event: p.event,
                     included: p.included,
                     reason: p.reason.into(),
+                    blurry: p.blurry,
                     related: p.related.map(|h| h.to_hex()),
                     has_thumbnail: s.is_some_and(|s| s.has_thumbnail),
                     width: s.and_then(|s| s.width),
@@ -680,6 +688,10 @@ pub fn choose_photo(
         (Action::Bytt, None) => {
             return Err(CommandError::new("ukjent_handling", "bytte mangler bilde"))
         }
+        (Action::Fremhev, _) => store.set_decision(year, &hash, Some(Decision::Fremhev))?,
+        (Action::Demp, _) => store.set_decision(year, &hash, Some(Decision::Demp))?,
+        // En dag tas bort bilde for bilde av grensesnittet; her logges bare handlingen.
+        (Action::FjernDag, _) => {}
     }
     Ok(store.add_feedback(year, action, &hash, other.as_ref())?)
 }

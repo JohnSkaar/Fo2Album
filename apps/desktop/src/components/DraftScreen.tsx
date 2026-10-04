@@ -114,6 +114,11 @@ function Kort({
           ) : (
             <span className="th__none">{tekster.bilder.ingenMiniatyr}</span>
           )}
+          {b.blurry && (
+            <span className="th__badge" title={t.uskarptHjelp}>
+              {t.uskarpt}
+            </span>
+          )}
         </span>
         <span className="dcard__why">{hvorfor}</span>
       </button>
