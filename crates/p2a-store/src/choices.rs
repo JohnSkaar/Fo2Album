@@ -16,6 +16,7 @@ fn decision_str(d: Decision) -> &'static str {
         Decision::IkkeMed => "fjernet",
         Decision::Fremhev => "fremhevet",
         Decision::Demp => "dempet",
+        Decision::Opp => "opprioritert",
     }
 }
 
@@ -65,6 +66,7 @@ impl Store {
             let d = match r.get::<_, String>(1)?.as_str() {
                 "lagt_til" => Decision::Med,
                 "fremhevet" => Decision::Fremhev,
+                "opprioritert" => Decision::Opp,
                 "dempet" => Decision::Demp,
                 _ => Decision::IkkeMed,
             };
@@ -126,8 +128,8 @@ impl Store {
             let first = quality(r, 2)?;
             let second = quality(r, 6)?;
             let (added, removed) = match action {
-                Action::TaMed | Action::Fremhev | Action::Demp => (first, None),
-                Action::FjernDag => (None, None),
+                Action::TaMed | Action::Fremhev | Action::Demp | Action::Opp => (first, None),
+                Action::FjernDag | Action::SlaaSammen => (None, None),
                 Action::TaBort => (None, first),
                 Action::Bytt => (first, second),
             };

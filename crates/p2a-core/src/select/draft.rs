@@ -46,6 +46,8 @@ pub struct DraftConfig {
     pub max_share: f32,
     /// Hverdager: bilder ≈ faktor · √(antall bilder i måneden).
     pub everyday_factor: f32,
+    /// Dager med høyst så mange sider kan foreslås slått sammen med nabodagene.
+    pub merge_max_pages: usize,
     /// Dager slås sammen til én tur når det går høyst så lenge mellom dem …
     pub trip_gap_seconds: i64,
     /// … og stedene er nærmere enn dette (km), og langt hjemmefra.
@@ -81,6 +83,7 @@ impl Default for DraftConfig {
             photos_per_page: 4.0,
             max_share: 0.5,
             everyday_factor: 1.5,
+            merge_max_pages: 3,
             trip_gap_seconds: 36 * 3600,
             trip_km: 30.0,
             adult_trip_pages: (2, 4),
@@ -107,6 +110,8 @@ pub enum Decision {
     Fremhev,
     /// Med, men aldri alene på en side og lavere prioritet.
     Demp,
+    /// Med, og høyere prioritet når sidene lages (ikke nødvendigvis egen side).
+    Opp,
 }
 
 impl Decision {
@@ -217,6 +222,9 @@ pub struct DraftHints {
     pub page_targets: HashMap<ContentHash, usize>,
     /// Sider brukeren er fornøyd med.
     pub locked_pages: Vec<LockedPage>,
+    /// Dager brukeren har slått sammen til én historie: hendelser som har et bilde i samme
+    /// sett, blir én.
+    pub merged_events: Vec<HashSet<ContentHash>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -224,6 +232,9 @@ pub struct Draft {
     pub events: Vec<DraftEvent>,
     /// Alle bilder med dato, i tidsrekkefølge.
     pub photos: Vec<DraftPhoto>,
+    /// Forslag om å slå sammen 2–4 korte dager tett etter hverandre til én historie
+    /// (indekser i `events`).
+    pub merge_suggestions: Vec<Vec<usize>>,
 }
 
 impl Draft {
@@ -294,8 +305,10 @@ pub fn make_draft(
             if people == Some(true) {
                 q += cfg.people_bonus;
             }
-            if decision == Some(Decision::Demp) {
-                q -= 0.15;
+            match decision {
+                Some(Decision::Demp) => q -= 0.15,
+                Some(Decision::Opp) => q += 0.25,
+                _ => {}
             }
             Item {
                 p,
@@ -319,6 +332,7 @@ pub fn make_draft(
         return Draft::default();
     }
     let mut groups = group_events(&items, cfg);
+    merge_groups(&mut groups, &items, &hints.merged_events);
     let nature = mark_things(&mut items, &groups, prefs, cfg);
     let index: HashMap<ContentHash, usize> = items
         .iter()
@@ -510,7 +524,12 @@ pub fn make_draft(
             }
         })
         .collect();
-    Draft { events, photos }
+    let merge_suggestions = suggest_merges(&events, cfg);
+    Draft {
+        events,
+        photos,
+        merge_suggestions,
+    }
 }
 
 /// Skjermbilder og bilder som ikke kan brukes, holdes utenfor forslaget.
@@ -578,6 +597,75 @@ fn raw_events(items: &[Item]) -> Vec<(usize, usize)> {
         if i == items.len() || items[i].t - items[i - 1].t > EVENT_GAP_SECONDS {
             out.push((start, i));
             start = i;
+        }
+    }
+    out
+}
+
+/// Slår sammen hendelsene brukeren har bedt om, til én historie.
+fn merge_groups(groups: &mut Vec<Group>, items: &[Item], merged: &[HashSet<ContentHash>]) {
+    for set in merged {
+        let hit: Vec<usize> = (0..groups.len())
+            .filter(|&g| {
+                groups[g]
+                    .members
+                    .iter()
+                    .any(|&i| set.contains(&items[i].p.hash))
+            })
+            .collect();
+        if hit.len() < 2 {
+            continue;
+        }
+        let mut members: Vec<usize> = hit
+            .iter()
+            .flat_map(|&g| groups[g].members.clone())
+            .collect();
+        members.sort_unstable();
+        let adult = hit.iter().any(|&g| groups[g].adult_trip);
+        for &g in hit.iter().skip(1).rev() {
+            groups.remove(g);
+        }
+        let into = &mut groups[hit[0]];
+        into.members = members;
+        into.everyday = false;
+        into.adult_trip |= adult;
+    }
+}
+
+/// Hele kalenderdager mellom to tidspunkt.
+fn day_diff(a: TakenAt, b: TakenAt) -> i64 {
+    let day = |t: TakenAt| {
+        TakenAt::new(t.year, t.month, t.day, 0, 0, 0).map_or(0, |d| d.local_seconds() / 86_400)
+    };
+    day(b) - day(a)
+}
+
+/// Forslag: 2–4 korte dager (høyst `merge_max_pages` sider hver) med høyst to dager mellom
+/// og innen fire dager totalt, f.eks. en langhelg hos besteforeldrene.
+fn suggest_merges(events: &[DraftEvent], cfg: &DraftConfig) -> Vec<Vec<usize>> {
+    let ok = |e: &DraftEvent| !e.everyday && e.pages >= 1 && e.pages <= cfg.merge_max_pages;
+    let mut out = Vec::new();
+    let mut k = 0;
+    while k < events.len() {
+        if !ok(&events[k]) {
+            k += 1;
+            continue;
+        }
+        let mut run = vec![k];
+        while run.len() < 4 && k + run.len() < events.len() {
+            let next = &events[k + run.len()];
+            let last = &events[*run.last().expect("ikke tom")];
+            if !ok(next)
+                || day_diff(last.end, next.start) > 2
+                || day_diff(events[k].start, next.end) > 3
+            {
+                break;
+            }
+            run.push(k + run.len());
+        }
+        k += run.len();
+        if run.len() >= 2 {
+            out.push(run);
         }
     }
     out
@@ -1515,5 +1603,39 @@ mod tests {
             auto.pages()
         );
         assert!(bigger.included().count() > auto.included().count());
+    }
+
+    #[test]
+    fn short_days_in_a_row_are_suggested_merged_and_can_be_merged() {
+        // En påskehelg: tre korte dager på rad, og en dag langt senere.
+        let mut photos = Vec::new();
+        for (k, d) in [22u8, 23, 24].iter().enumerate() {
+            photos.extend(day(k as u16 * 100, 4, *d, 12));
+        }
+        photos.extend(day(900, 9, 1, 12));
+        let d = draft(&photos, &HashMap::new());
+        assert_eq!(d.events.len(), 4);
+        assert_eq!(d.merge_suggestions, vec![vec![0, 1, 2]]);
+
+        let set: HashSet<ContentHash> = photos[..36].iter().map(|p| p.hash).collect();
+        let merged = with(
+            &photos,
+            &DraftHints {
+                merged_events: vec![set],
+                ..DraftHints::default()
+            },
+        );
+        assert_eq!(merged.events.len(), 2);
+        assert_eq!(merged.events[0].photos, 36);
+        assert!(merged.pages() < d.pages());
+    }
+
+    #[test]
+    fn boosted_photo_is_included() {
+        let photos = day(0, 8, 8, 60);
+        let auto = draft(&photos, &HashMap::new());
+        let out = auto.photos.iter().find(|p| !p.included).unwrap().hash;
+        let d = draft(&photos, &HashMap::from([(out, Decision::Opp)]));
+        assert!(d.photos.iter().find(|p| p.hash == out).unwrap().included);
     }
 }

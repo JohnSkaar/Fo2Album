@@ -160,6 +160,8 @@ export interface Laert {
 
 export interface Utkast {
   year: number;
+  /** Forslag om å slå sammen korte dager tett etter hverandre (indekser i `events`). */
+  mergeSuggestions: number[][];
   pages: number;
   /** Sider uten sidetak (hele historien). */
   fullPages: number;

@@ -75,6 +75,11 @@ Føringer fra eierens andre runde (4. oktober 2026):
 
 35. Kunden må kunne justere antall sider både ned og opp etter at gjennomkjøringen er gjort; de fleste vil trenge det. Prisene justeres med sideantallet (grunnpris for permen osv.); eieren kommer tilbake til prisene.
 
+36. Foreslå å kombinere 2, 3 og 4 dager til én historie under gjennomgangen.
+37. Revideringen må være rask: marker mange bilder, sider og dager samtidig, og utfør med ett trykk (fjern, nedprioriter, opprioriter, fjern sidene og bildene i dem osv.).
+
+Status 36–37: gjort i prototypen. Kjernen: `DraftHints::merged_events`, `Draft::merge_suggestions`, `Decision::Opp`, `Action::Opp`/`SlaaSammen`. Appen viser ikke forslagene og markeringen ennå.
+
 Status 35: gjort i prototypen, appen og kjernen (`DraftHints::album_pages`: skalaen som gir nærmest ønsket sidetall, 0,2–3,0; flere sider gir plass til en større andel av bildene).
 
 Status 27–34: alt er i **prototypen** (turer krever GPS i bildene; spørsmålet «Var det en tur uten barn?» erstatter ansiktsgjenkjenning til M4). I Rust-kjernen: ingen tak, stemningsbilder bare alene når de er blant årets flotteste, turer slått sammen med GPS, turer uten barn med myk maks og portrettside, «Fornøyd»-sider og «presenter på x sider» (`DraftHints`), og forsideforslag (`select::cover`). I appen: kilder og «Lag utkast» på samme side. Ikke i appen ennå: lagring av «Fornøyd», turtype, x-sider og forsidekandidater (ny tabell i `p2a-store`), og grensesnittet for dem.

@@ -23,6 +23,10 @@ pub enum Action {
     Demp,
     /// Tok bort en hel dag (hendelse).
     FjernDag,
+    /// Ga bildet høyere prioritet.
+    Opp,
+    /// Slo sammen dager til én historie.
+    SlaaSammen,
 }
 
 impl Action {
@@ -34,6 +38,8 @@ impl Action {
             Action::Fremhev => "fremhev",
             Action::Demp => "demp",
             Action::FjernDag => "fjern_dag",
+            Action::Opp => "opp",
+            Action::SlaaSammen => "slaa_sammen",
         }
     }
 }
@@ -48,6 +54,8 @@ impl FromStr for Action {
             "fremhev" => Action::Fremhev,
             "demp" => Action::Demp,
             "fjern_dag" => Action::FjernDag,
+            "opp" => Action::Opp,
+            "slaa_sammen" => Action::SlaaSammen,
             _ => return Err(UnknownValue(s.to_string())),
         })
     }
@@ -261,7 +269,11 @@ pub fn learn(log: &[Feedback]) -> Preferences {
                 // Uten svar: bare svake signaler fra selve handlingen.
                 Action::TaMed => p.event_density += 0.01,
                 Action::TaBort => p.event_density -= 0.01,
-                Action::Fremhev | Action::Demp | Action::FjernDag => {}
+                Action::Fremhev
+                | Action::Demp
+                | Action::FjernDag
+                | Action::Opp
+                | Action::SlaaSammen => {}
                 Action::Bytt => {
                     if let (Some(a), Some(r)) = (f.added, f.removed) {
                         if a.sharp + IMPLICIT_SHARP_GAP < r.sharp {

@@ -386,6 +386,15 @@ fn demo(args: &[String]) -> Result<(), String> {
                 10 + (k / 3) % 8,
                 (k * 7) % 60
             )
+        } else if year == 2011 && i % 8 == 6 {
+            // Påskehelg hjemme: tre korte dager på rad, som appen foreslår å slå sammen.
+            let k = i / 8;
+            format!(
+                "2011:04:{:02} {:02}:{:02}:00",
+                22 + k % 3,
+                11 + (k / 3) % 3,
+                (k * 11) % 60
+            )
         } else if year == 2011 && i % 4 == 1 {
             // Én stor hendelse (som en dåp): mange bilder samme dag, så historien får
             // flere sider i utkastet.

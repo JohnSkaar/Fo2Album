@@ -487,6 +487,8 @@ pub struct LearnedDto {
 #[serde(rename_all = "camelCase")]
 pub struct DraftDto {
     year: i32,
+    /// Forslag om å slå sammen korte dager tett etter hverandre (indekser i `events`).
+    merge_suggestions: Vec<Vec<usize>>,
     pages: usize,
     /// Sidene albumet får uten sidetak (hele historien), så prisvalgene kan vises.
     full_pages: usize,
@@ -569,6 +571,7 @@ fn draft_for(
     let id = |i: usize| draft.photos[i].hash.to_hex();
     Ok(DraftDto {
         year,
+        merge_suggestions: draft.merge_suggestions.clone(),
         pages: draft.pages(),
         full_pages: full_pages.unwrap_or_else(|| draft.pages()),
         page_cap,
@@ -699,8 +702,9 @@ pub fn choose_photo(
         }
         (Action::Fremhev, _) => store.set_decision(year, &hash, Some(Decision::Fremhev))?,
         (Action::Demp, _) => store.set_decision(year, &hash, Some(Decision::Demp))?,
+        (Action::Opp, _) => store.set_decision(year, &hash, Some(Decision::Opp))?,
         // En dag tas bort bilde for bilde av grensesnittet; her logges bare handlingen.
-        (Action::FjernDag, _) => {}
+        (Action::FjernDag | Action::SlaaSammen, _) => {}
     }
     Ok(store.add_feedback(year, action, &hash, other.as_ref())?)
 }

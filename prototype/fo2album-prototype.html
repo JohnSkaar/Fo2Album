@@ -228,6 +228,16 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
 .ask-inline span{flex:1 1 320px}
 .kindrow .chip{font-size:12px;padding:4px 10px}
 .dock .xn{min-width:24px;text-align:center}
+.dockhead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.dockrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.docklbl{font:700 12px/16px var(--body);color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;min-width:64px}
+.dockrow .btn{padding:6px 12px;font-size:13px}
+.pg2 .fr.marked{outline:3px dashed var(--bg-brand);outline-offset:-3px;z-index:1}
+.pg2 .fr.marked::after{content:"✓";position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;background:var(--bg-brand);color:#fff;font-size:11px;display:grid;place-items:center}
+.daymark{border:0;background:none;font-size:18px;padding:0 2px;color:var(--text-brand);vertical-align:-1px}
+.ev--marked{outline:3px dashed var(--bg-brand);outline-offset:2px}
+.mergesug{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--bg-brand-subtle);border-radius:12px;padding:10px 14px;font-size:14px}
+.mergesug span{flex:1 1 320px}
 .sizes{align-items:center}
 .ownsize{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
 .ownsize input{width:80px;font:600 14px var(--body);padding:6px 8px;border:1.5px solid var(--border-strong);border-radius:10px}
@@ -379,7 +389,7 @@ const IMG_EXT = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
 const SKIP_EXT = /\.(heic|heif|dng|cr2|cr3|nef|arw|raf|orf)$/i;
 const MAX_PHOTOS = 3000;
 
-const state = { photos: [], folders: [], year: null, pages: [], spread: 0, sel: null, coverId: null, coverType: 'mood', view: 'start', pendingSource: 'PC', draft: null, decisions: new Map(), pick: null, ask: null, thanks: false, actions: 0, skips: 0, ingesting: 0, analysing: false, openEvents: new Set(), sel: new Set(), menu: null, pageSel: null, fs: { open: false, spread: 0 }, lb: null, byId: null, kinds: new Map(), targets: new Map(), locked: new Map(), pgMarked: new Set(), note: null, undo: null, ana: null, fullPages: null, coverCands: new Set(), backId: null, coversOpen: true };
+const state = { photos: [], folders: [], year: null, pages: [], spread: 0, sel: null, coverId: null, coverType: 'mood', view: 'start', pendingSource: 'PC', draft: null, decisions: new Map(), pick: null, ask: null, thanks: false, actions: 0, skips: 0, ingesting: 0, analysing: false, openEvents: new Set(), sel: new Set(), menu: null, pageSel: null, fs: { open: false, spread: 0 }, lb: null, byId: null, kinds: new Map(), targets: new Map(), locked: new Map(), pgMarked: new Set(), note: null, undo: null, ana: null, fullPages: null, coverCands: new Set(), backId: null, coversOpen: true, merges: [], mergeNo: new Set(), dayMarked: new Set(), markMode: false };
 let uid = 0;
 
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),2600); }
@@ -750,7 +760,7 @@ function renderPage(page, mode){
     const src = mode === 'print' ? URL.createObjectURL(p.file) : (p.thumb || '');
     const [fx, fy] = p.focus || [.5, .5], fit = r.fill ? 'cover' : 'contain';
     const tag = mode === 'print' ? 'div' : 'button';
-    return `<${tag} class="fr${state.menu?.id === id ? ' sel' : ''}" data-pid="${id}" data-pgid="${page.id}" style="left:${pct(r.x, PW)};top:${pct(r.y, PH)};width:${pct(r.w, PW)};height:${pct(r.h, PH)}" ${tag === 'button' ? `aria-label="Bilde på siden: ${esc(p.name)}"` : ''}><img src="${src}" alt="" style="object-fit:${fit};object-position:${fx*100}% ${fy*100}%"></${tag}>`;
+    return `<${tag} class="fr${state.menu?.id === id ? ' sel' : ''}${state.sel.has(id) ? ' marked' : ''}" data-pid="${id}" data-pgid="${page.id}" style="left:${pct(r.x, PW)};top:${pct(r.y, PH)};width:${pct(r.w, PW)};height:${pct(r.h, PH)}" ${tag === 'button' ? `aria-label="Bilde på siden: ${esc(p.name)}"` : ''}><img src="${src}" alt="" style="object-fit:${fit};object-position:${fx*100}% ${fy*100}%"></${tag}>`;
   }).join('');
   return `<div class="pg2${state.pageSel === page.id ? ' on' : ''}${page.locked && mode !== 'print' ? ' locked' : ''}" data-pgid="${page.id}">${frames}</div>`;
 }
@@ -795,7 +805,7 @@ function prepare(){
   const sortedAes = vis.map(aes).sort((a, b) => a - b), moodCut = sortedAes[Math.floor((sortedAes.length - 1) * prefs.mood)];
   const topCut = sortedAes[Math.floor((sortedAes.length - 1) * .97)];
   // Personer først: et tydelig tillegg for bilder med personer.
-  const qOf = p => (prefs.ws*p.sharpRel + prefs.we*p.q.expo + prefs.wc*p.q.color) / (prefs.ws + prefs.we + prefs.wc) + (hasPeople(p) ? .3 : 0) - (p.emph === 'demp' ? .15 : 0);
+  const qOf = p => (prefs.ws*p.sharpRel + prefs.we*p.q.expo + prefs.wc*p.q.color) / (prefs.ws + prefs.we + prefs.wc) + (hasPeople(p) ? .3 : 0) - (p.emph === 'demp' ? .15 : 0) + (p.emph === 'opp' ? .25 : 0);
   const items = vis.map(p => ({ p, t: +p.date, q: qOf(p), dec: state.decisions.get(p.id), people: hasPeople(p), mood: !hasPeople(p) && aes(p) >= moodCut,
     noise: /\.png$/i.test(p.name) && !p.exif ? 'skjermbilde' : p.q.expo < CFG.unExpo ? 'morkt' : p.q.sharp < CFG.unSharp ? 'uskarpt' : !hasPeople(p) && aes(p) < moodCut ? 'gjenstand' : null }))
     .sort((a, b) => a.t - b.t || a.p.id - b.p.id);
@@ -813,6 +823,13 @@ function prepare(){
     else { const d = items[a].p.date, key = d.getFullYear()*12 + d.getMonth(); if(!everyday.has(key)){ everyday.set(key, groups.length); groups.push({ m: [], everyday: true }); } groups[everyday.get(key)].m.push(...m); }
   }
   groups.sort((a, b) => a.m[0] - b.m[0]);
+  // Dager brukeren har slått sammen, blir én historie.
+  for(const ms of state.merges){
+    const hit = groups.filter(g => g.m.some(i => ms.has(items[i].p.id)));
+    if(hit.length < 2) continue;
+    const into = hit[0]; into.m = hit.flatMap(g => g.m).sort((a, b) => a - b); into.everyday = false; into.merged = ms;
+    hit.slice(1).forEach(g => groups.splice(groups.indexOf(g), 1));
+  }
   groups.forEach(g => {
     g.ids = new Set(g.m.map(i => items[i].p.id));
     g.days = Math.round((items[g.m[g.m.length-1]].t - items[g.m[0]].t) / 864e5) + 1;
@@ -956,7 +973,7 @@ function makeDraft(cap){
     const fresh = chosen.length ? layoutFor(ana, g, chosen, left) : [];
     const pages = [...keep, ...fresh].sort((a, b) => byId(a.ids[0]).date - byId(b.ids[0]).date);
     const removed = g.m.every(i => state.decisions.get(items[i].p.id) === 'ikke') && g.m.some(i => draft.reason.get(items[i].p.id) === 'dag_fjernet');
-    draft.events.push({ gi: k, everyday: g.everyday, start: items[g.m[0]].p.date, end: items[g.m[g.m.length-1]].p.date, removed, ids: g.m.map(i => items[i].p.id), pages, trip: looksLikeTrip(g) });
+    draft.events.push({ gi: k, merged: g.merged || null, everyday: g.everyday, start: items[g.m[0]].p.date, end: items[g.m[g.m.length-1]].p.date, removed, ids: g.m.map(i => items[i].p.id), pages, trip: looksLikeTrip(g) });
   });
   draft.eventOf = new Map(draft.events.flatMap((e, k) => e.ids.map(id => [id, k])));
   state.ana = ana;
@@ -1002,13 +1019,14 @@ function represent(pageIds, x){
 function snapshot(){
   const d = state.draft;
   return { events: d.events.map(e => ({ removed: e.removed, pages: e.pages.map(pg => ({ ...pg, ids: [...pg.ids] })) })), reason: new Map(d.reason), related: new Map(d.related),
-    selected: state.photos.filter(p => p.selected).map(p => p.id), decisions: new Map(state.decisions), locked: new Map(state.locked) };
+    selected: state.photos.filter(p => p.selected).map(p => p.id), decisions: new Map(state.decisions), locked: new Map(state.locked),
+    emph: new Map(state.photos.filter(p => p.emph).map(p => [p.id, p.emph])) };
 }
 function undo(){
   const s = state.undo, d = state.draft; if(!s || !d) return;
   s.events.forEach((e, k) => { d.events[k].pages = e.pages; d.events[k].removed = e.removed; });
   d.reason = s.reason; d.related = s.related; state.decisions = s.decisions; state.locked = s.locked;
-  const sel = new Set(s.selected); state.photos.forEach(p => p.selected = sel.has(p.id));
+  const sel = new Set(s.selected); state.photos.forEach(p => { p.selected = sel.has(p.id); p.emph = s.emph.get(p.id); });
   state.undo = null; state.note = { text: 'Endringen er angret.' }; refresh();
 }
 /* «Fornøyd»: siden beholdes i neste revisjon, helt til den endres. */
@@ -1094,8 +1112,13 @@ function logAct(a, ask = true){
   state.actions++; state.thanks = false; state.pages = [];
   state.ask = ask && ASK[a] && state.skips < 3 && (state.actions <= 3 || state.actions % 3 === 0) ? { a, i: log.length - 1 } : null;
 }
+function clearMarks(){ state.sel.clear(); state.pgMarked.clear(); state.dayMarked.clear(); state.presentN = null; }
+/* Opprioriter: med, og høyere prioritet når sidene lages (ikke nødvendigvis egen side). */
+function boost(id){ const p = byId(id); p.emph = 'opp'; if(!p.selected) setIn(id); else state.decisions.set(id, 'med'); }
 function act(a, ids, other){
   ids = [...ids];
+  if(ids.length > 1) state.undo = snapshot();
+  if(a === 'opp') ids.forEach(boost);
   if(a === 'ta_bort') ids.forEach(id => setOut(id));
   if(a === 'ta_med') ids.forEach(id => setIn(id));
   if(a === 'bytt'){ setIn(ids[0], other); setOut(other); }
@@ -1103,7 +1126,8 @@ function act(a, ids, other){
   if(a === 'demp') ids.forEach(dampen);
   logAct(a);
   const n = ids.length;
-  toast({ ta_bort: n > 1 ? `${n} bilder er tatt bort` : 'Bildet er tatt bort', ta_med: n > 1 ? `${n} bilder er med` : 'Bildet er med', bytt: 'Bildene er byttet', fremhev: 'Bildet får mer plass', demp: 'Bildet er med, men mindre' }[a]);
+  toast({ ta_bort: n > 1 ? `${n} bilder er tatt bort` : 'Bildet er tatt bort', ta_med: n > 1 ? `${n} bilder er med` : 'Bildet er med', bytt: 'Bildene er byttet', fremhev: 'Bildet får mer plass', demp: n > 1 ? `${n} bilder er nedprioritert` : 'Bildet er med, men mindre', opp: n > 1 ? `${n} bilder er opprioritert` : 'Bildet er opprioritert' }[a]);
+  if(n > 1 && a !== 'bytt') state.note = { text: { ta_bort: `${n} bilder er tatt bort.`, ta_med: `${n} bilder er med.`, demp: `${n} bilder er nedprioritert.`, opp: `${n} bilder er opprioritert, og får mer plass i neste revisjon.`, fremhev: `${n} bilder får egen side.` }[a], undo: true };
   state.sel.clear(); state.menu = null; refresh();
 }
 function removeDay(k){
@@ -1166,7 +1190,45 @@ function coverSection(){
 }
 function card(id){
   const p = byId(id), on = state.sel.has(id), why = reasonText(state.draft.reason.get(id));
-  return `<div class="dc${on ? ' on' : ''}"><button class="dc__img" data-dc="${id}" aria-pressed="${on}" aria-label="${p.selected ? 'Med' : 'Ikke med'}: ${esc(why)}. Klikk for å markere."><img src="${p.thumb || ''}" alt="" loading="lazy"><span class="ck">✓</span>${p.blurry ? '<span class="blur" title="Kan være uskarpt">◔ Uskarpt?</span>' : ''}${p.emph === 'fremhev' ? '<span class="emph">Fremhevet</span>' : p.emph === 'demp' ? '<span class="emph">Dempet</span>' : ''}</button><button class="zoom" data-zoom="${id}" aria-label="Vis stort" title="Vis stort">⤢</button><button class="star${state.coverCands.has(id) ? ' on' : ''}" data-star="${id}" aria-pressed="${state.coverCands.has(id)}" title="Kandidat til forside eller bakside">${state.coverCands.has(id) ? '★' : '☆'}</button><span class="why">${esc(why)}</span></div>`;
+  return `<div class="dc${on ? ' on' : ''}"><button class="dc__img" data-dc="${id}" aria-pressed="${on}" aria-label="${p.selected ? 'Med' : 'Ikke med'}: ${esc(why)}. Klikk for å markere."><img src="${p.thumb || ''}" alt="" loading="lazy"><span class="ck">✓</span>${p.blurry ? '<span class="blur" title="Kan være uskarpt">◔ Uskarpt?</span>' : ''}${p.emph === 'fremhev' ? '<span class="emph">Fremhevet</span>' : p.emph === 'demp' ? '<span class="emph">Nedprioritert</span>' : p.emph === 'opp' ? '<span class="emph">Opprioritert</span>' : ''}</button><button class="zoom" data-zoom="${id}" aria-label="Vis stort" title="Vis stort">⤢</button><button class="star${state.coverCands.has(id) ? ' on' : ''}" data-star="${id}" aria-pressed="${state.coverCands.has(id)}" title="Kandidat til forside eller bakside">${state.coverCands.has(id) ? '★' : '☆'}</button><span class="why">${esc(why)}</span></div>`;
+}
+/* ---------- Slå sammen dager ---------- */
+const dayKey = e => e.ids[0];
+const dayDiff = (a, b) => Math.round((new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate())) / 864e5);
+/* Forslag: 2–4 korte dager tett etter hverandre (høyst 3 sider hver, innen 4 dager) kan bli
+   én historie, f.eks. en langhelg hos besteforeldrene. */
+function mergeSuggestions(){
+  const ev = state.draft.events, out = []; let k = 0;
+  const ok = e => !e.everyday && !e.removed && e.pages.length && e.pages.length <= 3;
+  while(k < ev.length){
+    if(!ok(ev[k])){ k++; continue; }
+    const run = [k];
+    while(run.length < 4 && k + run.length < ev.length){
+      const next = ev[k + run.length], last = ev[run[run.length - 1]];
+      if(!ok(next) || dayDiff(last.end, next.start) > 2 || dayDiff(ev[k].start, next.end) > 3) break;
+      run.push(k + run.length);
+    }
+    if(run.length >= 2 && !state.mergeNo.has(dayKey(ev[k]))) out.push(run);
+    k += run.length;
+  }
+  return out;
+}
+function mergeSuggestionHtml(run){
+  const ev = run.map(k => state.draft.events[k]), a = ev[0], b = ev[ev.length - 1];
+  const span = a.start.getMonth() === b.end.getMonth() ? `${a.start.getDate()}.–${fmtDay(b.end)}` : `${fmtDay(a.start)}–${fmtDay(b.end)}`;
+  const pages = ev.reduce((x, e) => x + e.pages.length, 0);
+  return `<div class="mergesug"><span><b>Forslag:</b> ${run.length} dager tett etter hverandre (${span}, ${pages} sider). Skal de bli én historie?</span><button class="btn btn--s" data-merge="${run.join(',')}">Slå sammen til én historie</button><button class="btn btn--g" data-mergeno="${dayKey(a)}">Nei takk</button></div>`;
+}
+function mergeDays(ks){
+  const ids = new Set(ks.flatMap(k => state.draft.events[k].ids));
+  state.merges = state.merges.filter(ms => ![...ms].some(id => ids.has(id)));
+  state.merges.push(ids); state.dayMarked.clear();
+  const log = loadLog(); log.push({ a: 'slaa_sammen', r: null }); saveLog(log);
+  revise(state.draft.cap, `${ks.length} dager er slått sammen til én historie.`);
+}
+function splitDay(k){
+  const ms = state.draft.events[k].merged; state.merges = state.merges.filter(m => m !== ms);
+  revise(state.draft.cap, 'Dagene er delt opp igjen.');
 }
 function pageCard(pg){
   const on = state.pgMarked.has(pg.id);
@@ -1195,7 +1257,7 @@ function renderDraft(){
   const les = lessons(learn(loadLog())), log = loadLog();
   const nLocked = draftPagesFlat().filter(pg => pg.locked).length;
   const over = pages > MAX_SIDER ? [MAX_SIDER, MAX_SIDER - SIDETRINN, MAX_SIDER - 2*SIDETRINN] : [];
-  let html = `<div class="sum"><p><b>${included} bilder på ${pages} sider</b>, fra ${d.events.filter(e => e.pages.length).length} dager og hendelser. <span class="crumb">Revisjon ${d.revision}${nLocked ? ` · ${nLocked} ${nLocked === 1 ? 'side' : 'sider'} du er fornøyd med` : ''}</span></p><button class="btn btn--p" data-fs="0">Vis albumet i helskjerm</button></div>
+  let html = `<div class="sum"><p><b>${included} bilder på ${pages} sider</b>, fra ${d.events.filter(e => e.pages.length).length} dager og hendelser. <span class="crumb">Revisjon ${d.revision}${nLocked ? ` · ${nLocked} ${nLocked === 1 ? 'side' : 'sider'} du er fornøyd med` : ''}</span></p><div class="toolbar"><button class="chip" data-markmode aria-pressed="${state.markMode}" title="Når den er på, markerer et klikk på bilder og sider i stedet for å åpne menyen. Ctrl/⌘-klikk virker alltid.">${state.markMode ? '✓ Markeringsmodus' : 'Markeringsmodus'}</button><button class="btn btn--p" data-fs="0">Vis albumet i helskjerm</button></div></div>
   ${over.length ? `<div class="price over"><b>Albumet er på ${pages} sider. Trykkeriet tar foreløpig maks ${MAX_SIDER} sider i ett album.</b><span class="crumb">Se gjerne gjennom forslaget først. Velg så hvor mange sider albumet skal ha; alle historiene krymper litt, og sidene du er fornøyd med, beholdes.</span><div class="chips">${over.map(t => `<button class="chip" data-cap="${t}">${t} sider · ${kr(pris(t))}</button>`).join('')}</div></div>` : ''}
   <div class="price"><b>Albumet er nå på ${pages} sider og koster ${kr(pris(pages))}.</b>
   <span class="crumb">Juster antall sider etter ønske. Færre sider: alle historiene krymper litt, men hver dag beholder minst én side. Flere sider: flere bilder og mer plass til historiene. Sider du er fornøyd med, beholdes.</span>
@@ -1207,6 +1269,7 @@ function renderDraft(){
   ${coverSection()}
   <details class="learned"><summary>Dette har appen lært om dere</summary>${les.length ? `<ul>${les.map(l => `<li>${l}</li>`).join('')}</ul>` : '<p>Ingenting ennå. Når du tar med, tar bort eller bytter bilder, lærer appen litt etter litt hva dere liker.</p>'}${log.length ? `<p class="crumb">Basert på ${log.length} valg og ${log.filter(f => f.r).length} svar. Lagres bare i denne nettleseren.</p>` : ''}</details>
   <p class="crumb">Øverst i hver dag er <b>albumsidene</b>, slik albumet blir. Klikk et bilde på en side for å ta det bort, fremheve det, dempe det eller endre utsnitt. Klikk i margen på en side for å velge rammer. Under ligger alle bildene fra dagen: klikk for å markere mange, og bruk knappene nederst.</p>`;
+  const suggestions = mergeSuggestions();
   let lastMonth = -1, pageNo = 1;
   d.events.forEach((e, k) => {
     const m = e.start.getFullYear()*12 + e.start.getMonth();
@@ -1214,8 +1277,11 @@ function renderDraft(){
     const med = e.ids.filter(id => byId(id)?.selected), ut = e.ids.filter(id => !byId(id)?.selected);
     const showAll = state.openEvents.has(k), vis = showAll ? ut : ut.slice(0, 12), first = pageNo; pageNo += e.pages.length;
     const selPage = e.pages.find(pg => pg.id === state.pageSel);
-    html += `<section class="ev${e.removed ? ' ev--off' : ''}" data-ev="${k}"><div class="ev-h"><div><h3>${eventTitle(e)}</h3><span class="count">${e.ids.length} bilder · ${e.pages.length ? `side ${first}–${first + e.pages.length - 1}` : 'ingen sider'}</span></div>
-      <div class="toolbar">${e.removed ? `<button class="btn btn--s" data-day="tilbake">Ta med dagen igjen</button>` : `<button class="btn btn--g" data-day="fs">Helskjerm</button><button class="btn btn--g" data-day="sider">Marker sidene</button><button class="btn btn--g" data-day="velg">Marker bildene</button><button class="btn btn--g" data-day="fornoyd">Fornøyd med dagen</button><button class="btn btn--s" data-day="fjern">Fjern dagen</button>`}</div></div>
+    const sug = suggestions.find(r => r[0] === k);
+    if(sug) html += mergeSuggestionHtml(sug);
+    const dk = dayKey(e), dm = state.dayMarked.has(dk);
+    html += `<section class="ev${e.removed ? ' ev--off' : ''}${dm ? ' ev--marked' : ''}" data-ev="${k}"><div class="ev-h"><div><h3><button class="daymark" data-daymark="${dk}" aria-pressed="${dm}" title="Marker dagen">${dm ? '☑' : '☐'}</button> ${eventTitle(e)}${e.merged ? ' <span class="tag">Slått sammen</span>' : ''}</h3><span class="count">${e.ids.length} bilder · ${e.pages.length ? `side ${first}–${first + e.pages.length - 1}` : 'ingen sider'}</span></div>
+      <div class="toolbar">${e.removed ? `<button class="btn btn--s" data-day="tilbake">Ta med dagen igjen</button>` : `<button class="btn btn--g" data-day="fs">Helskjerm</button><button class="btn btn--g" data-day="sider">Marker sidene</button><button class="btn btn--g" data-day="velg">Marker bildene</button><button class="btn btn--g" data-day="fornoyd">Fornøyd med dagen</button><button class="btn btn--s" data-day="fjern">Fjern dagen</button>${e.merged ? '<button class="btn btn--g" data-day="del">Del opp igjen</button>' : ''}`}</div></div>
       ${dayKindHtml(e)}
       ${e.pages.length ? `<div class="albumrow"><span class="albumlabel">Albumsidene</span><div class="spreads">${spreadsOf(e.pages).map(sp => `<div class="spr">${sp.map(pageCard).join('')}</div>`).join('')}</div></div>` : ''}
       ${selPage ? templateBar(selPage) : ''}
@@ -1225,23 +1291,27 @@ function renderDraft(){
   $('draftWrap').innerHTML = html;
 }
 function renderDock(){
-  const dk = $('dock'), n = state.sel.size;
+  const dk = $('dock'), n = state.sel.size, m = state.pgMarked.size, dd = state.dayMarked.size;
   if(state.ask){
     const [q, opts] = ASK[state.ask.a];
     dk.innerHTML = `<b>${q}</b><span class="crumb">Valgfritt. Svaret hjelper appen å forstå hva dere bryr dere om.</span><div class="chips">${opts.map(([v, t]) => `<button class="chip" data-why="${v}">${t}</button>`).join('')}<button class="btn btn--g" data-why="">Hopp over</button></div>`;
-  } else if(n){
+  } else if(n || m || dd){
+    // Én markering for bilder, sider og dager. Én knapp utfører handlingen på alt som er markert.
     const ids = [...state.sel], inn = ids.filter(id => byId(id).selected), ut = ids.filter(id => !byId(id).selected);
     const swap = inn.length === 1 && ut.length === 1 && state.draft.eventOf.get(inn[0]) === state.draft.eventOf.get(ut[0]);
-    dk.innerHTML = `<b>${n} ${n === 1 ? 'bilde' : 'bilder'} markert</b><div class="toolbar">${inn.length ? `<button class="btn btn--s" data-act="ta_bort">Ta bort${inn.length > 1 ? ` (${inn.length})` : ''}</button>` : ''}${ut.length ? `<button class="btn btn--s" data-act="ta_med">Ta med${ut.length > 1 ? ` (${ut.length})` : ''}</button>` : ''}${swap ? '<button class="btn btn--s" data-act="bytt">Bytt dem</button>' : ''}${n === 1 ? '<button class="btn btn--g" data-act="stort">Vis stort</button>' : ''}<button class="btn btn--g" data-act="fjern_markering">Fjern markering</button></div><span class="crumb">Shift-klikk markerer alle bildene mellom.</span>`;
-  } else if(state.pgMarked.size){
-    const m = state.pgMarked.size, x = state.presentN ?? m;
-    dk.innerHTML = `<b>${m} ${m === 1 ? 'side' : 'sider'} markert</b><div class="toolbar"><span>Presenter dette på</span><button class="btn btn--s" data-pg="minus" aria-label="Færre sider">−</button><b class="xn">${x}</b><button class="btn btn--s" data-pg="pluss" aria-label="Flere sider">+</button><span>${x === 1 ? 'side' : 'sider'}</span><button class="btn btn--p" data-pg="lag">Lag forslag</button><button class="btn btn--s" data-pg="fornoyd">Fornøyd med sidene</button><button class="btn btn--s" data-pg="fjern">Fjern sidene</button><button class="btn btn--g" data-pg="av">Fjern markering</button></div><span class="crumb">Appen velger bilder og oppsett på nytt for disse sidene. Du kan angre.</span>`;
+    const parts = [n && `${n} ${n === 1 ? 'bilde' : 'bilder'}`, m && `${m} ${m === 1 ? 'side' : 'sider'}`, dd && `${dd} ${dd === 1 ? 'dag' : 'dager'}`].filter(Boolean).join(' · ');
+    const x = state.presentN ?? m;
+    dk.innerHTML = `<div class="dockhead"><b>Markert: ${parts}</b><button class="btn btn--g" data-all="av">Fjern all markering</button></div>
+      ${n ? `<div class="dockrow"><span class="docklbl">Bildene</span>${inn.length ? `<button class="btn btn--s" data-act="ta_bort">Ta bort (${inn.length})</button>` : ''}${ut.length ? `<button class="btn btn--s" data-act="ta_med">Ta med (${ut.length})</button>` : ''}<button class="btn btn--s" data-act="opp">Opprioriter (${n})</button>${inn.length ? `<button class="btn btn--s" data-act="demp">Nedprioriter (${inn.length})</button>` : ''}<button class="btn btn--s" data-act="kandidat">☆ Forsidekandidat</button>${swap ? '<button class="btn btn--s" data-act="bytt">Bytt dem</button>' : ''}${n === 1 ? '<button class="btn btn--g" data-act="stort">Vis stort</button>' : ''}</div>` : ''}
+      ${m ? `<div class="dockrow"><span class="docklbl">Sidene</span><button class="btn btn--s" data-pg="fjern">Fjern sidene og bildene i dem</button><span>Presenter på</span><button class="btn btn--s" data-pg="minus" aria-label="Færre sider">−</button><b class="xn">${x}</b><button class="btn btn--s" data-pg="pluss" aria-label="Flere sider">+</button><span>${x === 1 ? 'side' : 'sider'}</span><button class="btn btn--s" data-pg="lag">Lag forslag</button><button class="btn btn--s" data-pg="fornoyd">Fornøyd</button></div>` : ''}
+      ${dd ? `<div class="dockrow"><span class="docklbl">Dagene</span>${dd >= 2 ? '<button class="btn btn--s" data-days="slaa">Slå sammen til én historie</button>' : ''}<button class="btn btn--s" data-days="fornoyd">Fornøyd med dagene</button><button class="btn btn--s" data-days="fjern">Fjern dagene</button></div>` : ''}
+      <span class="crumb">Klikk bilder og sider for å markere flere; Shift-klikk markerer alle bildene mellom. Ctrl/⌘-klikk (eller markeringsmodus) markerer bilder og sider rett i albumet. Esc fjerner markeringen.</span>`;
   } else if(state.note){
     dk.innerHTML = `<b>${esc(state.note.text)}</b>${state.note.undo && state.undo ? '<div class="toolbar"><button class="btn btn--s" data-pg="angre">Angre</button><button class="btn btn--g" data-pg="ok">Ok</button></div>' : '<div class="toolbar"><button class="btn btn--g" data-pg="ok">Ok</button></div>'}`;
   } else if(state.thanks){
     dk.innerHTML = `<b>Takk! Appen husker det til neste utkast.</b>`;
   }
-  dk.classList.toggle('hidden', !(state.ask || n || state.thanks || state.pgMarked.size || state.note) || state.view !== 'draft');
+  dk.classList.toggle('hidden', !(state.ask || n || m || dd || state.thanks || state.note) || state.view !== 'draft');
 }
 function photoMenu(id, inFs){
   const p = byId(id);
@@ -1314,6 +1384,9 @@ function coverClick(e){
 /* ---------- Klikk ---------- */
 function onPageClick(e){
   const fr = e.target.closest('.fr');
+  const marking = state.markMode || e.ctrlKey || e.metaKey || e.shiftKey;
+  if(fr && marking){ const id = +fr.dataset.pid; state.sel.has(id) ? state.sel.delete(id) : state.sel.add(id); state.menu = null; refresh(); return true; }
+  if(!fr && marking && e.target.closest('.pg2')){ const id = +e.target.closest('.pg2').dataset.pgid; state.pgMarked.has(id) ? state.pgMarked.delete(id) : state.pgMarked.add(id); refresh(); return true; }
   if(fr){ const id = +fr.dataset.pid; state.pageSel = null; state.menu = state.menu?.id === id ? null : { id }; refresh(); if(!state.fs.open && state.menu){ const el = e.currentTarget.querySelector(`button.fr[data-pid="${id}"]`); if(el) showMenuNear(el); } return true; }
   const pg = e.target.closest('.pg2');
   if(pg){ const id = +pg.dataset.pgid; state.menu = null; state.pageSel = state.pageSel === id ? null : id; refresh(); return true; }
@@ -1350,6 +1423,10 @@ let lastClicked = null;
 $('draftWrap').addEventListener('click', e => {
   if(e.target.closest('#startDraft')){ runAnalysis(null); return; }
   const c = e.target.closest('[data-cap]'); if(c){ resize(c.dataset.cap ? +c.dataset.cap : null); return; }
+  if(e.target.closest('[data-markmode]')){ state.markMode = !state.markMode; refresh(); return; }
+  const mg = e.target.closest('[data-merge]'); if(mg){ mergeDays(mg.dataset.merge.split(',').map(Number)); return; }
+  const mn = e.target.closest('[data-mergeno]'); if(mn){ state.mergeNo.add(+mn.dataset.mergeno); refresh(); return; }
+  const dmk = e.target.closest('[data-daymark]'); if(dmk){ const key = +dmk.dataset.daymark; state.dayMarked.has(key) ? state.dayMarked.delete(key) : state.dayMarked.add(key); refresh(); return; }
   if(e.target.closest('[data-ownsize]')){ const n = Math.round(+$('ownPages').value); if(n >= 1) resize(n); return; }
   const kd = e.target.closest('[data-kind]');
   if(kd){ const k = +kd.closest('[data-ev]').dataset.ev, g = state.ana.groups[state.draft.events[k].gi];
@@ -1360,7 +1437,7 @@ $('draftWrap').addEventListener('click', e => {
   const mo = e.target.closest('[data-more]'); if(mo){ const k = +mo.dataset.more; state.openEvents.has(k) ? state.openEvents.delete(k) : state.openEvents.add(k); renderDraft(); return; }
   const day = e.target.closest('[data-day]');
   if(day){ const k = +day.closest('[data-ev]').dataset.ev, ev = state.draft.events[k];
-    if(day.dataset.day === 'fjern') removeDay(k); else if(day.dataset.day === 'tilbake') restoreDay(k);
+    if(day.dataset.day === 'fjern') removeDay(k); else if(day.dataset.day === 'tilbake') restoreDay(k); else if(day.dataset.day === 'del') splitDay(k);
     else if(day.dataset.day === 'velg'){ ev.ids.filter(id => byId(id).selected).forEach(id => state.sel.add(id)); refresh(); }
     else if(day.dataset.day === 'sider'){ ev.pages.forEach(pg => state.pgMarked.add(pg.id)); refresh(); }
     else if(day.dataset.day === 'fornoyd'){ const all = ev.pages.every(pg => pg.locked); ev.pages.forEach(pg => setLocked(pg, !all)); state.note = { text: all ? 'Dagen er ikke lenger merket «Fornøyd».' : 'Dagen er merket «Fornøyd» og beholdes i neste revisjon.' }; refresh(); }
@@ -1384,6 +1461,12 @@ $('fs').addEventListener('click', e => {
   onPageClick(e);
 });
 $('dock').addEventListener('click', e => {
+  if(e.target.closest('[data-all]')){ clearMarks(); refresh(); return; }
+  const dy = e.target.closest('[data-days]');
+  if(dy){ const ks = state.draft.events.map((ev, k) => state.dayMarked.has(dayKey(ev)) ? k : -1).filter(k => k >= 0);
+    if(dy.dataset.days === 'slaa'){ mergeDays(ks); return; }
+    if(dy.dataset.days === 'fornoyd'){ ks.forEach(k => state.draft.events[k].pages.forEach(pg => setLocked(pg, true))); state.dayMarked.clear(); state.note = { text: `${ks.length} ${ks.length === 1 ? 'dag er' : 'dager er'} merket «Fornøyd».` }; refresh(); return; }
+    state.undo = snapshot(); ks.forEach(k => removeDay(k)); state.dayMarked.clear(); state.note = { text: `${ks.length} ${ks.length === 1 ? 'dag er' : 'dager er'} tatt bort. Bildene ligger under «Ikke med».`, undo: true }; refresh(); return; }
   const pgb = e.target.closest('[data-pg]');
   if(pgb){ const a = pgb.dataset.pg, m = state.pgMarked.size;
     if(a === 'minus'){ state.presentN = Math.max(1, (state.presentN ?? m) - 1); renderDock(); }
@@ -1401,8 +1484,11 @@ $('dock').addEventListener('click', e => {
   const ids = [...state.sel];
   if(a.dataset.act === 'fjern_markering'){ state.sel.clear(); refresh(); return; }
   if(a.dataset.act === 'stort'){ openLightbox(ids[0]); return; }
+  if(a.dataset.act === 'kandidat'){ ids.forEach(id => state.coverCands.add(id)); state.sel.clear(); toast(`${ids.length} ${ids.length === 1 ? 'bilde er' : 'bilder er'} kandidat til forsiden`); refresh(); return; }
   if(a.dataset.act === 'ta_bort') act('ta_bort', ids.filter(id => byId(id).selected));
   else if(a.dataset.act === 'ta_med') act('ta_med', ids.filter(id => !byId(id).selected));
+  else if(a.dataset.act === 'opp') act('opp', ids);
+  else if(a.dataset.act === 'demp') act('demp', ids.filter(id => byId(id).selected));
   else { const inn = ids.find(id => !byId(id).selected), ut = ids.find(id => byId(id).selected); act('bytt', [inn], ut); }
 });
 $('lb').addEventListener('click', e => {
@@ -1418,7 +1504,7 @@ $('lb').addEventListener('click', e => {
   closeLightbox(); act(k, [id]);
 });
 document.addEventListener('keydown', e => {
-  if(e.key === 'Escape'){ if(state.lb) { closeLightbox(); refresh(); } else if(state.fs.open) closeFs(); else if(state.sel.size){ state.sel.clear(); refresh(); } return; }
+  if(e.key === 'Escape'){ if(state.lb) { closeLightbox(); refresh(); } else if(state.fs.open) closeFs(); else if(state.sel.size || state.pgMarked.size || state.dayMarked.size){ clearMarks(); refresh(); } return; }
   if(state.fs.open && !state.lb){ if(e.key === 'ArrowRight'){ state.fs.spread++; state.menu = null; renderFs(); } if(e.key === 'ArrowLeft'){ state.fs.spread--; state.menu = null; renderFs(); } return; }
   if(state.view !== 'album' || /INPUT|SELECT/.test(document.activeElement.tagName)) return;
   if(e.key === 'ArrowRight' && !$('next').disabled){ state.spread++; renderAlbum(); }

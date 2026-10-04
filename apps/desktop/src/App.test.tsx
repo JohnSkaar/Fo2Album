@@ -190,6 +190,7 @@ describe("albumutkast", () => {
   const h = (c: string) => c.repeat(64);
   const utkast: Utkast = {
     year: 2011,
+    mergeSuggestions: [],
     pages: 312,
     fullPages: 312,
     pageCap: null,
