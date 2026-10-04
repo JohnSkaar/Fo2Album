@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimale rettigheter for hovedvinduet. Ingen HTTP-, shell- eller filsystem-plugins; mappetilgang kommer i M1 via egne kommandoer.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

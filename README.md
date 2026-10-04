@@ -18,3 +18,14 @@ Claude Code leser `CLAUDE.md` automatisk. Den beskriver prinsippene (lokalt før
 - `design/` – tokens (CSS og JSON)
 - `prototype/` – klikkbar HTML-prototype
 - `website/` – markedssiden for pho2album.no (se `website/LES-MEG.txt`)
+
+## Utvikling
+
+Krever Rust (stable), Node 22 og pnpm 10. På Linux trengs i tillegg Tauri sine systempakker (`libwebkit2gtk-4.1-dev` m.fl.).
+
+```
+pnpm install
+pnpm dev          # starter appen
+```
+
+Se `CLAUDE.md` for alle kommandoer og `docs/ARCHITECTURE.md` for beslutninger og lisenser. CI (`.github/workflows/ci.yml`) bygger, tester og starter appen på macOS og Windows.

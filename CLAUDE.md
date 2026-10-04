@@ -38,6 +38,21 @@ docs/DESIGN.md       ← designsystem og UI-regler
 design/              ← tokens
 prototype/           ← klikkbar HTML-prototype (referanse for flyt og UI, ikke kode å bygge videre på)
 website/             ← markedsside for pho2album.no (statisk, Netlify)
+eval/RESULTS.md      ← logg over evalueringskjøringer
+apps/desktop/        ← Tauri-appen: src-tauri/ (Rust) + src/ (React). All UI-tekst i src/tekster.ts
+crates/p2a-*/        ← Rust-kjernen (core, ingest, store) og policy-tester
+scripts/             ← byggesjekker og røyktest
+```
+
+## Kommandoer
+
+```
+pnpm install                 # én gang
+pnpm dev                     # start appen i utviklingsmodus
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace       # inkluderer «ingen nettverk»-testen (crates/p2a-policy)
+cargo deny check             # lisenser og forbudte pakker
 ```
 
 ## Arbeidsmåte

@@ -1,0 +1,17 @@
+{
+  "name": "pho2album-workspace",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "scripts": {
+    "dev": "pnpm --filter pho2album-desktop tauri dev",
+    "build": "pnpm --filter pho2album-desktop build",
+    "lint": "pnpm --filter pho2album-desktop lint",
+    "typecheck": "pnpm --filter pho2album-desktop typecheck",
+    "test": "pnpm --filter pho2album-desktop test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9"
+  }
+}
