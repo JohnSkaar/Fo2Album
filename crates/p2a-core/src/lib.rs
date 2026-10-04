@@ -5,7 +5,9 @@
 
 pub mod model;
 
-pub use model::{CommentKind, ContentHash, DateSource, Role, SourceKind, TakenAt};
+pub use model::{
+    CommentKind, ContentHash, DateSource, FileStatus, PhotoMeta, Role, SourceKind, TakenAt,
+};
 
 /// Versjonen av kjernen, vist i appen og logget i `eval/RESULTS.md`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

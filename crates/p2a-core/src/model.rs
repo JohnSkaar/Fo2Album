@@ -233,6 +233,22 @@ impl TakenAt {
         )
     }
 
+    /// Fra sekunder siden 1970 (UTC). Brukes for filens endringstid når EXIF og filnavn mangler.
+    pub fn from_unix_utc(secs: i64) -> Option<Self> {
+        let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+        let (y, m, d) = civil_from_days(days);
+        let mut t = TakenAt::new(
+            y,
+            m,
+            d,
+            (rem / 3600) as u8,
+            (rem % 3600 / 60) as u8,
+            (rem % 60) as u8,
+        )?;
+        t.offset_minutes = Some(0);
+        Some(t)
+    }
+
     /// Sekunder siden 1970-01-01 i lokal tid (uten tidssone). Brukes til tidsavstander.
     pub fn local_seconds(&self) -> i64 {
         let days = days_from_civil(self.year, self.month, self.day);
@@ -265,9 +281,107 @@ fn days_from_civil(y: i32, m: u8, d: u8) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
+/// Omvendt av [`days_from_civil`].
+fn civil_from_days(days: i64) -> (i32, u8, u8) {
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u8;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u8;
+    ((yoe + era * 400 + i64::from(m <= 2)) as i32, m, d)
+}
+
+/// Om en fil kan leses lokalt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FileStatus {
+    Local,
+    /// Plassholder: innholdet ligger bare i skyen. Leses ikke (ville utløst nedlasting).
+    CloudOnly,
+    /// Kunne ikke leses (skadet fil, manglende tilgang, ukjent format).
+    Unreadable,
+}
+
+impl FileStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FileStatus::Local => "lokal",
+            FileStatus::CloudOnly => "bare_i_skyen",
+            FileStatus::Unreadable => "uleselig",
+        }
+    }
+}
+
+impl_from_str!(
+    FileStatus,
+    [
+        FileStatus::Local,
+        FileStatus::CloudOnly,
+        FileStatus::Unreadable
+    ]
+);
+
+/// Det vi vet om ett unikt bilde etter innlesing.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhotoMeta {
+    pub hash: ContentHash,
+    /// jpeg | heic | png | webp
+    pub format: Option<String>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub orientation: Option<u16>,
+    pub taken_at: Option<TakenAt>,
+    pub date_source: Option<DateSource>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub gps: Option<(f64, f64)>,
+    /// Perseptuell hash (64 bit) for nesten like bilder.
+    pub phash: Option<u64>,
+}
+
+impl PhotoMeta {
+    pub fn new(hash: ContentHash) -> Self {
+        PhotoMeta {
+            hash,
+            format: None,
+            width: None,
+            height: None,
+            orientation: None,
+            taken_at: None,
+            date_source: None,
+            camera_make: None,
+            camera_model: None,
+            gps: None,
+            phash: None,
+        }
+    }
+
+    /// Antall piksler, brukt for å velge beste kopi blant dubletter.
+    pub fn pixels(&self) -> u64 {
+        self.width.unwrap_or(0) as u64 * self.height.unwrap_or(0) as u64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_unix_utc_matches_known_dates() {
+        assert_eq!(
+            TakenAt::from_unix_utc(0).unwrap().to_iso(),
+            "1970-01-01T00:00:00"
+        );
+        assert_eq!(
+            TakenAt::from_unix_utc(1_310_646_896).unwrap().to_iso(),
+            "2011-07-14T12:34:56"
+        );
+        for secs in [951_782_400i64, 1_709_164_800, 4_102_444_799] {
+            assert_eq!(TakenAt::from_unix_utc(secs).unwrap().local_seconds(), secs);
+        }
+    }
 
     #[test]
     fn enums_round_trip() {

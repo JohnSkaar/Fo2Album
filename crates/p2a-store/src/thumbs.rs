@@ -29,4 +29,11 @@ impl Store {
             Err(e) => Err(e.into()),
         }
     }
+
+    pub(crate) fn delete_thumbnail(&self, hash: &ContentHash) -> Result<(), StoreError> {
+        match fs::remove_file(self.thumb_path(hash)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+            _ => Ok(()),
+        }
+    }
 }
