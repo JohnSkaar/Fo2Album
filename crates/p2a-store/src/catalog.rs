@@ -71,6 +71,8 @@ pub struct CatalogSummary {
     pub near_duplicates: usize,
     /// Bilder der datoen bare kommer fra filens endringstid.
     pub uncertain_dates: usize,
+    /// Bilder uten miniatyr (f.eks. HEIC på en maskin uten HEIC-dekoder).
+    pub without_preview: usize,
 }
 
 /// Et bilde slik grensesnittet trenger det.
@@ -389,6 +391,9 @@ impl Store {
             near_duplicates: one("SELECT count(*) FROM photos WHERE duplicate_of IS NOT NULL")?,
             uncertain_dates: one(
                 "SELECT count(*) FROM photos WHERE duplicate_of IS NULL AND date_source = 'endringstid'",
+            )?,
+            without_preview: one(
+                "SELECT count(*) FROM photos WHERE duplicate_of IS NULL AND has_thumbnail = 0",
             )?,
         })
     }

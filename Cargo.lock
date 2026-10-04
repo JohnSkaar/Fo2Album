@@ -2280,6 +2280,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc2-image-io"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32b0446e98cf4a784cc7a0177715ff317eeaa8463841c616cfc78aa4f953c4ea"
+dependencies = [
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+]
+
+[[package]]
 name = "objc2-io-surface"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2403,6 +2413,17 @@ name = "p2a-core"
 version = "0.1.0"
 
 [[package]]
+name = "p2a-heic"
+version = "0.1.0"
+dependencies = [
+ "objc2-core-foundation",
+ "objc2-core-graphics",
+ "objc2-image-io",
+ "thiserror 2.0.21",
+ "windows",
+]
+
+[[package]]
 name = "p2a-ingest"
 version = "0.1.0"
 dependencies = [
@@ -2411,6 +2432,7 @@ dependencies = [
  "jpeg-decoder",
  "kamadak-exif",
  "p2a-core",
+ "p2a-heic",
  "p2a-store",
  "rayon",
  "regex",

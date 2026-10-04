@@ -81,6 +81,8 @@ Sjekkes automatisk av `cargo deny check licenses` (tillatte lisenser står i `de
 | `keyring` | Nøkkelring på Mac og Windows (app-skallet) | MIT OR Apache-2.0 | |
 | `image`, `jpeg-decoder` | Dekoding av JPEG, PNG og WebP; miniatyrer | MIT OR Apache-2.0 | |
 | `kamadak-exif` | EXIF fra JPEG, HEIC, PNG og WebP | BSD-2-Clause | |
+| `objc2-image-io`, `objc2-core-graphics`, `objc2-core-foundation` (bare Mac) | HEIC via ImageIO (`crates/p2a-heic`) | Zlib OR Apache-2.0 OR MIT | Dekoderen følger med macOS |
+| `windows` (bare Windows) | HEIC via WIC (`crates/p2a-heic`) | MIT OR Apache-2.0 | Krever «HEIF Image Extensions» og HEVC-støtte fra Microsoft Store; uten dem får HEIC-bilder ingen miniatyr, og appen sier fra |
 | `blake3` | Innholdshash | CC0-1.0 OR Apache-2.0 | |
 | `walkdir`, `rayon`, `regex` | Skanning, parallell lesing, datoer i filnavn | MIT OR Apache-2.0 / Unlicense OR MIT | |
 

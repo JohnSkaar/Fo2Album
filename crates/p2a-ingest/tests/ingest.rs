@@ -313,3 +313,47 @@ fn transcoded_copies_corrupt_files_and_thumbnails() {
     assert_eq!(after.summary.near_duplicates, 0);
     assert_eq!(after.summary.photos, 3);
 }
+
+#[test]
+fn heic_is_decoded_where_the_platform_can() {
+    use p2a_ingest::synth::pattern;
+
+    let lib = tempfile::tempdir().unwrap();
+    let data = tempfile::tempdir().unwrap();
+    let img = pattern(1200, 900, 77);
+    // Ekte HEIC der plattformen kan kode det (Mac); ellers en ugyldig HEIC-fil.
+    let heic = p2a_heic::encode_for_tests(img.width(), img.height(), img.as_raw());
+    let can_decode = heic.is_some();
+    write(
+        lib.path(),
+        "IMG_20110302_081500.HEIC",
+        &heic.unwrap_or_else(|| b"....ftypheic".to_vec()),
+    );
+
+    let keys = MemoryKeyStore::default();
+    let (mut store, _) = Store::create(data.path(), &keys).unwrap();
+    store
+        .add_source(SourceKind::Icloud, lib.path(), "iCloud")
+        .unwrap();
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |_| {},
+    )
+    .unwrap();
+
+    if can_decode {
+        assert_eq!(report.summary.photos, 1);
+        assert_eq!(report.summary.without_preview, 0);
+        let p = &store.photos_in_year(2011).unwrap()[0];
+        assert!(p.has_thumbnail);
+        assert_eq!((p.width, p.height), (Some(1200), Some(900)));
+        let thumb =
+            image::load_from_memory(&store.get_thumbnail(&p.hash).unwrap().unwrap()).unwrap();
+        assert_eq!(thumb.width(), 400);
+    } else {
+        // Uten dekoder: bildet er med (dato fra filnavnet), men uten miniatyr.
+        assert_eq!(report.summary.photos + report.summary.unreadable, 1);
+    }
+}

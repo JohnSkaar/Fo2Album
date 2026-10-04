@@ -1,8 +1,8 @@
 //! Dekoding av bilder og miniatyrer.
 //!
-//! JPEG dekodes direkte i redusert størrelse (`jpeg-decoder`), PNG og WebP med `image`.
-//! HEIC dekodes med plattformens egne API-er (M1.4); til da får HEIC-bilder metadata og
-//! hash, men ingen miniatyr.
+//! JPEG dekodes direkte i redusert størrelse (`jpeg-decoder`), PNG og WebP med `image`,
+//! HEIC med plattformens egne API-er (`p2a-heic`: ImageIO på Mac, WIC på Windows). Uten
+//! HEIC-dekoder får bildet metadata og hash, men ingen miniatyr.
 
 use std::io::Cursor;
 use std::path::Path;
@@ -19,7 +19,7 @@ pub const ANALYSIS_MIN: u32 = 1000;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
-    /// Formatet kan ikke dekodes på denne plattformen ennå (f.eks. HEIC før M1.4).
+    /// Formatet kan ikke dekodes på denne maskinen (f.eks. HEIC på Windows uten HEIF-utvidelsen).
     #[error("formatet støttes ikke ennå")]
     Unsupported,
     #[error("kunne ikke dekode bildet: {0}")]
@@ -42,6 +42,7 @@ pub fn decode_file(
     orientation: Option<u16>,
 ) -> Result<Decoded, DecodeError> {
     let image_format = match format {
+        Some("heic") => return decode_heic(&std::fs::read(path)?, orientation),
         Some("jpeg") => ImageFormat::Jpeg,
         Some("png") => ImageFormat::Png,
         Some("webp") => ImageFormat::WebP,
@@ -59,6 +60,29 @@ pub fn decode_file(
         let dims = (img.width(), img.height());
         (img, dims)
     };
+    if let Some(o) = orientation.and_then(|o| Orientation::from_exif(o as u8)) {
+        image.apply_orientation(o);
+        if matches!(orientation, Some(5..=8)) {
+            std::mem::swap(&mut width, &mut height);
+        }
+    }
+    Ok(Decoded {
+        image,
+        width,
+        height,
+    })
+}
+
+fn decode_heic(bytes: &[u8], orientation: Option<u16>) -> Result<Decoded, DecodeError> {
+    let rgb = p2a_heic::decode(bytes, ANALYSIS_MIN).map_err(|e| match e {
+        p2a_heic::HeicError::Unsupported => DecodeError::Unsupported,
+        p2a_heic::HeicError::Corrupt(m) => DecodeError::Corrupt(m),
+    })?;
+    let mut image = DynamicImage::ImageRgb8(
+        image::RgbImage::from_raw(rgb.width, rgb.height, rgb.pixels)
+            .ok_or_else(|| DecodeError::Corrupt("uventet antall piksler".into()))?,
+    );
+    let (mut width, mut height) = (rgb.full_width, rgb.full_height);
     if let Some(o) = orientation.and_then(|o| Orientation::from_exif(o as u8)) {
         image.apply_orientation(o);
         if matches!(orientation, Some(5..=8)) {
@@ -175,8 +199,10 @@ mod tests {
             decode_file(&p, Some("jpeg"), None),
             Err(DecodeError::Corrupt(_))
         ));
+        // Søppel er aldri gyldig HEIC: enten ingen dekoder, eller skadet.
+        assert!(decode_file(&p, Some("heic"), None).is_err());
         assert!(matches!(
-            decode_file(&p, Some("heic"), None),
+            decode_file(&p, Some("tiff"), None),
             Err(DecodeError::Unsupported)
         ));
     }
