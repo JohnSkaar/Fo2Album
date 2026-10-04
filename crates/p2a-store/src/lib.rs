@@ -15,6 +15,7 @@
 mod catalog;
 mod choices;
 mod crypto;
+mod faces;
 mod keystore;
 mod profile;
 mod recovery;
@@ -32,6 +33,7 @@ pub use catalog::{
     CatalogSummary, FileEntry, FileToRead, PhotoSummary, ReadOutcome, Source, SyncReport,
 };
 pub use crypto::MasterKey;
+pub use faces::{FaceGroup, FaceSample, NewFace, StoredFace, GROUP_IGNORED, GROUP_UNNAMED};
 pub use keystore::{FileKeyStore, KeyStore, KeyStoreError, MemoryKeyStore};
 pub use profile::{Comment, NewComment, Person, Relation};
 pub use recovery::{RecoveryKey, RecoveryParseError};

@@ -2973,6 +2973,7 @@ dependencies = [
  "jpeg-decoder",
  "kamadak-exif",
  "p2a-core",
+ "p2a-faces",
  "p2a-heic",
  "p2a-store",
  "rayon",

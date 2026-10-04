@@ -15,6 +15,7 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 jpeg-decoder = { version = "0.3", default-features = false }
 kamadak-exif = "0.6"
 p2a-core.workspace = true
+p2a-faces = { version = "0.1.0", path = "../p2a-faces" }
 p2a-heic = { version = "0.1.0", path = "../p2a-heic" }
 p2a-store = { version = "0.1.0", path = "../p2a-store" }
 rayon = "1"

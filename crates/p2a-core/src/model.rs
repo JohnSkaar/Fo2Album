@@ -392,6 +392,33 @@ pub struct PhotoMeta {
     pub quality: Option<BasicQuality>,
 }
 
+/// Et ansikt i et bilde (M4). Boksen er andeler (0–1) av bildets bredde og høyde.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FaceInfo {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    /// Hvor sikker modellen er på at det er et ansikt, 0–1.
+    pub score: f32,
+    /// Skarphet i ansiktet, 0–1.
+    pub sharpness: f32,
+    /// Personen i familieprofilen, hvis brukeren har navngitt gruppen (eller appen er sikker).
+    pub person: Option<i64>,
+    /// Gruppen appen har lagt ansiktet i (samme person), også når den ikke har navn ennå.
+    pub group: Option<i64>,
+    /// Brukeren har sagt at denne gruppen ikke skal telle (fremmede, bakgrunn).
+    pub ignored: bool,
+}
+
+impl FaceInfo {
+    /// Et ansikt som teller: ikke ignorert, og stort nok til å synes (minst 4 % av bildehøyden,
+    /// SCORING.md §3.3).
+    pub fn counts(&self) -> bool {
+        !self.ignored && self.h >= 0.04
+    }
+}
+
 /// Prototypens enkle kvalitetsmål, alle 0–1. Grunnlaget for utgangspunktet
 /// (`select::baseline`) som M3 skal slå på gullsettet.
 #[derive(Debug, Clone, Copy, PartialEq)]

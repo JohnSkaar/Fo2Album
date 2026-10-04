@@ -11,7 +11,9 @@
 //! 3. Serier (innen 20 s) og nesten like bilder (pHash) gir bare ett bilde hver.
 //! 4. Skarphet måles mot resten av året (rangering), så «uskarpt» betyr uskarpt for denne
 //!    familiens kamera og lys.
-//! 5. Personer først: bilder med personer (foreløpig gjettet fra hudtoner) får et tillegg.
+//! 5. Personer først: bilder med personer (ansikter fra M4; hudtoner der ansiktene ikke er
+//!    funnet ennå) får et tillegg. Barna i familien får omtrent like mange bilder i hver
+//!    historie. En tur over flere dager der ingen av barna er med, blir en tur uten barn.
 //!    Ting uten personer er med bare når de er et flott stemningsbilde, og da høyst ett per
 //!    hendelse; på en tur der nesten ingen bilder har personer, er naturen selve historien.
 //! 6. Innen hendelsen: grådig valg som veier kvalitet mot å vise flere deler av hendelsen.
@@ -28,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 use crate::events::EVENT_GAP_SECONDS;
 use crate::layout::{self, Page, PageKind, Single};
 use crate::learn::Preferences;
-use crate::{BasicQuality, ContentHash, PhotoMeta, TakenAt};
+use crate::{BasicQuality, ContentHash, FaceInfo, PhotoMeta, TakenAt};
 
 /// Parametre (SCORING.md §11). Startverdier, kalibreres mot evalueringssettet.
 #[derive(Debug, Clone, PartialEq)]
@@ -70,6 +72,11 @@ pub struct DraftConfig {
     pub people_bonus: f32,
     /// Hendelser der færre enn denne andelen har personer, er turer i naturen.
     pub nature_people_share: f32,
+    /// Tillegg for et bilde med et av barna som har få bilder i historien så langt
+    /// (lik fordeling, M4).
+    pub child_balance: f32,
+    /// Så mange bilder med ansikter må en tur ha før appen selv sier «uten barn».
+    pub adult_trip_min_faces: usize,
 }
 
 impl Default for DraftConfig {
@@ -97,6 +104,8 @@ impl Default for DraftConfig {
             people_skin: 0.02,
             people_bonus: 0.3,
             nature_people_share: 0.25,
+            child_balance: 0.3,
+            adult_trip_min_faces: 5,
         }
     }
 }
@@ -194,8 +203,10 @@ pub struct DraftEvent {
     pub layout: Vec<Page>,
     /// Små hendelser i en måned, samlet («hverdager»).
     pub everyday: bool,
-    /// Brukeren har sagt at dette er en tur uten barn.
+    /// Tur uten barn: brukeren har sagt det, eller ingen av barna er på bildene (M4).
     pub adult_trip: bool,
+    /// Appen gjenkjente selv at barna ikke er med (brukeren har ikke svart ennå).
+    pub adult_trip_guess: bool,
     /// Ser ut som en tur over flere dager: appen spør om den var uten barn.
     pub looks_like_trip: bool,
     /// Indekser (i `layout`) til sider brukeren er fornøyd med.
@@ -225,6 +236,12 @@ pub struct DraftHints {
     /// Dager brukeren har slått sammen til én historie: hendelser som har et bilde i samme
     /// sett, blir én.
     pub merged_events: Vec<HashSet<ContentHash>>,
+    /// Hendelser brukeren har sagt ikke er en tur uten barn (går foran appens gjenkjenning).
+    pub family_trips: HashSet<ContentHash>,
+    /// Ansiktene i bildene (M4). Bilder som ikke er gått gjennom, mangler; da brukes hudtoner.
+    pub faces: HashMap<ContentHash, Vec<FaceInfo>>,
+    /// Personene (`FaceInfo::person`) som er barna i familien.
+    pub children: HashSet<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -258,6 +275,9 @@ struct Item<'a> {
     decision: Option<Decision>,
     /// `None` når bildet ikke er målt ennå.
     people: Option<bool>,
+    /// Personene i bildet (person i profilen, ellers appens gruppe), med hvor godt ansiktet
+    /// er (høyde × skarphet).
+    persons: Vec<(i64, f32)>,
     mood: bool,
     /// Blant årets aller flotteste bilder (estetikk).
     exceptional: bool,
@@ -300,7 +320,17 @@ pub fn make_draft(
                 sharp: rank(q.sharp),
                 ..q
             });
-            let people = raw.map(|q| q.skin >= cfg.people_skin);
+            let faces = hints.faces.get(&p.hash);
+            let persons: Vec<(i64, f32)> = faces
+                .into_iter()
+                .flatten()
+                .filter(|f| f.counts())
+                .filter_map(|f| Some((f.person.or(f.group)?, f.h * f.sharpness)))
+                .collect();
+            let people = match faces {
+                Some(fs) => Some(fs.iter().any(FaceInfo::counts)),
+                None => raw.map(|q| q.skin >= cfg.people_skin),
+            };
             let mut q = rel.map_or(0.5, |q| prefs.quality(&q));
             if people == Some(true) {
                 q += cfg.people_bonus;
@@ -319,6 +349,7 @@ pub fn make_draft(
                 noise: noise(p, cfg),
                 decision,
                 people,
+                persons,
                 mood: false,
                 exceptional: false,
                 blurry: raw
@@ -339,11 +370,17 @@ pub fn make_draft(
         .enumerate()
         .map(|(i, it)| (it.p.hash, i))
         .collect();
-    for g in &mut groups {
-        g.adult_trip = g
-            .members
-            .iter()
-            .any(|&i| hints.adult_trips.contains(&items[i].p.hash));
+    for (k, g) in groups.iter_mut().enumerate() {
+        let said =
+            |set: &HashSet<ContentHash>| g.members.iter().any(|&i| set.contains(&items[i].p.hash));
+        g.adult_trip = said(&hints.adult_trips);
+        if !g.adult_trip
+            && !said(&hints.family_trips)
+            && no_children(g, &items, nature[k], hints, cfg)
+        {
+            g.adult_trip = true;
+            g.adult_trip_guess = true;
+        }
         g.target = g
             .members
             .iter()
@@ -389,6 +426,7 @@ pub fn make_draft(
     let scale = page_scale(&groups, cfg, hints.album_pages);
     let targets: Vec<usize> = groups.iter().map(|g| target_pages(g, cfg, scale)).collect();
     let mut left_pages = vec![0; groups.len()];
+    let mut portraits: Vec<Vec<usize>> = vec![Vec::new(); groups.len()];
     for (g, group) in groups.iter().enumerate() {
         for (_, idx) in &locked_in[g] {
             idx.iter().for_each(|&i| included[i] = true);
@@ -419,7 +457,17 @@ pub fn make_draft(
         } else {
             1
         };
-        let (picked, first, jumped) = pick(&pool, &items, quota, mood_max, prefs, cfg);
+        let (mut picked, first, jumped) =
+            pick(&pool, &items, quota, mood_max, &hints.children, prefs, cfg);
+        // Tur uten barn: alle personene får ett bilde hver, det beste ansiktet de har.
+        if group.adult_trip {
+            portraits[g] = portraits_for(&pool, &items, cfg.portrait_page_max);
+            for &i in &portraits[g] {
+                if !picked.contains(&i) {
+                    picked.push(i);
+                }
+            }
+        }
         for &i in &picked {
             included[i] = true;
         }
@@ -463,9 +511,16 @@ pub fn make_draft(
                 })
                 .collect();
             pages.extend(
-                story_pages(&items, chosen, left_pages[g], group.adult_trip, cfg)
-                    .into_iter()
-                    .map(|p| (false, p)),
+                story_pages(
+                    &items,
+                    chosen,
+                    left_pages[g],
+                    group.adult_trip,
+                    &portraits[g],
+                    cfg,
+                )
+                .into_iter()
+                .map(|p| (false, p)),
             );
             pages.sort_by_key(|(_, p)| p.photos.iter().min().copied().unwrap_or(usize::MAX));
             let locked_pages = pages
@@ -491,6 +546,7 @@ pub fn make_draft(
                 layout,
                 everyday: group.everyday,
                 adult_trip: group.adult_trip,
+                adult_trip_guess: group.adult_trip_guess,
                 looks_like_trip: !group.everyday && !nature[g] && days >= 2,
                 locked_pages,
             }
@@ -745,6 +801,7 @@ struct Group {
     members: Vec<usize>,
     everyday: bool,
     adult_trip: bool,
+    adult_trip_guess: bool,
     /// Brukerens «presenter på x sider».
     target: Option<usize>,
 }
@@ -760,6 +817,7 @@ fn group_events(items: &[Item], cfg: &DraftConfig) -> Vec<Group> {
                 members: (a..b).collect(),
                 everyday: false,
                 adult_trip: false,
+                adult_trip_guess: false,
                 target: None,
             });
         } else {
@@ -769,6 +827,7 @@ fn group_events(items: &[Item], cfg: &DraftConfig) -> Vec<Group> {
                     members: Vec::new(),
                     everyday: true,
                     adult_trip: false,
+                    adult_trip_guess: false,
                     target: None,
                 });
                 groups.len() - 1
@@ -817,6 +876,7 @@ fn story_pages(
     chosen: &[usize],
     pages: usize,
     adult_trip: bool,
+    portraits: &[usize],
     cfg: &DraftConfig,
 ) -> Vec<Page> {
     if chosen.is_empty() || pages == 0 {
@@ -825,7 +885,19 @@ fn story_pages(
     let mut out = Vec::new();
     let mut rest: Vec<usize> = chosen.to_vec();
     let mut pages = pages;
-    if adult_trip && pages >= 2 {
+    if adult_trip && pages >= 2 && portraits.len() >= 2 {
+        let mut faces: Vec<usize> = portraits.to_vec();
+        faces.sort();
+        rest.retain(|i| !faces.contains(i));
+        out.push(Page {
+            kind: PageKind::Rutenett {
+                kolonner: if faces.len() <= 4 { 2 } else { 3 },
+            },
+            photos: faces,
+        });
+        pages -= 1;
+    } else if adult_trip && pages >= 2 {
+        // Uten ansikter: nærbilder gjettet fra hudtoner.
         let mut faces: Vec<usize> = chosen
             .iter()
             .copied()
@@ -908,11 +980,78 @@ fn similar(a: &Item, b: &Item, prefs: &Preferences, cfg: &DraftConfig) -> bool {
 
 /// Velger bilder i én gruppe. Returnerer valgte, det første automatiske valget, og valg der
 /// et bedre bilde ble hoppet over for å vise en annen del av hendelsen.
+/// Tur over flere dager der appen kjenner barna, ser nok ansikter, og ingen av dem er barna.
+fn no_children(
+    g: &Group,
+    items: &[Item],
+    nature: bool,
+    hints: &DraftHints,
+    cfg: &DraftConfig,
+) -> bool {
+    if hints.children.is_empty() || g.everyday || nature {
+        return false;
+    }
+    let (first, last) = (g.members[0], *g.members.last().expect("ikke tom"));
+    if (items[last].t - items[first].t) / 86_400 < 1 {
+        return false;
+    }
+    let with_faces = g
+        .members
+        .iter()
+        .filter(|&&i| !items[i].persons.is_empty())
+        .count();
+    with_faces >= cfg.adult_trip_min_faces
+        && !g.members.iter().any(|&i| {
+            items[i]
+                .persons
+                .iter()
+                .any(|(p, _)| hints.children.contains(p))
+        })
+}
+
+/// Ett bilde per person: det med best ansikt (størst og skarpest), helst der personen er
+/// alene. Personene med flest bilder kommer først; høyst `max`. Brukerens «ikke med» holdes.
+fn portraits_for(pool: &[usize], items: &[Item], max: usize) -> Vec<usize> {
+    let mut count: HashMap<i64, usize> = HashMap::new();
+    for &i in pool {
+        for (p, _) in &items[i].persons {
+            *count.entry(*p).or_default() += 1;
+        }
+    }
+    let mut people: Vec<(i64, usize)> = count.into_iter().collect();
+    people.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let mut out: Vec<usize> = Vec::new();
+    for (p, _) in people {
+        if out.len() >= max {
+            break;
+        }
+        let best = pool
+            .iter()
+            .copied()
+            .filter(|&i| !out.contains(&i) && items[i].decision != Some(Decision::IkkeMed))
+            .filter_map(|i| {
+                let (_, score) = items[i].persons.iter().find(|(q, _)| *q == p)?;
+                let alone = if items[i].persons.len() == 1 {
+                    1.0
+                } else {
+                    0.6
+                };
+                Some((i, score * alone))
+            })
+            .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)));
+        if let Some((i, _)) = best {
+            out.push(i);
+        }
+    }
+    out
+}
+
 fn pick(
     members: &[usize],
     items: &[Item],
     quota: usize,
     mood_max: usize,
+    children: &HashSet<i64>,
     prefs: &Preferences,
     cfg: &DraftConfig,
 ) -> (Vec<usize>, Option<usize>, Vec<usize>) {
@@ -943,6 +1082,22 @@ fn pick(
     let mut jumped = Vec::new();
     // Høyst ett stemningsbilde per hendelse (tre på turer uten barn), unntatt i naturen.
     let mut moods = chosen.iter().filter(|&&i| items[i].mood).count();
+    // Lik fordeling av barna: et bilde med et barn som har få bilder i historien så langt,
+    // får et tillegg som minker for hvert bilde barnet får.
+    let child_gain = |i: usize, chosen: &[usize]| {
+        items[i]
+            .persons
+            .iter()
+            .filter(|(p, _)| children.contains(p))
+            .map(|(p, _)| {
+                let n = chosen
+                    .iter()
+                    .filter(|&&j| items[j].persons.iter().any(|(q, _)| q == p))
+                    .count();
+                cfg.child_balance / (1.0 + n as f32)
+            })
+            .fold(0.0, f32::max)
+    };
 
     while chosen.len() < quota {
         let blocked = |i: usize, chosen: &[usize]| {
@@ -962,7 +1117,7 @@ fn pick(
                 .map(|&j| (items[i].t - items[j].t).abs())
                 .min()
                 .map_or(1.0, |d| (d as f32 / step).min(1.0));
-            imp * items[i].q + (1.0 - imp) * spread
+            imp * items[i].q + (1.0 - imp) * spread + child_gain(i, &chosen)
         };
         let Some(best) = open.iter().copied().max_by(|&a, &b| {
             value(a)
@@ -1493,6 +1648,117 @@ mod tests {
             .photos
             .iter()
             .all(|&i| d.photos[i].reason != Reason::Stemningsbilde));
+    }
+
+    fn face(person: i64) -> FaceInfo {
+        FaceInfo {
+            x: 0.3,
+            y: 0.2,
+            w: 0.2,
+            h: 0.25,
+            score: 0.95,
+            sharpness: 0.6,
+            person: Some(person),
+            group: Some(person),
+            ignored: false,
+        }
+    }
+
+    /// Ansikter i turen: voksne 10, 11 og 12 (eller barnet 1 i hvert tiende bilde).
+    fn trip_faces(photos: &[PhotoMeta], with_child: bool) -> DraftHints {
+        let mut faces = HashMap::new();
+        for (k, p) in photos
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| p.taken_at.unwrap().month == 6)
+        {
+            let mut fs = vec![face(10 + (k % 3) as i64)];
+            if with_child && k % 10 == 0 {
+                fs.push(face(1));
+            }
+            faces.insert(p.hash, fs);
+        }
+        DraftHints {
+            faces,
+            children: [1].into(),
+            ..DraftHints::default()
+        }
+    }
+
+    #[test]
+    fn trip_without_the_children_is_recognised_and_everyone_gets_a_portrait() {
+        let photos = trip();
+        let h = trip_faces(&photos, false);
+        let d = with(&photos, &h);
+        let e = trip_event(&d);
+        assert!(e.adult_trip && e.adult_trip_guess, "ingen av barna er med");
+        assert!((2..=5).contains(&e.pages), "{} sider", e.pages);
+        let people: HashSet<i64> = e.layout[0]
+            .photos
+            .iter()
+            .flat_map(|&i| h.faces[&d.photos[i].hash].iter().map(|f| f.person.unwrap()))
+            .collect();
+        assert_eq!(e.layout[0].photos.len(), 3, "ett portrett per person");
+        assert_eq!(people, [10, 11, 12].into());
+
+        // Med barnet på bildene er det en familietur.
+        let d = with(&photos, &trip_faces(&photos, true));
+        assert!(!trip_event(&d).adult_trip);
+        // Brukerens «nei» går foran appens gjenkjenning.
+        let mut said_no = h.clone();
+        said_no.family_trips.insert(photos[0].hash);
+        assert!(!trip_event(&with(&photos, &said_no)).adult_trip);
+    }
+
+    #[test]
+    fn children_get_about_the_same_number_of_photos() {
+        // Barn 1 er på de fleste og skarpeste bildene; barn 2 på hvert femte.
+        let photos = day(0, 5, 17, 120);
+        let mut faces = HashMap::new();
+        for (k, p) in photos.iter().enumerate() {
+            faces.insert(p.hash, vec![face(if k % 5 == 0 { 2 } else { 1 })]);
+        }
+        let count = |d: &Draft, who: i64| {
+            d.included()
+                .filter(|p| faces[&p.hash][0].person == Some(who))
+                .count()
+        };
+        let plain = DraftHints {
+            faces: faces.clone(),
+            ..DraftHints::default()
+        };
+        let kids = DraftHints {
+            faces: faces.clone(),
+            children: [1, 2].into(),
+            ..DraftHints::default()
+        };
+        let (a, b) = (with(&photos, &plain), with(&photos, &kids));
+        let (a1, a2, b1, b2) = (count(&a, 1), count(&a, 2), count(&b, 1), count(&b, 2));
+        assert!(b2 > a2, "barn 2 får flere bilder: {a2} → {b2}");
+        assert!(
+            (b1 as i64 - b2 as i64).abs() <= (a1 as i64 - a2 as i64).abs(),
+            "jevnere: {a1}/{a2} → {b1}/{b2}"
+        );
+    }
+
+    #[test]
+    fn faces_decide_people_over_skin_tones() {
+        // Hudtoner, men ansiktene er gått gjennom og ingen ble funnet: ikke personer.
+        let mut photos = day(0, 8, 2, 40);
+        for p in &mut photos {
+            p.quality.as_mut().unwrap().skin = 0.2;
+        }
+        let none = DraftHints {
+            faces: photos.iter().map(|p| (p.hash, vec![])).collect(),
+            ..DraftHints::default()
+        };
+        let (skin, faces) = (draft(&photos, &HashMap::new()), with(&photos, &none));
+        assert!(
+            faces.included().count() < skin.included().count(),
+            "uten ansikter er bildene ting: {} mot {}",
+            faces.included().count(),
+            skin.included().count()
+        );
     }
 
     #[test]

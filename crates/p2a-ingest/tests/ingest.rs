@@ -363,3 +363,41 @@ fn heic_is_decoded_where_the_platform_can() {
         assert_eq!(report.summary.photos + report.summary.unreadable, 1);
     }
 }
+
+/// Ansikter med ekte bilder. Kjør med
+/// `P2A_ANSIKTSMAPPE=/sti cargo test -p p2a-ingest -- --ignored --nocapture`.
+/// Mappen bør ha minst to bilder av samme person; de skal havne i samme gruppe.
+#[test]
+#[ignore]
+fn ansikter_grupperes_i_personer() {
+    let dir = std::env::var("P2A_ANSIKTSMAPPE").expect("P2A_ANSIKTSMAPPE");
+    let data = tempfile::tempdir().unwrap();
+    let keys = MemoryKeyStore::default();
+    let (mut store, _) = Store::create(data.path(), &keys).unwrap();
+    store
+        .add_source(SourceKind::Pc, Path::new(&dir), "Ansikter")
+        .unwrap();
+    let mut phases = Vec::new();
+    let report = ingest_all(
+        &mut store,
+        &DedupConfig::default(),
+        &AtomicBool::new(false),
+        &mut |p: Progress| phases.push(p.phase),
+    )
+    .unwrap();
+    assert!(phases.contains(&Phase::Personer));
+    assert!(report.faces > 0);
+    let groups = store.face_groups(2, 3).unwrap();
+    for g in &groups {
+        println!(
+            "gruppe {}: {} ansikter i {} bilder",
+            g.group, g.faces, g.photos
+        );
+    }
+    assert!(
+        groups.iter().any(|g| g.photos >= 2),
+        "samme person i flere bilder"
+    );
+    // Andre gang er alt gjort: ingen ansikter mangler.
+    assert!(store.photos_missing_faces().unwrap().is_empty());
+}

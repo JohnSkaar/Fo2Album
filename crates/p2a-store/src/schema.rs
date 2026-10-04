@@ -135,6 +135,26 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE photos ADD COLUMN q_skin REAL;
     UPDATE photos SET q_sharp = NULL, q_exposure = NULL, q_color = NULL;
     "#,
+    // 5: ansikter (M4). Kjennetegnene er personopplysninger og ligger bare her, i den
+    // krypterte databasen.
+    r#"
+    CREATE TABLE faces (
+        id            INTEGER PRIMARY KEY,
+        content_hash  BLOB NOT NULL REFERENCES photos(content_hash) ON DELETE CASCADE,
+        x REAL NOT NULL, y REAL NOT NULL, w REAL NOT NULL, h REAL NOT NULL,  -- andeler 0–1
+        landmarks     BLOB NOT NULL,             -- 10 × f32, andeler
+        score         REAL NOT NULL,
+        sharpness     REAL NOT NULL,
+        embedding     BLOB NOT NULL,             -- 128 × f32
+        grp           INTEGER,                   -- gruppen fra grupperingen (samme person)
+        person_id     INTEGER REFERENCES persons(id) ON DELETE SET NULL,
+        confirmed     INTEGER NOT NULL DEFAULT 0,  -- brukeren har plassert ansiktet selv
+        ignored       INTEGER NOT NULL DEFAULT 0   -- skal ikke telle (fremmede, bakgrunn)
+    );
+    CREATE INDEX faces_photo ON faces(content_hash);
+    CREATE INDEX faces_grp ON faces(grp);
+    ALTER TABLE photos ADD COLUMN faces_done INTEGER NOT NULL DEFAULT 0;
+    "#,
 ];
 
 pub const CURRENT_VERSION: i64 = MIGRATIONS.len() as i64;

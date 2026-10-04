@@ -7,11 +7,14 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 
 use p2a_core::config::DedupConfig;
 use p2a_core::{dedup, ContentHash, DateSource, PhotoMeta, TakenAt};
+use p2a_faces::{cluster, Embedding, FaceEngine};
 use p2a_store::{
-    CatalogSummary, FileEntry, FileToRead, ReadOutcome, Store, StoreError, SyncReport,
+    CatalogSummary, FileEntry, FileToRead, NewFace, ReadOutcome, Store, StoreError, SyncReport,
+    GROUP_UNNAMED,
 };
 use rayon::prelude::*;
 
@@ -30,6 +33,10 @@ pub enum Phase {
     Leser,
     /// Leter etter transkodede dubletter.
     Dubletter,
+    /// Finner ansikter i bilder som er lest av en eldre versjon.
+    Ansikter,
+    /// Grupperer ansiktene i personer.
+    Personer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -50,6 +57,8 @@ pub struct IngestReport {
     /// Kilder som ikke finnes (f.eks. frakoblet disk). Hoppes over, slettes ikke.
     pub missing_sources: Vec<String>,
     pub cancelled: bool,
+    /// Antall ansikter i katalogen etter grupperingen.
+    pub faces: usize,
     pub summary: CatalogSummary,
 }
 
@@ -66,6 +75,82 @@ struct Analyzed {
     meta: PhotoMeta,
     /// JPEG-miniatyr, krypteres før den lagres. `None` hvis formatet ikke kan dekodes ennå.
     thumbnail: Option<Vec<u8>>,
+    /// Ansiktene, hvis bildet kunne dekodes og modellene er lastet.
+    faces: Option<Vec<NewFace>>,
+}
+
+/// Ansiktsmodellene lastes én gang per kjøring av programmet. `None` hvis de ikke kan lastes
+/// (da blir ansiktene funnet neste gang).
+fn engine() -> Option<&'static FaceEngine> {
+    static ENGINE: OnceLock<Option<FaceEngine>> = OnceLock::new();
+    ENGINE.get_or_init(|| FaceEngine::new().ok()).as_ref()
+}
+
+/// Ansiktene i et dekodet bilde, med boks og landemerker som andeler av bildet.
+fn find_faces(image: &image::DynamicImage) -> Option<Vec<NewFace>> {
+    let engine = engine()?;
+    let rgb = image.to_rgb8();
+    let (w, h) = (rgb.width().max(1) as f32, rgb.height().max(1) as f32);
+    let faces = engine.faces(&rgb).ok()?;
+    Some(
+        faces
+            .into_iter()
+            .map(|f| {
+                let d = &f.detection;
+                let mut landmarks = [0.0; 10];
+                for (i, [x, y]) in d.landmarks.iter().enumerate() {
+                    landmarks[2 * i] = x / w;
+                    landmarks[2 * i + 1] = y / h;
+                }
+                NewFace {
+                    x: d.x / w,
+                    y: d.y / h,
+                    w: d.w / w,
+                    h: d.h / h,
+                    landmarks,
+                    score: d.score,
+                    sharpness: f.sharpness,
+                    embedding: f.embedding.to_bytes(),
+                }
+            })
+            .collect(),
+    )
+}
+
+/// Ansikter lavere enn dette (i punkter i originalbildet) grupperes ikke: kjennetegnet blir for
+/// usikkert. De telles fortsatt som personer i bildet.
+const MIN_FACE_PX: f32 = 36.0;
+
+/// Grupperer alle ansiktene i personer på nytt. Ansikter brukeren har plassert, flyttes ikke.
+pub fn group_faces(store: &mut Store) -> Result<usize, StoreError> {
+    let stored = store.stored_faces()?;
+    let embeddings: Vec<Option<Embedding>> = stored
+        .iter()
+        .map(|f| Embedding::from_bytes(&f.embedding))
+        .collect();
+    let mut ids = Vec::new();
+    let mut items = Vec::new();
+    for (f, e) in stored.iter().zip(&embeddings) {
+        if let Some(e) = e
+            .as_ref()
+            .filter(|_| f.fixed.is_some() || f.pixels >= MIN_FACE_PX)
+        {
+            ids.push(f.id);
+            items.push(cluster::Item {
+                embedding: e,
+                quality: f.quality,
+                fixed: f.fixed.map(|g| g as u32),
+                photo: f.photo as u64,
+            });
+        }
+    }
+    let labels = cluster::cluster(&items, p2a_faces::SAME_PERSON, GROUP_UNNAMED as u32);
+    let groups: Vec<(i64, i64)> = ids
+        .into_iter()
+        .zip(labels.into_iter().map(i64::from))
+        .collect();
+    store.set_face_groups(&groups)?;
+    Ok(groups.len())
 }
 
 /// Leser alle kildene i katalogen.
@@ -181,6 +266,11 @@ pub fn ingest_all(
                 store.set_has_thumbnail(h)?;
             }
         }
+        let faces: Vec<(ContentHash, Vec<NewFace>)> = analyzed
+            .iter()
+            .filter_map(|(h, a)| Some((*h, a.as_ref()?.faces.clone()?)))
+            .collect();
+        store.put_faces(&faces)?;
     }
     progress(Progress {
         phase: Phase::Leser,
@@ -225,6 +315,47 @@ pub fn ingest_all(
         });
     }
 
+    // 4. Ansikter i bilder som er lest av en eldre versjon (eller der modellene manglet).
+    if !report.cancelled && engine().is_some() {
+        let missing = store.photos_missing_faces()?;
+        let total = missing.len();
+        for (n, chunk) in missing.chunks(BATCH).enumerate() {
+            if cancel.load(Ordering::Relaxed) {
+                report.cancelled = true;
+                break;
+            }
+            progress(Progress {
+                phase: Phase::Ansikter,
+                done: n * BATCH,
+                total,
+            });
+            let found: Vec<(ContentHash, Vec<NewFace>)> = chunk
+                .par_iter()
+                .filter_map(|(h, root, rel, format, orientation)| {
+                    let path = scan::full_path(root, rel);
+                    let d = decode::decode_file(&path, format.as_deref(), *orientation).ok()?;
+                    Some((*h, find_faces(&d.image)?))
+                })
+                .collect();
+            store.put_faces(&found)?;
+        }
+    }
+
+    // 5. Personer: grupper ansiktene på nytt når noe er nytt.
+    if !report.cancelled {
+        progress(Progress {
+            phase: Phase::Personer,
+            done: 0,
+            total: 1,
+        });
+        report.faces = group_faces(store)?;
+        progress(Progress {
+            phase: Phase::Personer,
+            done: 1,
+            total: 1,
+        });
+    }
+
     report.summary = store.summary()?;
     Ok(report)
 }
@@ -246,6 +377,7 @@ fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
         meta.width = e.width;
         meta.height = e.height;
     }
+    let mut faces = None;
     let thumbnail = match decode::decode_file(path, meta.format.as_deref(), meta.orientation) {
         Ok(decoded) => {
             // Mål etter rotering, så stående og liggende bilder får riktig form i albumet.
@@ -253,12 +385,17 @@ fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
             meta.height = Some(decoded.height);
             meta.phash = Some(phash::phash(&decoded.image));
             meta.quality = Some(features::basic_quality(&decoded.image));
+            faces = find_faces(&decoded.image);
             Some(decode::thumbnail_jpeg(&decoded))
         }
         Err(DecodeError::Unsupported) => None,
         Err(DecodeError::Corrupt(_) | DecodeError::Io(_)) => return None,
     };
-    Some(Analyzed { meta, thumbnail })
+    Some(Analyzed {
+        meta,
+        thumbnail,
+        faces,
+    })
 }
 
 fn format_of(name: &str) -> Option<&'static str> {

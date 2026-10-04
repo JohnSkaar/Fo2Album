@@ -11,7 +11,7 @@ use p2a_core::config::DedupConfig;
 use p2a_core::layout::PageKind;
 use p2a_core::learn::{learn, Action, Feedback, FeedbackReason, Lesson, Preferences};
 use p2a_core::select::draft::{make_draft, Decision, DraftConfig, DraftHints, Phase, Reason};
-use p2a_core::{ContentHash, SourceKind};
+use p2a_core::{ContentHash, Role, SourceKind};
 use p2a_ingest::pipeline::{ingest_all, IngestReport, Progress};
 use p2a_ingest::sources;
 use p2a_store::{CatalogSummary, PhotoSummary, RecoveryKey, Store, StoreError, VaultStatus};
@@ -459,6 +459,8 @@ pub struct DraftEventDto {
     /// Ser ut som en tur over flere dager; appen kan spørre om den var uten barn.
     looks_like_trip: bool,
     adult_trip: bool,
+    /// Appen så selv at ingen av barna er med (M4).
+    adult_trip_guess: bool,
     layout: Vec<PageDto>,
 }
 
@@ -538,6 +540,17 @@ fn draft_for(
         .collect();
     let decisions = store.decisions(year)?;
     let (prefs, learned) = learned_from(&store.feedback_log()?);
+    // Personene (M4): ansiktene i årets bilder og hvem som er barna i familien.
+    let people = DraftHints {
+        faces: store.faces_in_year(year)?,
+        children: store
+            .persons()?
+            .into_iter()
+            .filter(|p| p.role == Role::Barn)
+            .map(|p| p.id)
+            .collect(),
+        ..DraftHints::default()
+    };
     // Med sidetak regnes også hele historien ut, så brukeren ser hva den ville kostet.
     let full_pages = page_cap.map(|_| {
         make_draft(
@@ -545,7 +558,7 @@ fn draft_for(
             &decisions,
             &prefs,
             &DraftConfig::default(),
-            &DraftHints::default(),
+            &people,
             &mut |_| {},
         )
         .pages()
@@ -557,7 +570,7 @@ fn draft_for(
         &DraftConfig::default(),
         &DraftHints {
             album_pages: page_cap,
-            ..DraftHints::default()
+            ..people.clone()
         },
         &mut |phase| {
             progress(match phase {
@@ -587,6 +600,7 @@ fn draft_for(
                 everyday: e.everyday,
                 looks_like_trip: e.looks_like_trip,
                 adult_trip: e.adult_trip,
+                adult_trip_guess: e.adult_trip_guess,
                 layout: e
                     .layout
                     .iter()
