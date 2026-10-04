@@ -96,6 +96,12 @@ fn decode_heic(bytes: &[u8], orientation: Option<u16>) -> Result<Decoded, Decode
     })
 }
 
+/// Dekoder JPEG fra minnet i redusert størrelse (lengste side minst [`ANALYSIS_MIN`]).
+/// Brukes bl.a. for bilder hentet ut av album-PDF-er.
+pub fn decode_jpeg_bytes(bytes: &[u8]) -> Result<DynamicImage, DecodeError> {
+    decode_jpeg_scaled(bytes).map(|(img, _)| img)
+}
+
 /// Dekoder JPEG i redusert størrelse. Returnerer bildet og originalens mål.
 fn decode_jpeg_scaled(bytes: &[u8]) -> Result<(DynamicImage, (u32, u32)), DecodeError> {
     let corrupt = |e: jpeg_decoder::Error| DecodeError::Corrupt(e.to_string());

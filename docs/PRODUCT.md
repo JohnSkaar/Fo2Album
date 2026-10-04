@@ -17,15 +17,18 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 ## v1-omfang
 
 **Med:**
-- Ett produkt: **Årets familiealbum** (ett år, ett album). Format: innbundet 21 × 28 cm (endelige formater bestemmes med trykkeri).
+- Ett produkt: **Årets familiealbum** (ett år, ett album). Format: innbundet 21 × 28 cm (endelige formater bestemmes med trykkeri). **Normalt 200–300 sider** (som eierens egne album fra 2006–2010); sidetallet følger av hendelsene. Avklar med trykkeriet hvor mange sider innbindingen tåler.
 - Kilder: lokale mapper + de synkroniserte mappene til Dropbox, iCloud for Windows/Mac (iCloud Photos) og Google Drive for desktop. Brukeren legger til så mange mapper hun vil; hver mappe merkes med kilde.
 - Filformater: JPEG, HEIC/HEIF, PNG, WebP; ev. RAW senere. Videoer: hoppes over i v1 (ev. stillbilde fra Live Photo senere).
 - Dublettfjerning på tvers av kilder (eksakte og nesten like).
 - Analyse og poengsetting lokalt, med forklaring per bilde.
 - Personer: lokal ansiktsgjenkjenning og gruppering; brukeren navngir de viktigste og kan markere roller (barn, besteforeldre, venner) og «viktig for oss».
-- Utkast: forside, månedsvise kapitler, variert layout (helside, 2, 3, 4 bilder, serie-oppslag), bildetekster med måned/dato og stedsnavn.
+- Utkast: forside, kapitler per hendelse (hvert treffpunkt eller besøk minst én side, to når det er mange bilder) samlet i måneder, variert layout (helside, 2, 3, 4 bilder, serie-oppslag), bildetekster med måned/dato og stedsnavn. Sidetallet følger av hendelsene; brukeren kan sette et tak.
+- Alle personer med navn og profilbilde er med minst én gang.
 - Forsidehjelp (se under).
 - Redigering: bytte, flytte, fjerne, legge til, bytte layout per side, beskjære.
+- **Redigeringsvisning (eierens føring):** albumet vises slik det er, kronologisk side for side. Ved siden av vises bildene som **ikke** er med (fra samme tid/hendelse), hver med en kort begrunnelse («Nesten likt et bedre bilde», «Uskarpt», «Tre andre bilder fra samme øyeblikk er med»), så det er lett å bytte inn.
+- **Tekst på sidene er valgfritt.** Standard er at det **ikke står noe annet enn bildene**. Kunden kan slå på datoer per side, sidetall og bildetekster (sted/hendelse) hver for seg.
 - **Helhetsvurdering:** uskarpe bilder utelukkes ikke før appen har vurdert hvor mye personen og situasjonen betyr (se `SCORING.md` §3.6 og §6.1). Uskarpe, men viktige bilder får litt mindre plass.
 - **Oppskarping** tilbys for bilder brukeren vil fremheve; aldri automatisk, og originalen endres ikke.
 - **Kommentarer på utkastet** (bilde, side, person, hendelse, hele albumet). Strukturerte kommentarer justerer utvalget; fritekst lagres og vises igjen.
@@ -40,11 +43,16 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 1. **Velkommen** → «Velg bildemappene dere vil lage årets familiealbum av». Kort med kilder: PC, Dropbox, iCloud, Google Disk. Hjelpetekst om hvor mappene vanligvis ligger. Appen kan foreslå kjente stier automatisk (med samtykke).
 2. **Velg år** (standard: forrige kalenderår, eller året med flest bilder).
 3. **Analyse** (kan ta tid; vis fremdrift og hva som skjer: «Fant 8 412 bilder · 1 230 dubletter · leter etter de beste …»). Fortsett i bakgrunnen; kan pauses.
-4. **Hvem er med?** Vis de 6–12 største ansiktsgruppene. Brukeren navngir og markerer roller. Spør særskilt: «Er det noen som er spesielt viktige å få med, som besteforeldre eller oldeforeldre?»
+3b. **Komplett utkast først (eierens føring).** Appen foreslår et ferdig album, med alle sider, før brukeren har valgt noe som helst. Brukeren justerer etterpå; hun skal aldri måtte bygge albumet fra et tomt utvalg. Stegene under forbedrer utkastet, de er ikke forutsetninger for det.
+4. **Hvem er med?** (forbedrer utkastet; ukjente personer er med som «person 1, 2 …» til de får navn) Vis de 6–12 største ansiktsgruppene. Brukeren navngir og markerer roller. Spør særskilt: «Er det noen som er spesielt viktige å få med, som besteforeldre eller oldeforeldre?»
 5. **Forslag**: rutenett per måned med forslaget forhåndsvalgt, poeng og begrunnelse ved hover («Skarp, alle smiler, oldemor er med – 1 av 4 bilder av henne i år»).
 6. **Forside** (se under).
 7. **Utkast** → redigering og **kommentarer** → **Lagre PDF / Bestill**.
 8. **Neste år:** appen åpner med familieprofilen: kjente personer, fjorårets kommentarer og det den har lært. Brukeren bekrefter eller justerer før analysen starter.
+
+## Mine album (historikk og «Bestill flere»)
+
+Forslag, venter på beslutning (se ARCHITECTURE.md, «Identitet, historikk og bytte av maskin»). Eieren vil ha en historikk som hos Blurb: én rad per album med forside, tittel, år, sider, format og dato, og knappene **Forhåndsvis**, **Bestill flere**, **Last ned PDF** og **Slett**. Historikken er knyttet til nøkkelen, så den følger familien ved bytte av PC (gjenopprettingsnøkkel eller kryptert sikkerhetskopi). Det finnes ingen mobilapp i v1; bytte av telefon påvirker bare hvor bildene kommer fra (iCloud og Google beholder dem).
 
 ## Personvern: hva vi vet om kunden
 

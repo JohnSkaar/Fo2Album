@@ -57,6 +57,7 @@ cargo deny check             # lisenser og forbudte pakker
 cargo run --release -p p2a-cli -- bench --antall 1000 --bredde 4032   # ytelsesmåling
 cargo run -p p2a-cli -- demo --data /tmp/p2a-demo                     # testdata, så:
 P2A_DATA_DIR=/tmp/p2a-demo pnpm dev                                   # appen med testdataene
+cargo run --release -p p2a-cli -- eval kjor --resultater eval/RESULTS.md # evaluering (se eval/LES-MEG.md)
 ```
 
 ## Arbeidsmåte

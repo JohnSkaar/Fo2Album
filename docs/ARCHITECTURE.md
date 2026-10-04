@@ -29,6 +29,14 @@
   - Testet: ingen klartekst (navn, «SQLite format 3», miniatyrinnhold) finnes i filene på disken (`crates/p2a-store/tests/vault.rs`).
 - **«Slett alle data»** sletter databasen, miniatyrene og nøkkelen i nøkkelringen.
 
+### Identitet, historikk og bytte av maskin (forslag)
+
+- **Kunde-ID avledes fra hovednøkkelen** (HKDF → Ed25519-nøkkelpar). Den som har gjenopprettingsnøkkelen, får dermed tilbake både familieprofilen og kunde-ID-en på en ny maskin, og kan se og bestille tidligere album uten konto.
+- **Albumhistorikken** (prosjekt: hvilke bilder på hvilken side, tekster, beskjæring; pluss den ferdige trykk-PDF-en) ligger kryptert lokalt og er med i den krypterte sikkerhetskopien.
+- **«Bestill flere»** sender PDF-en fra det lokale arkivet på nytt. Mangler PDF-en (ny maskin uten sikkerhetskopi), lages den på nytt fra prosjektet så lenge bildene finnes.
+- **Hos oss** finnes bare ordrene (per kunde-ID), som i tabellen under.
+- **Åpent valg (alternativ B):** en ende-til-ende-kryptert kopi av familieprofilen og arkivet hos oss, som vi ikke kan lese. Gir enklere maskinbytte uten egen sikkerhetskopi, men bryter med prinsippet om at ingenting annet enn trykk-PDF-en forlater maskinen, og krever derfor eierens beslutning.
+
 ### Hos oss (minimalt)
 
 | Opplysning | Hvorfor | Hvor lenge |
@@ -51,7 +59,9 @@ crates/p2a-core/       domenetyper, poengsetting, utvalg, sideoppsett (ren, inge
 crates/p2a-ingest/     kilder, skanning, EXIF, dekoding, hashing, dubletter
 crates/p2a-store/      kryptert lagring (SQLCipher), katalog, familieprofil, miniatyrer, «Slett alle data»
 crates/p2a-heic/       HEIC via ImageIO (Mac) og WIC (Windows); eneste pakke med unsafe (FFI)
-crates/p2a-cli/        utviklerverktøy: `p2a bench` (ytelse), `p2a demo` (testdata); evaluering i M2
+crates/p2a-cli/        verktøyet `p2a`: bench (ytelse), demo (testdata), les-inn, eval (gullsett og evaluering)
+crates/p2a-eval/       evaluering: bilder ut av album-PDF, matching mot biblioteket, gullsett, målinger
+crates/p2a-keychain/   nøkkelringen på Mac og Windows (delt av appen og p2a)
 crates/p2a-policy/     tester som håndhever prinsippene (ingen nettverk i analysekoden)
 scripts/               byggesjekker (ingen eksterne ressurser, røyktest)
 ```
@@ -86,6 +96,7 @@ Sjekkes automatisk av `cargo deny check licenses` (tillatte lisenser står i `de
 | `objc2-image-io`, `objc2-core-graphics`, `objc2-core-foundation` (bare Mac) | HEIC via ImageIO (`crates/p2a-heic`) | Zlib OR Apache-2.0 OR MIT | Dekoderen følger med macOS |
 | `windows` (bare Windows) | HEIC via WIC (`crates/p2a-heic`) | MIT OR Apache-2.0 | Krever «HEIF Image Extensions» og HEVC-støtte fra Microsoft Store; uten dem får HEIC-bilder ingen miniatyr, og appen sier fra |
 | `blake3` | Innholdshash | CC0-1.0 OR Apache-2.0 | |
+| `lopdf` | Lese bilder ut av album-PDF-er (evaluering, M2) | MIT | |
 | `walkdir`, `rayon`, `regex` | Skanning, parallell lesing, datoer i filnavn | MIT OR Apache-2.0 / Unlicense OR MIT | |
 
 Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.

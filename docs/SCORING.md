@@ -69,6 +69,8 @@ Scene-tagger via lokal null-skudd-klassifisering (CLIP-lignende) mot en fast nor
 
 Avledet **bildetype** (brukes til variasjon i §6 og §7): `portrett`, `par`, `gruppe`, `barn-lek/aksjon`, `landskap/stemning`, `detalj`, `mat`, `dyr`, `sted/bygning`.
 
+**Gjenstander er fyll, ikke hovedsak (eierens føring).** Bilder av ting (`detalj`, `mat`, gjenstander som en stige eller et verktøy) får normalt ingen egen plass. De brukes som stemningsfyll i rutenett når de bidrar til historien, og får bare stor plass hvis de er et ekte stemningsbilde (Q_aes i topp 1 %).
+
 ### 3.5 Kontekst `C`
 - **Hendelse** (§4.2): hvilket øyeblikk tilhører bildet, og hvor viktig er hendelsen.
 - **Sted:** GPS → omvendt geokoding **lokalt** (offline database, f.eks. GeoNames) til stedsnavn for bildetekster. Avstand fra «hjem» (det hyppigste overnattingsstedet) indikerer reise.
@@ -123,7 +125,7 @@ rar_p = 1 + α · exp(−n_p / τ)        α = 1.2, τ = 8
 ```
 En person med 3 gode bilder får ≈ ×1.83, en med 40 får ≈ ×1.01.
 
-**Dekning:** hver navngitt person med rolle ≠ annen skal være med i albumet minst `min_p` ganger (barn/kjernefamilie: 6, besteforeldre: 2, nær familie/venn: 1), hvis det finnes et akseptabelt bilde. **Akseptabelt** = `Q_tech ≥ 0.4`, eller for personer med `n_p ≤ 5`: det beste bildet som ikke er ubrukelig (§2). Kjernefamilien skal være rimelig jevnt fordelt (ikke 40 bilder av det ene barnet og 8 av det andre); balanse inngår i målfunksjonen (§6).
+**Dekning:** hver navngitt person skal være med i albumet minst `min_p` ganger (barn/kjernefamilie: 6, besteforeldre: 2, nær familie/venn: 1, **alle andre med profilbilde: 1**), hvis det finnes et akseptabelt bilde. Normalen er at alle personer brukeren har gitt navn og profilbilde, er med minst én gang i historien. **Akseptabelt** = `Q_tech ≥ 0.4`, eller for personer med `n_p ≤ 5`: det beste bildet som ikke er ubrukelig (§2). Kjernefamilien skal være rimelig jevnt fordelt (ikke 40 bilder av det ene barnet og 8 av det andre); balanse inngår i målfunksjonen (§6).
 
 ### 4.2 Hendelser
 1. Sorter bilder på tid. Del i hendelser når tidsgapet > `max(3 t, 2 × median-gap i nabolaget)` **eller** stedet endres > 30 km.
@@ -137,6 +139,7 @@ E_e = norm( 0.35·log(1 + antall bilder)            // hvor mye ble fotografert
           + 0.15·andel bilder med flere viktige personer )
 ```
 4. Hendelser får **kapittelplass**: viktige hendelser får flere sider; hverdager samles i månedsoppslag.
+5. **Hver hendelse er med (hardt krav, eierens føring 4. oktober 2026).** Albumet er historien om året, fortalt hendelse for hendelse: hvert treffpunkt eller besøk får **minst én side**, og **to sider** når det er tatt mange bilder (`event_two_pages_photos`, start 40). Unntak bare for «hendelser» med færre enn `event_min_photos` (start 3) akseptable bilder, f.eks. et enkelt bilde av en kvittering. Albumets lengde følger av hendelsene, ikke av et fast sidetall.
 
 ---
 
@@ -173,7 +176,7 @@ P_i = min(1, Σ_p∈i  w_p · rar_p · ansiktskvalitet_pi) / P_norm
 - Forklaringen skal si det når betydningen har reddet et uskarpt bilde: «Litt uskarpt, men det eneste bildet av oldemor i år».
 
 ### 6.2 Utvalg som optimering
-Antall bilder `K` bestemmes av antall sider (standard 40 sider ≈ 110–150 bilder, avhengig av layoutmiks). Velg mengden `A` (|A| = K) som maksimerer:
+Antall bilder `K` følger av hendelsene (§4.2 punkt 5): summen av sidene hendelsene krever, ganger bilder per side i layoutmiksen. Brukeren kan sette et tak på sider (pris), og da prioriteres hendelser etter viktighet `E_e`, men ingen hendelse skal falle helt ut uten at brukeren får beskjed. Velg mengden `A` (|A| = K) som maksimerer:
 
 ```
 F(A) =  Σ_i∈A S_i
@@ -186,7 +189,7 @@ F(A) =  Σ_i∈A S_i
 Startverdier: `λ_month = 0.6, λ_event = 0.8, λ_person = 1.0, λ_type = 0.4, λ_red = 2.0`.
 
 Kvadratrot-leddene gjør funksjonen submodulær (avtagende utbytte), så **grådig utvelgelse med «lazy evaluation»** gir et nær-optimalt resultat raskt. Deretter:
-- **Harde krav:** dekning `min_p` (§4.1), minst 3 bilder per måned med bilder (hvis det finnes ≥ 3 akseptable), maks 25 % fra én enkelt hendelse.
+- **Harde krav:** hver hendelse med minst `event_min_photos` akseptable bilder er med (§4.2 punkt 5), dekning `min_p` for alle navngitte personer (§4.1), minst 3 bilder per måned med bilder (hvis det finnes ≥ 3 akseptable), maks 25 % fra én enkelt hendelse.
 - **Lokal forbedring:** 1–2 runder med bytte (fjern ett, legg til ett) hvis F øker.
 
 ### 6.3 Brukerens egne signaler (lokalt)
@@ -205,12 +208,16 @@ Hvert valgt bilde får en **sidevekt** som avgjør plassen det får:
 
 | Plass | Kriterier (alle startverdier) |
 |---|---|
-| **Helside** | S i topp 5 % **og** oppløsning holder til helside, **og** minst én av: (a) sjelden viktig person (`n_p ≤ 5`, rolle besteforeldre/oldeforeldre/«spesielt viktig») med godt ansikt; (b) portrett av navngitt venn eller familiemedlem med Q_moment ≥ 0.8; (c) stemnings-/landskapsbilde med Q_aes i topp 3 %; (d) hendelsens «nøkkelbilde» for en hendelse med E ≥ 0.8 |
+| **Helside** | S i topp 5 % **og** oppløsning holder til helside, **og** minst én av: (a) sjelden viktig person (`n_p ≤ 5`, rolle besteforeldre/oldeforeldre/«spesielt viktig») med godt ansikt; (b) portrett av navngitt venn eller familiemedlem med Q_moment ≥ 0.8; (c) ekstremt flott natur/landskap (Q_aes i topp 1 %), helst som **åpning av en historie**; (d) hendelsens «nøkkelbilde» for en hendelse med E ≥ 0.8. **Aldri** for bildetype `detalj`/`mat`/gjenstand, uansett poeng (prototypen ga en stige helside; det skal ikke skje) |
 | **Halv side** (2-bildesmal, stort felt) | S i topp 20 % |
 | **Rutenett** (3–4 per side) | Resten, gruppert etter hendelse |
 | **Serie-oppslag** | Se §5 |
 
 **Uskarpe, men viktige bilder** får mindre plass, der uskarpheten synes mindre: `Q_tech < 0.5` gir aldri helside, og `Q_tech < 0.35` gir et felt i rutenett. Brukeren kan alltid gjøre bildet større. Senere: regn ut hvor stor uskarpheten blir på trykk (i mm) for feltstørrelsen, i stedet for faste terskler.
+
+**Sider per historie (hendelse):** minst 1, 2 når det er mange bilder (§4.2 punkt 5), og **maks 4 som utgangspunkt** for første utkast (`event_max_pages`). Ingen absolutt regel: de viktigste hendelsene (E ≥ 0.9, f.eks. sommerferien) kan få flere, og brukeren kan alltid utvide.
+
+**Stemningsbilder** er som standard **små drypp rundt omkring** (et felt i et rutenett mellom personbilder), ikke egne sider. Unntaket er ekstremt flott natur som åpner en historie (helside, kriterium c).
 
 **Rytme og variasjon i layout:**
 - Maks 1 helside per 4 sider i snitt, aldri to helsider ved siden av hverandre unntatt bevisst «oppslag-par» (to helsider som hører sammen, f.eks. landskap + portrett fra samme sted).
@@ -218,7 +225,7 @@ Hvert valgt bilde får en **sidevekt** som avgjør plassen det får:
 - Bland bildetyper på hvert oppslag: unngå et oppslag med bare gruppebilder; sett gjerne en detalj eller et stemningsbilde inn mellom.
 - Kronologi innen kapittel, men tillat små omrokkeringer (± 1 dag) for bedre komposisjon.
 - Kapittelstart: hendelser med E ≥ 0.6 får egen åpningsside med tittel (stedsnavn eller hendelse: «Sommer på Hvaler», «Jul hos besteforeldre»), ellers månedsoverskrift.
-- Bildetekster: dato og sted fra lokal geokoding; brukeren kan redigere.
+- Tekst: **standard er bare bilder, ingen tekst.** Kunden kan slå på dato per side, sidetall og bildetekster (sted fra lokal geokoding, hendelse) hver for seg, og redigere tekstene.
 
 **Oppløsningskrav:** effektiv ppi = pikselbredde / feltbredde i tommer. Under 150 ppi: ikke tillatt; 150–200: varsel; ≥ 200: ok. Helside 21 × 28 cm krever ≈ 1650 × 2200 px.
 
@@ -264,6 +271,7 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
    - **Eierens eget bibliotek:** fasit (ferdige album) for 2006–2010, som brukes som første gullsett og til kalibrering når hovedstrukturen er på plass. **2011** brukes som eierens eget testår uten fasit (bl.a. nyfødtbilder i dårlig lys), for å prøve helhetsvurderingen i §3.6 og §6.1 i praksis.
 2. **Metrikker:**
    - Presisjon/recall mot familiens eget utvalg (på hendelsesnivå og bildenivå; tillat «nesten samme bilde» som treff).
+   - **Hendelsesdekning** (viktigst etter eierens føring): andel av hendelsene (med minst `event_min_photos` bilder) som er med i utvalget, og andel av hendelsene i familiens eget album som også er med i utvalget. Måles også for familiens eget album, for å sjekke at «nesten alle hendelser er med» stemmer.
    - Dekning: andel navngitte personer over `min_p`; måneder representert.
    - Redundans: snitt av høyeste parvise likhet i utvalget.
    - Variasjon: entropi over bildetyper.
@@ -281,7 +289,11 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
 | near_dup_hamming | 6 | pHash-terskel for transkodede dubletter (begge har EXIF-tid, og tiden er innen ±2 s) |
 | near_dup_hamming_without_time | 4 | Strengere pHash-terskel når minst ett bilde mangler EXIF-tid (f.eks. WhatsApp-kopier) |
 | rarity_alpha / tau | 1.2 / 8 | Sjeldenhetsbonus |
-| min_p (barn, kjerne, besteforeldre, venn) | 6, 6, 2, 1 | Dekningskrav |
+| min_p (barn, kjerne, besteforeldre, venn, andre med profilbilde) | 6, 6, 2, 1, 1 | Dekningskrav |
+| event_min_photos | 3 | Minste antall akseptable bilder for at en hendelse må være med |
+| event_two_pages_photos | 40 | Hendelser med så mange bilder får minst to sider |
+| event_max_pages | 4 | Normalt maks sider per hendelse (unntak for E ≥ 0.9) |
+| album_pages_default | 200–300 | Normalt sidetall; følger av hendelsene |
 | λ_month, λ_event, λ_person, λ_type, λ_red | 0.6, 0.8, 1.0, 0.4, 2.0 | Målfunksjon |
 | max_event_share | 0.25 | Maks andel fra én hendelse |
 | full_page_percentile | 0.05 | Topp-andel som kan få helside |

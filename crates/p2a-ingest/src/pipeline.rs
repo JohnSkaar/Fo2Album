@@ -16,7 +16,7 @@ use p2a_store::{
 use rayon::prelude::*;
 
 use crate::decode::{self, DecodeError};
-use crate::{dates, exif, hash, phash, scan};
+use crate::{dates, exif, features, hash, phash, scan};
 
 /// Antall filer per runde. Styrer hvor ofte fremdrift rapporteres og data lagres.
 const BATCH: usize = 64;
@@ -188,6 +188,26 @@ pub fn ingest_all(
         total,
     });
 
+    // Bilder lest inn av en eldre versjon mangler kvalitetsmål; regn dem ut nå.
+    if !report.cancelled {
+        let missing = store.photos_missing_quality()?;
+        for chunk in missing.chunks(BATCH) {
+            if cancel.load(Ordering::Relaxed) {
+                report.cancelled = true;
+                break;
+            }
+            let computed: Vec<(ContentHash, p2a_core::BasicQuality)> = chunk
+                .par_iter()
+                .filter_map(|(h, root, rel, format, orientation)| {
+                    let path = scan::full_path(root, rel);
+                    let d = decode::decode_file(&path, format.as_deref(), *orientation).ok()?;
+                    Some((*h, features::basic_quality(&d.image)))
+                })
+                .collect();
+            store.set_quality(&computed)?;
+        }
+    }
+
     // 3. Transkodede dubletter, på tvers av alle kilder.
     if !report.cancelled {
         progress(Progress {
@@ -232,6 +252,7 @@ fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
             meta.width = Some(decoded.width);
             meta.height = Some(decoded.height);
             meta.phash = Some(phash::phash(&decoded.image));
+            meta.quality = Some(features::basic_quality(&decoded.image));
             Some(decode::thumbnail_jpeg(&decoded))
         }
         Err(DecodeError::Unsupported) => None,

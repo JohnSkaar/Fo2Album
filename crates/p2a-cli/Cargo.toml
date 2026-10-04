@@ -18,5 +18,7 @@ workspace = true
 p2a-core.workspace = true
 p2a-ingest = { path = "../p2a-ingest" }
 p2a-store.workspace = true
+p2a-eval = { path = "../p2a-eval" }
+p2a-keychain = { path = "../p2a-keychain" }
 rayon = "1"
 tempfile = "3"

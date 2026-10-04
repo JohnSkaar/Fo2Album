@@ -20,7 +20,7 @@ fn first_start_creates_store_and_recovery_key() {
     );
 
     let (store, recovery) = Store::create(dir.path(), &keys).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 1);
+    assert_eq!(store.schema_version().unwrap(), 2);
     assert_eq!(recovery.display_code().len(), 34);
     assert_eq!(
         Store::status(dir.path(), &keys).unwrap(),

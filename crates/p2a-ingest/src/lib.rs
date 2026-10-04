@@ -6,6 +6,7 @@
 pub mod dates;
 pub mod decode;
 pub mod exif;
+pub mod features;
 pub mod hash;
 pub mod phash;
 pub mod pipeline;

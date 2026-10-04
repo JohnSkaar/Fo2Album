@@ -84,6 +84,20 @@ const MIGRATIONS: &[&str] = &[
         value  TEXT NOT NULL
     );
     "#,
+    // 2: enkle kvalitetsmål (M2-utgangspunktet) og krypterte dokumenter (bl.a. gullsett).
+    r#"
+    ALTER TABLE photos ADD COLUMN q_sharp REAL;
+    ALTER TABLE photos ADD COLUMN q_exposure REAL;
+    ALTER TABLE photos ADD COLUMN q_color REAL;
+
+    -- Små dokumenter som hører til familien (gullsett, albumhistorikk). Ligger i den
+    -- krypterte databasen som alt annet.
+    CREATE TABLE documents (
+        name        TEXT PRIMARY KEY,
+        data        BLOB NOT NULL,
+        updated_at  TEXT NOT NULL
+    );
+    "#,
 ];
 
 pub const CURRENT_VERSION: i64 = MIGRATIONS.len() as i64;

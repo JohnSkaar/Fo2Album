@@ -22,6 +22,13 @@ unsafe_code = "deny"
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
 
+# Bildebehandling i debug er svært tregt; optimaliser avhengighetene også under utvikling og test.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.p2a-ingest]
+opt-level = 2
+
 [profile.release]
 codegen-units = 1
 lto = "thin"

@@ -1,0 +1,18 @@
+[package]
+name = "p2a-keychain"
+description = "Operativsystemets nøkkelring (Mac, Windows) for hovednøkkelen; nøkkelfil under utvikling på Linux."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+p2a-store.workspace = true
+zeroize = "1"
+
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+keyring = { version = "3", default-features = false, features = ["apple-native", "windows-native"] }

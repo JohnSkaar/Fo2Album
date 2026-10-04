@@ -72,3 +72,27 @@ jobs:
       - name: Røyktest (starter appen)
         shell: bash
         run: node scripts/smoke-test.mjs "target/debug/pho2album${{ runner.os == 'Windows' && '.exe' || '' }}"
+
+  verktoy:
+    name: Verktøyet p2a (${{ matrix.os }})
+    # Bare når noen trykker «Run workflow», så vanlige pusher ikke bruker ekstra minutter.
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: p2a-macos
+            bin: target/release/p2a
+          - os: windows-latest
+            artifact: p2a-windows
+            bin: target/release/p2a.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked -p p2a-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.bin }}

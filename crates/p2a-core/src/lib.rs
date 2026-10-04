@@ -5,10 +5,13 @@
 
 pub mod config;
 pub mod dedup;
+pub mod events;
 pub mod model;
+pub mod select;
 
 pub use model::{
-    CommentKind, ContentHash, DateSource, FileStatus, PhotoMeta, Role, SourceKind, TakenAt,
+    BasicQuality, CommentKind, ContentHash, DateSource, FileStatus, PhotoMeta, Role, SourceKind,
+    TakenAt,
 };
 
 /// Versjonen av kjernen, vist i appen og logget i `eval/RESULTS.md`.

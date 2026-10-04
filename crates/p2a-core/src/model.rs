@@ -339,6 +339,27 @@ pub struct PhotoMeta {
     pub gps: Option<(f64, f64)>,
     /// Perseptuell hash (64 bit) for nesten like bilder.
     pub phash: Option<u64>,
+    /// Enkle kvalitetsmål (prototypens). Erstattes av Q_tech i M3.
+    pub quality: Option<BasicQuality>,
+}
+
+/// Prototypens enkle kvalitetsmål, alle 0–1. Grunnlaget for utgangspunktet
+/// (`select::baseline`) som M3 skal slå på gullsettet.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BasicQuality {
+    /// Laplace-varians på hele bildet (log-skalert).
+    pub sharp: f32,
+    /// Nær middels lysstyrke og lite klipping.
+    pub exposure: f32,
+    /// Fargerikhet (Hasler og Süsstrunk).
+    pub color: f32,
+}
+
+impl BasicQuality {
+    /// Prototypens poeng, 0–100: skarphet 50 %, eksponering 30 %, farge 20 %.
+    pub fn score(&self) -> f32 {
+        100.0 * (0.5 * self.sharp + 0.3 * self.exposure + 0.2 * self.color)
+    }
 }
 
 impl PhotoMeta {
@@ -355,6 +376,7 @@ impl PhotoMeta {
             camera_model: None,
             gps: None,
             phash: None,
+            quality: None,
         }
     }
 

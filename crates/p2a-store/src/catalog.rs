@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use p2a_core::{ContentHash, DateSource, FileStatus, PhotoMeta, SourceKind, TakenAt};
+use p2a_core::{BasicQuality, ContentHash, DateSource, FileStatus, PhotoMeta, SourceKind, TakenAt};
 use rusqlite::{params, OptionalExtension};
 
 use crate::{now_iso, Store, StoreError};
@@ -268,8 +268,8 @@ impl Store {
                     tx.execute(
                         "INSERT OR IGNORE INTO photos (content_hash, format, width, height,
                             orientation, taken_at, taken_offset, date_source, camera_make,
-                            camera_model, gps_lat, gps_lon, phash)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                            camera_model, gps_lat, gps_lon, phash, q_sharp, q_exposure, q_color)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                         params![
                             &p.hash.0[..],
                             p.format,
@@ -284,6 +284,9 @@ impl Store {
                             p.gps.map(|g| g.0),
                             p.gps.map(|g| g.1),
                             p.phash.map(|h| h as i64),
+                            p.quality.map(|q| q.sharp),
+                            p.quality.map(|q| q.exposure),
+                            p.quality.map(|q| q.color),
                         ],
                     )?;
                     tx.execute(
@@ -305,16 +308,36 @@ impl Store {
         Ok(())
     }
 
-    /// Bilder med perseptuell hash, til dublettsøk: (hash, phash, tid, piksler, har kamera-EXIF).
+    /// Bilder med perseptuell hash, til dublettsøk.
     pub fn phash_candidates(&self) -> Result<Vec<PhotoMeta>, StoreError> {
-        let mut stmt = self.conn.prepare(
+        self.load_photos("WHERE phash IS NOT NULL", &[])
+    }
+
+    /// Unike bilder (uten transkodede kopier) fra et år, med alle metadata. Brukes av
+    /// utvalget og evalueringen.
+    pub fn photo_metas_in_year(&self, year: i32) -> Result<Vec<PhotoMeta>, StoreError> {
+        let (from, to) = (format!("{year:04}"), format!("{:04}", year + 1));
+        self.load_photos(
+            "WHERE duplicate_of IS NULL AND taken_at >= ?1 AND taken_at < ?2 ORDER BY taken_at, content_hash",
+            &[&from, &to],
+        )
+    }
+
+    fn load_photos(
+        &self,
+        filter: &str,
+        args: &[&dyn rusqlite::ToSql],
+    ) -> Result<Vec<PhotoMeta>, StoreError> {
+        let sql = format!(
             "SELECT content_hash, phash, taken_at, taken_offset, date_source, width, height,
-                    camera_make, camera_model, format
-             FROM photos WHERE phash IS NOT NULL",
-        )?;
-        let rows = stmt.query_map([], |r| {
+                    camera_make, camera_model, format, orientation, gps_lat, gps_lon,
+                    q_sharp, q_exposure, q_color
+             FROM photos {filter}"
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(args, |r| {
             let mut p = PhotoMeta::new(hash_from(r.get(0)?)?);
-            p.phash = Some(r.get::<_, i64>(1)? as u64);
+            p.phash = r.get::<_, Option<i64>>(1)?.map(|h| h as u64);
             p.taken_at = r
                 .get::<_, Option<String>>(2)?
                 .and_then(|s| TakenAt::from_iso(&s));
@@ -327,8 +350,87 @@ impl Store {
             p.camera_make = r.get(7)?;
             p.camera_model = r.get(8)?;
             p.format = r.get(9)?;
+            p.orientation = r.get(10)?;
+            p.gps = match (r.get::<_, Option<f64>>(11)?, r.get::<_, Option<f64>>(12)?) {
+                (Some(a), Some(b)) => Some((a, b)),
+                _ => None,
+            };
+            p.quality = match (r.get(13)?, r.get(14)?, r.get(15)?) {
+                (Some(sharp), Some(exposure), Some(color)) => Some(BasicQuality {
+                    sharp,
+                    exposure,
+                    color,
+                }),
+                _ => None,
+            };
             Ok(p)
         })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// Bilder som mangler kvalitetsmål, med en lokal fil de kan leses fra:
+    /// (hash, kildemappe, relativ sti, format, orientering).
+    #[allow(clippy::type_complexity)]
+    pub fn photos_missing_quality(
+        &self,
+    ) -> Result<Vec<(ContentHash, PathBuf, String, Option<String>, Option<u16>)>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT p.content_hash, s.path, f.rel_path, p.format, p.orientation
+             FROM photos p
+             JOIN files f ON f.id = (SELECT id FROM files WHERE content_hash = p.content_hash
+                                     AND status = 'lokal' LIMIT 1)
+             JOIN sources s ON s.id = f.source_id
+             WHERE p.q_sharp IS NULL AND p.has_thumbnail = 1",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok((
+                hash_from(r.get(0)?)?,
+                PathBuf::from(r.get::<_, String>(1)?),
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+            ))
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_quality(&mut self, items: &[(ContentHash, BasicQuality)]) -> Result<(), StoreError> {
+        let tx = self.conn.transaction()?;
+        for (h, q) in items {
+            tx.execute(
+                "UPDATE photos SET q_sharp = ?2, q_exposure = ?3, q_color = ?4 WHERE content_hash = ?1",
+                params![&h.0[..], q.sharp, q.exposure, q.color],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Lagrer et dokument (f.eks. et gullsett) i den krypterte databasen.
+    pub fn put_document(&self, name: &str, data: &[u8]) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT INTO documents (name, data, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(name) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at",
+            params![name, data, now_iso()],
+        )?;
+        Ok(())
+    }
+
+    pub fn document(&self, name: &str) -> Result<Option<Vec<u8>>, StoreError> {
+        Ok(self
+            .conn
+            .query_row("SELECT data FROM documents WHERE name = ?1", [name], |r| {
+                r.get(0)
+            })
+            .optional()?)
+    }
+
+    /// Navn på dokumenter som starter med `prefix`.
+    pub fn document_names(&self, prefix: &str) -> Result<Vec<String>, StoreError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT name FROM documents WHERE name LIKE ?1 || '%' ORDER BY name")?;
+        let rows = stmt.query_map([prefix], |r| r.get(0))?;
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
