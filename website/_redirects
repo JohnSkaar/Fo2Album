@@ -1,5 +1,7 @@
-# fo2album.no og www sendes til pho2album.no
-https://fo2album.no/*      https://pho2album.no/:splat  301!
-https://www.fo2album.no/*  https://pho2album.no/:splat  301!
-http://fo2album.no/*       https://pho2album.no/:splat  301!
-http://www.fo2album.no/*   https://pho2album.no/:splat  301!
+# fo2album.no er hovedadressen. pho2album.no og www sendes hit.
+https://www.fo2album.no/*    https://fo2album.no/:splat  301!
+http://www.fo2album.no/*     https://fo2album.no/:splat  301!
+https://pho2album.no/*       https://fo2album.no/:splat  301!
+https://www.pho2album.no/*   https://fo2album.no/:splat  301!
+http://pho2album.no/*        https://fo2album.no/:splat  301!
+http://www.pho2album.no/*    https://fo2album.no/:splat  301!

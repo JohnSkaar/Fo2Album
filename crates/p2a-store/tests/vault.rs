@@ -20,7 +20,7 @@ fn first_start_creates_store_and_recovery_key() {
     );
 
     let (store, recovery) = Store::create(dir.path(), &keys).unwrap();
-    assert_eq!(store.schema_version().unwrap(), 2);
+    assert_eq!(store.schema_version().unwrap(), 3);
     assert_eq!(recovery.display_code().len(), 34);
     assert_eq!(
         Store::status(dir.path(), &keys).unwrap(),
@@ -210,4 +210,68 @@ fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
         }
     }
     out
+}
+
+#[test]
+fn decisions_and_feedback_are_kept() {
+    use p2a_core::learn::{Action, FeedbackReason};
+    use p2a_core::select::draft::Decision;
+
+    let (dir, keys) = setup();
+    let a = ContentHash([1; 32]);
+    let b = ContentHash([2; 32]);
+    {
+        let (store, _) = Store::create(dir.path(), &keys).unwrap();
+        store.set_decision(2025, &a, Some(Decision::Med)).unwrap();
+        store
+            .set_decision(2025, &a, Some(Decision::IkkeMed))
+            .unwrap();
+        store.set_decision(2025, &b, Some(Decision::Med)).unwrap();
+        store.set_decision(2025, &b, None).unwrap();
+        let id = store
+            .add_feedback(2025, Action::Bytt, &b, Some(&a))
+            .unwrap();
+        store
+            .set_feedback_reason(id, Some(FeedbackReason::ViktigOyeblikk))
+            .unwrap();
+        store.add_feedback(2025, Action::TaBort, &a, None).unwrap();
+    }
+    let store = Store::open(dir.path(), &keys).unwrap();
+    let d = store.decisions(2025).unwrap();
+    assert_eq!(d.len(), 1);
+    assert_eq!(d[&a], Decision::IkkeMed);
+    assert!(store.decisions(2024).unwrap().is_empty());
+    let log = store.feedback_log().unwrap();
+    assert_eq!(log.len(), 2);
+    assert_eq!(log[0].action, Action::Bytt);
+    assert_eq!(log[0].reason, Some(FeedbackReason::ViktigOyeblikk));
+    assert_eq!(log[1].reason, None);
+}
+
+#[test]
+fn godparents_are_remembered_and_confirmation_sticks() {
+    use p2a_core::{RelationKind, RelationStatus};
+    use p2a_store::Relation;
+
+    let (dir, keys) = setup();
+    {
+        let (store, _) = Store::create(dir.path(), &keys).unwrap();
+        let barn = store.add_person("Ella", Role::Barn, false, None).unwrap();
+        let fadder = store.add_person("Kari", Role::Venn, false, None).unwrap();
+        let mut r = Relation {
+            person_id: fadder,
+            kind: RelationKind::FadderFor,
+            other_id: barn,
+            status: RelationStatus::Bekreftet,
+            learned_year: Some(2008),
+        };
+        store.set_relation(&r).unwrap();
+        r.status = RelationStatus::Foreslatt;
+        store.set_relation(&r).unwrap();
+    }
+    let store = Store::open(dir.path(), &keys).unwrap();
+    let rel = store.relations().unwrap();
+    assert_eq!(rel.len(), 1);
+    assert_eq!(rel[0].status, RelationStatus::Bekreftet);
+    assert_eq!(rel[0].learned_year, Some(2008));
 }

@@ -1,6 +1,6 @@
 # Poengsetting og utvalg
 
-Dette er kjernen i Pho2Album. Målet er ikke «de 200 skarpeste bildene», men **det albumet familien selv ville laget hvis de hadde tid**: de beste bildene, de viktigste øyeblikkene, alle menneskene som betyr noe, og stor variasjon.
+Dette er kjernen i Fo2Album. Målet er ikke «de 200 skarpeste bildene», men **det albumet familien selv ville laget hvis de hadde tid**: de beste bildene, de viktigste øyeblikkene, alle menneskene som betyr noe, og stor variasjon.
 
 All analyse skjer lokalt. Alle tall under er **startverdier** som skal kalibreres mot evalueringssettet (se nederst). Legg dem i én konfigurasjonsfil (`scoring.config`), ikke spredt i koden.
 
@@ -139,7 +139,9 @@ E_e = norm( 0.35·log(1 + antall bilder)            // hvor mye ble fotografert
           + 0.15·andel bilder med flere viktige personer )
 ```
 4. Hendelser får **kapittelplass**: viktige hendelser får flere sider; hverdager samles i månedsoppslag.
-5. **Hver hendelse er med (hardt krav, eierens føring 4. oktober 2026).** Albumet er historien om året, fortalt hendelse for hendelse: hvert treffpunkt eller besøk får **minst én side**, og **to sider** når det er tatt mange bilder (`event_two_pages_photos`, start 40). Unntak bare for «hendelser» med færre enn `event_min_photos` (start 3) akseptable bilder, f.eks. et enkelt bilde av en kvittering. Albumets lengde følger av hendelsene, ikke av et fast sidetall.
+5. **Hver hendelse er med (hardt krav, eierens føring 4. oktober 2026).** Albumet er historien om året, fortalt hendelse for hendelse: hvert treffpunkt eller besøk får **minst én side**, og flere jo mer som er fotografert: `sider ≈ 0,6 · √(antall bilder)`, maks 16 (`pages_per_sqrt_photo`, `event_max_pages`). 40 bilder gir 4 sider, 120 gir 7, 300 gir 10. **Store historier får stor plass i første utkast**; brukeren kan velge et mindre album (sidetak, se §7 «Pris»). Hendelser med færre enn `event_min_photos` (start 3) bilder samles i «hverdager» per måned. Albumets lengde følger av hendelsene, ikke av et fast sidetall.
+
+   Implementert i `crates/p2a-core/src/select/draft.rs` (første versjon, uten personer og sted).
 
 ---
 
@@ -197,6 +199,21 @@ Kvadratrot-leddene gjør funksjonen submodulær (avtagende utbytte), så **gråd
 - Bilder brukeren har redigert/beskåret → +0.05.
 - Bilder delt til familien (f.eks. eksportert til WhatsApp-mappe) → svakt signal.
 - **Overstyringer i appen:** når brukeren fjerner/legger til bilder, juster vekter lokalt (f.eks. lavere vekt på en bildetype som stadig fjernes). Lagres per bruker, aldri sendt.
+- **«Hvorfor?» (implementert, `crates/p2a-core/src/learn.rs`).** Hvert valg logges (`feedback`-tabellen), og appen spør forsiktig hvorfor. Faste svar flytter én vekt et lite steg, med faste grenser:
+
+  | Svar | Endring |
+  |---|---|
+  | Uskarpt | skarphet +0,04, kvalitet teller mer +0,02 |
+  | Dårlig lys | eksponering +0,04 |
+  | For likt et annet | flere bilder regnes som «nesten like» (pHash-grense +1) |
+  | For mange herfra / Mangler noe herfra | bilder per hendelse −/+ 4 % |
+  | Viktig øyeblikk / Viktig person | kvalitet teller mindre (−0,03 / −0,02) |
+  | Fint bilde / Skarpere | farge +0,03 / skarphet +0,03 |
+  | Liker det ikke / Skal ikke i albumet | huskes, endrer ingen vekter |
+  | Ingen svar | svake signaler: ta med/ta bort ±1 % bilder per hendelse; bytte til et mye uskarpere bilde betyr at øyeblikket teller mer |
+
+  Det appen har lært vises med ord («Øyeblikket betyr mer enn om bildet er perfekt»). Loggen gjelder alle år, så neste års utkast starter med det appen har lært.
+- **Relasjoner som læres av hendelser (eierens føring).** Familieprofilen tar vare på relasjoner mellom personer (`person_relations`, f.eks. `fadder_for`). Eksempel: i en dåp er fadderne de som står ved døpefonten med barnet; appen foreslår dem som faddere, brukeren bekrefter, og neste år vet appen det (fadderne løftes fram i barnets merkedager, konfirmasjon osv.). Tabellen finnes; gjenkjenningen kommer med personer (M4).
 - **Kommentarer på utkastet:** brukeren kan kommentere bilder, sider, personer, hendelser og hele albumet. Strukturerte kommentarer («mer av», «mindre av», «viktig», «ikke ta med») justerer vektene direkte. Fritekst lagres og vises igjen, men tolkes ikke i v1.
 - **Familieprofilen** (kryptert, lokalt; se `ARCHITECTURE.md`) tar vare på personer, roller, fødselsdatoer, kommentarer, overstyringer og lærte vekter fra år til år. Neste års utvalg starter fra den: fjorårets kommentarer vises, og vektene er allerede justert.
 
@@ -215,7 +232,13 @@ Hvert valgt bilde får en **sidevekt** som avgjør plassen det får:
 
 **Uskarpe, men viktige bilder** får mindre plass, der uskarpheten synes mindre: `Q_tech < 0.5` gir aldri helside, og `Q_tech < 0.35` gir et felt i rutenett. Brukeren kan alltid gjøre bildet større. Senere: regn ut hvor stor uskarpheten blir på trykk (i mm) for feltstørrelsen, i stedet for faste terskler.
 
-**Sider per historie (hendelse):** minst 1, 2 når det er mange bilder (§4.2 punkt 5), og **maks 4 som utgangspunkt** for første utkast (`event_max_pages`). Ingen absolutt regel: de viktigste hendelsene (E ≥ 0.9, f.eks. sommerferien) kan få flere, og brukeren kan alltid utvide.
+**Sider per historie (hendelse):** minst 1, og flere jo mer som er fotografert (§4.2 punkt 5). Grensen på 4 sider er fjernet (eierens føring 4. oktober 2026, dåpen): store historier får stor plass i første utkast, og brukeren styrer størrelsen med sidetaket.
+
+**Oppsett av en historie (implementert, `crates/p2a-core/src/layout.rs`):** om lag 40 % av sidene får ett bilde (de beste), resten rutenett med 2–12 bilder i tidsrekkefølge. Enkeltbildene **veksler mellom helside uten marg og ett bilde med luft rundt**, så albumet puster. Store historier (3+ sider) **åpner med et enkeltbilde** på helside. Bilder med lav kvalitet får aldri helside.
+
+**Mønster fra eierens dåpsalbum (mål for M4–M6):** seremonien åpner (kirken over to helsider, så rutenett fra kirken), deretter selskapet (rutenett + helside), nærbilder av barnet med de nærmeste, **fadderne med ett portrett hver på egen side**, og til slutt **gjestene i portrettgallerier** (rutenett med 9–12 portretter). Krever personer og ansikter (M4).
+
+**Pris (foreløpig):** 4 kr per side, regnet i trinn på 50 sider (312 sider koster som 350). Appen viser prisen nå og de tre trinnene under, og et valgt trinn blir et sidetak: alle historiene krymper likt (i steg på 5 %), og hver hendelse beholder minst én side. Endelige priser kommer fra trykkeriet (M7).
 
 **Stemningsbilder** er som standard **små drypp rundt omkring** (et felt i et rutenett mellom personbilder), ikke egne sider. Unntaket er ekstremt flott natur som åpner en historie (helside, kriterium c).
 
@@ -291,8 +314,10 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
 | rarity_alpha / tau | 1.2 / 8 | Sjeldenhetsbonus |
 | min_p (barn, kjerne, besteforeldre, venn, andre med profilbilde) | 6, 6, 2, 1, 1 | Dekningskrav |
 | event_min_photos | 3 | Minste antall akseptable bilder for at en hendelse må være med |
-| event_two_pages_photos | 40 | Hendelser med så mange bilder får minst to sider |
-| event_max_pages | 4 | Normalt maks sider per hendelse (unntak for E ≥ 0.9) |
+| pages_per_sqrt_photo | 0.6 | Sider per hendelse ≈ faktor · √(antall bilder) |
+| event_max_pages | 16 | Maks sider per hendelse i første utkast (store historier får stor plass) |
+| photos_per_page | 4 | Snitt bilder per side, gir antall bilder per hendelse |
+| max_share | 0.5 | Maks andel av en hendelses bilder som foreslås |
 | album_pages_default | 200–300 | Normalt sidetall; følger av hendelsene |
 | λ_month, λ_event, λ_person, λ_type, λ_red | 0.6, 0.8, 1.0, 0.4, 2.0 | Målfunksjon |
 | max_event_share | 0.25 | Maks andel fra én hendelse |
@@ -304,4 +329,4 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
 | newborn_days_full / newborn_days_end | 14 / 90 | «Ny i familien»: full verdi, deretter avtagende (§3.6) |
 | blur_no_fullpage / blur_grid_only | 0.5 / 0.35 | Uskarpe bilder får mindre plass (§7) |
 
-Prototypen (`prototype/pho2album-prototype.html`) bruker en svært forenklet versjon (skarphet, eksponering, farge, hudtoner som stedfortreder for personer). Den er bare en referanse for flyten.
+Prototypen (`prototype/fo2album-prototype.html`) bruker en svært forenklet versjon (skarphet, eksponering, farge, hudtoner som stedfortreder for personer). Den er bare en referanse for flyten.

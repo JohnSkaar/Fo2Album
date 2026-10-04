@@ -1,4 +1,4 @@
-# Produkt: Pho2Album v1
+# Produkt: Fo2Album v1
 
 ## Løftet
 
@@ -6,7 +6,7 @@
 
 ## Hvorfor dette er unikt
 
-1. **Flere kilder blandes.** Familiens bilder ligger spredt: mammas iPhone (iCloud), pappas Android (Google Disk/Google Foto-eksport), Dropbox-kameraopplasting og mapper på PC-en. Pho2Album leser alle, fjerner dubletter på tvers og ser hele året samlet. Ingen av skytjenestene kan gjøre dette alene.
+1. **Flere kilder blandes.** Familiens bilder ligger spredt: mammas iPhone (iCloud), pappas Android (Google Disk/Google Foto-eksport), Dropbox-kameraopplasting og mapper på PC-en. Fo2Album leser alle, fjerner dubletter på tvers og ser hele året samlet. Ingen av skytjenestene kan gjøre dette alene.
 2. **Smart utvalg.** Ikke bare de skarpeste bildene, men de *viktigste*: variasjon gjennom året, alle i familien representert, sjeldne personer løftet fram (oldemor, en god venn), høydepunkter fått mer plass, serier brukt som et kunstnerisk grep når de er spesielt gode. Se `SCORING.md`.
 3. **Lokalt først.** Analysen skjer på maskinen. Ingen sky trenger å se barna.
 
@@ -23,7 +23,8 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 - Dublettfjerning på tvers av kilder (eksakte og nesten like).
 - Analyse og poengsetting lokalt, med forklaring per bilde.
 - Personer: lokal ansiktsgjenkjenning og gruppering; brukeren navngir de viktigste og kan markere roller (barn, besteforeldre, venner) og «viktig for oss».
-- Utkast: forside, kapitler per hendelse (hvert treffpunkt eller besøk minst én side, to når det er mange bilder) samlet i måneder, variert layout (helside, 2, 3, 4 bilder, serie-oppslag), bildetekster med måned/dato og stedsnavn. Sidetallet følger av hendelsene; brukeren kan sette et tak.
+- Utkast: forside, kapitler per hendelse (hvert treffpunkt eller besøk minst én side, flere når det er mange bilder) samlet i måneder, variert layout (helside uten marg, ett bilde med luft rundt, rutenett med 2–12 bilder, serie-oppslag), bildetekster med måned/dato og stedsnavn. **Store historier får stor plass i første utkast** (eierens føring 4. oktober 2026: en dåp for eget barn kan få 10 sider eller mer); brukeren velger selv et mindre album.
+- **Pris regnes ut automatisk og vises i trinn** (foreløpig 4 kr per side, trinn på 50 sider). Brukeren ser alternativene: «Albumet er nå på 350 sider og koster 1 400 kr. Med 300 sider: 1 200 kr.» Velger hun et mindre album, krymper alle historiene likt, og hver hendelse beholder minst én side. Endelige priser kommer fra trykkeriet.
 - Alle personer med navn og profilbilde er med minst én gang.
 - Forsidehjelp (se under).
 - Redigering: bytte, flytte, fjerne, legge til, bytte layout per side, beskjære.
@@ -42,10 +43,12 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 
 1. **Velkommen** → «Velg bildemappene dere vil lage årets familiealbum av». Kort med kilder: PC, Dropbox, iCloud, Google Disk. Hjelpetekst om hvor mappene vanligvis ligger. Appen kan foreslå kjente stier automatisk (med samtykke).
 2. **Velg år** (standard: forrige kalenderår, eller året med flest bilder).
-3. **Analyse** (kan ta tid; vis fremdrift og hva som skjer: «Fant 8 412 bilder · 1 230 dubletter · leter etter de beste …»). Fortsett i bakgrunnen; kan pauses.
+3. **«Lag utkast» starter analysen** (kan ta tid; vis hva som skjer, steg for steg: henter årets bilder, finner hendelsene, finner serier og nesten like bilder, velger de beste fra hver hendelse, lager sidene, skriver begrunnelser). Det er ingen «Velg bilder»-skjerm før dette; alle bildene ligger under «Alle bilder» for den som vil se dem.
 3b. **Komplett utkast først (eierens føring).** Appen foreslår et ferdig album, med alle sider, før brukeren har valgt noe som helst. Brukeren justerer etterpå; hun skal aldri måtte bygge albumet fra et tomt utvalg. Stegene under forbedrer utkastet, de er ikke forutsetninger for det.
+3c. **Vurder forslaget.** Hver hendelse vises med sidene den får, bildene som er med (til venstre) og bildene som ikke er med (til høyre), alle med en kort begrunnelse («Beste bilde i en serie på 6», «Nesten likt et bilde som er med», «Ikke plass: 12 bedre bilder herfra er med»). Brukeren tar bort, tar med eller bytter (klikk ett bilde i hver kolonne).
+3d. **Appen lærer forsiktig.** Etter et bytte spør appen av og til «Hvorfor?» med noen faste svar («Uskarpt», «For likt et annet», «Viktig øyeblikk», «Viktig person» …) og «Hopp over». Den spør de tre første gangene, deretter hver tredje gang, og slutter for økten hvis brukeren hopper over tre ganger på rad. Svarene flytter noen få, forklarbare vekter (SCORING §6.3), lagres kryptert i familieprofilen og vises under «Dette har appen lært om dere». Slik bygges en forståelse av familien, litt etter litt, år for år.
 4. **Hvem er med?** (forbedrer utkastet; ukjente personer er med som «person 1, 2 …» til de får navn) Vis de 6–12 største ansiktsgruppene. Brukeren navngir og markerer roller. Spør særskilt: «Er det noen som er spesielt viktige å få med, som besteforeldre eller oldeforeldre?»
-5. **Forslag**: rutenett per måned med forslaget forhåndsvalgt, poeng og begrunnelse ved hover («Skarp, alle smiler, oldemor er med – 1 av 4 bilder av henne i år»).
+5. **Forslag**: se 3c. Begrunnelsene blir rikere når personer kommer inn («Skarp, alle smiler, oldemor er med – 1 av 4 bilder av henne i år»).
 6. **Forside** (se under).
 7. **Utkast** → redigering og **kommentarer** → **Lagre PDF / Bestill**.
 8. **Neste år:** appen åpner med familieprofilen: kjente personer, fjorårets kommentarer og det den har lært. Brukeren bekrefter eller justerer før analysen starter.

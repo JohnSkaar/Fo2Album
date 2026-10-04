@@ -92,7 +92,7 @@ fn conv<E: std::error::Error + Send + Sync + 'static>(e: E) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
 }
 
-fn hash_from(blob: Vec<u8>) -> rusqlite::Result<ContentHash> {
+pub(crate) fn hash_from(blob: Vec<u8>) -> rusqlite::Result<ContentHash> {
     let arr: [u8; 32] = blob
         .try_into()
         .map_err(|_| conv(std::io::Error::other("hash har feil lengde")))?;

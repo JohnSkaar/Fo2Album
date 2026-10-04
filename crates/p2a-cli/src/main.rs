@@ -60,12 +60,12 @@ const USAGE: &str = "Bruk:
   p2a eval liste [--data STI]
   p2a eval kjor [--data STI] [--resultater eval/RESULTS.md]";
 
-/// Samme datamappe som appen (Tauri `app_data_dir` for `no.pho2album.app`), eller `--data`.
+/// Samme datamappe som appen (Tauri `app_data_dir` for `no.fo2album.app`), eller `--data`.
 fn data_dir(args: &[String]) -> Result<PathBuf, String> {
     if let Some(d) = flag(args, "--data").or_else(|| std::env::var("P2A_DATA_DIR").ok()) {
         return Ok(PathBuf::from(d));
     }
-    const ID: &str = "no.pho2album.app";
+    const ID: &str = "no.fo2album.app";
     let env = |k: &str| std::env::var_os(k).map(PathBuf::from);
     let dir = if cfg!(target_os = "macos") {
         env("HOME").map(|h| h.join("Library/Application Support").join(ID))
@@ -214,7 +214,7 @@ fn eval_run(args: &[String]) -> Result<(), String> {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_else(|| "ukjent".into());
     let mut section = format!(
-        "\n## {} – utgangspunkt (prototypens utvalg), commit {commit}\n\n{}\n",
+        "\n## {} – utgangspunkt (prototypens utvalg) og hendelsesstyrt utkast, commit {commit}\n\n{}\n",
         p2a_core::TakenAt::from_unix_utc(
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -227,6 +227,11 @@ fn eval_run(args: &[String]) -> Result<(), String> {
     );
     for r in &results {
         section.push_str(&p2a_eval::metrics::markdown_row(&r.gold.navn, &r.metrics));
+        section.push('\n');
+        section.push_str(&p2a_eval::metrics::markdown_row(
+            &format!("{} (utkast)", r.gold.navn),
+            &r.draft_metrics,
+        ));
         section.push('\n');
     }
     print!("{section}");
@@ -369,18 +374,39 @@ fn demo(args: &[String]) -> Result<(), String> {
     (0..count).into_par_iter().for_each(|i| {
         let year = if i % 5 == 0 { 2010 } else { 2011 };
         let (month, day) = (1 + (i * 7) % 12, 1 + (i * 3) % 28);
-        let taken = format!(
-            "{year}:{month:02}:{day:02} {:02}:{:02}:00",
-            8 + i % 12,
-            i % 60
-        );
+        let taken = if year == 2011 && i % 4 == 1 {
+            // Én stor hendelse (som en dåp): mange bilder samme dag, så historien får
+            // flere sider i utkastet.
+            let min = i / 4;
+            format!(
+                "2011:06:05 {:02}:{:02}:{:02}",
+                11 + min / 60,
+                min % 60,
+                i % 60
+            )
+        } else {
+            format!(
+                "{year}:{month:02}:{day:02} {:02}:{:02}:00",
+                8 + i % 12,
+                i % 60
+            )
+        };
         let spec = ExifSpec {
             taken: Some(&taken),
             make: Some("Apple"),
             ..Default::default()
         };
         let (w, h) = if i % 4 == 0 { (900, 1200) } else { (1200, 900) };
-        let jpeg = insert_exif(&encode_jpeg(&pattern(w, h, i), 85), &tiff(&spec));
+        let mut img = pattern(w, h, i);
+        // Detaljer i de fleste bildene, så skarphetsmålet har noe å skille på.
+        let detail = [0, 10, 25, 45][(i % 4) as usize] as f32;
+        for (x, y, p) in img.enumerate_pixels_mut() {
+            let v = ((x / 6 + y / 6 + i) % 2) as f32 * detail - detail / 2.0;
+            for c in p.0.iter_mut() {
+                *c = (*c as f32 + v).clamp(0.0, 255.0) as u8;
+            }
+        }
+        let jpeg = insert_exif(&encode_jpeg(&img, 85), &tiff(&spec));
         let dir = if i % 2 == 0 { &dropbox } else { &icloud };
         std::fs::write(dir.join(format!("IMG_{i:04}.JPG")), &jpeg).expect("skrive");
         if i % 9 == 0 {

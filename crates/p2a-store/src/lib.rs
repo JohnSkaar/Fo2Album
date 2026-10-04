@@ -1,4 +1,4 @@
-//! Kryptert lokal lagring for Pho2Album: katalog, familieprofil og miniatyrer.
+//! Kryptert lokal lagring for Fo2Album: katalog, familieprofil og miniatyrer.
 //!
 //! Alt som kan være personopplysninger ligger her, kryptert, på brukerens maskin
 //! (docs/ARCHITECTURE.md, «Personvern og sikkerhet»):
@@ -13,6 +13,7 @@
 //! Ingen nettverkstilgang (håndheves av `p2a-policy` og `deny.toml`).
 
 mod catalog;
+mod choices;
 mod crypto;
 mod keystore;
 mod profile;
@@ -32,7 +33,7 @@ pub use catalog::{
 };
 pub use crypto::MasterKey;
 pub use keystore::{FileKeyStore, KeyStore, KeyStoreError, MemoryKeyStore};
-pub use profile::{Comment, NewComment, Person};
+pub use profile::{Comment, NewComment, Person, Relation};
 pub use recovery::{RecoveryKey, RecoveryParseError};
 
 use crypto::{Purpose, KEY_LEN};
@@ -40,6 +41,7 @@ use crypto::{Purpose, KEY_LEN};
 const DB_FILE: &str = "katalog.db";
 const VAULT_FILE: &str = "nokkel.json";
 const THUMB_DIR: &str = "miniatyrer";
+/// Beholder det gamle navnet med vilje (se `crypto::Purpose::info`).
 const VAULT_AAD: &[u8] = b"pho2album/hovednokkel/v1";
 
 #[derive(Debug, thiserror::Error)]

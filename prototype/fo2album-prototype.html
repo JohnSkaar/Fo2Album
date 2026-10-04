@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pho2Album – prototype</title>
+<title>Fo2Album – prototype</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Nunito+Sans:wght@400;600;700&display=swap">
 <style>
@@ -144,6 +144,33 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
 .cand[aria-pressed="true"]{outline:3px solid var(--bg-brand);outline-offset:-3px}
 .cnote{font-size:13px;color:var(--text-tertiary)}
 
+/* Albumutkast */
+.intro{display:flex;flex-direction:column;gap:14px;align-items:flex-start;max-width:640px}
+.intro .lead{margin:0;font-size:17px;line-height:27px;color:var(--text-secondary)}
+.analyse{display:flex;flex-direction:column;gap:12px;max-width:560px}
+.analyse h2{font-size:20px}
+.analyse ol{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:4px;color:var(--text-tertiary)}
+.analyse li.done{color:var(--text-secondary)}.analyse li.done::marker{content:"✓  "}
+.analyse li.now{color:var(--text-primary);font-weight:700}
+.price{display:flex;flex-direction:column;gap:8px;background:#FBF0D9;border-radius:14px;padding:14px 16px}
+.learned{background:var(--bg-secondary);border-radius:14px;padding:12px 16px;font-size:14px}.learned summary{font-weight:700;cursor:pointer}.learned ul,.learned p{margin:8px 0 0}
+.ev{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.ev-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px}.ev-h h3{font-size:18px}
+.ev h4{margin:0 0 8px;font:700 13px/18px var(--body);color:var(--text-secondary)}
+.pgs{display:flex;gap:2px;overflow-x:auto;padding:4px 2px 8px;flex-wrap:wrap;row-gap:10px}
+.pgs .pg{width:78px;flex:none;box-shadow:var(--shadow-sm)}.pgs .pg:nth-child(even){margin-right:12px}
+.cols{display:grid;grid-template-columns:3fr 2fr;gap:16px}.cols .out{border-left:1px solid var(--border-default);padding-left:16px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}.dgrid--s{grid-template-columns:repeat(auto-fill,minmax(84px,1fr))}
+.dc{border:0;background:none;padding:0;text-align:left;display:flex;flex-direction:column;gap:4px;color:inherit}
+.dc .th{display:block;width:100%}.dc[aria-pressed="true"] .th{outline:3px solid var(--bg-brand);outline-offset:-3px}.dc--s .th{opacity:.85}
+.dc .why{font-size:12px;line-height:16px;color:var(--text-secondary)}
+.dock{position:sticky;bottom:0;background:var(--bg-surface);border-radius:16px;box-shadow:var(--shadow-lg);padding:14px 18px;display:flex;flex-direction:column;gap:8px;z-index:5}
+.tfull .in{inset:0;grid-template-rows:1fr}.tfull .ph{border-radius:0}
+.tair .in{inset:15% 13%;grid-template-rows:1fr}
+.t6 .in{grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr)}
+.t9 .in{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr)}
+.t12 .in{grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(4,1fr)}
+
 @media (max-width:1100px){.app{grid-template-columns:220px minmax(0,1fr)}.panel{display:none}}
 
 /* Print = PDF-eksport. Format 21 x 28 cm. */
@@ -162,11 +189,12 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
 <body>
 <div class="app">
   <aside class="side">
-    <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="9" fill="#B8532F" transform="rotate(-6 16 16)"/><g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 9h9a3 3 0 0 1 3 3v11H13a3 3 0 0 1-3-3z"/><path d="M10 20a3 3 0 0 1 3-3h9"/></g></svg>Pho2Album</div>
+    <div class="logo"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="9" fill="#B8532F" transform="rotate(-6 16 16)"/><g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 9h9a3 3 0 0 1 3 3v11H13a3 3 0 0 1-3-3z"/><path d="M10 20a3 3 0 0 1 3-3h9"/></g></svg>Fo2Album</div>
     <div class="grp">
       <div class="grp-h">Album</div>
-      <button class="item" id="navPick" aria-current="true"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg><span class="grow">Velg bilder</span></button>
-      <button class="item" id="navAlbum" aria-current="false"><svg class="ic" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg><span class="grow"><span id="navAlbumName">Albumutkast</span><small id="navAlbumSub">Ikke laget ennå</small></span></button>
+      <button class="item" id="navDraft" aria-current="false"><svg class="ic" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/></svg><span class="grow">Albumutkast<small id="navDraftSub">Ikke laget ennå</small></span></button>
+      <button class="item" id="navPick" aria-current="false"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg><span class="grow">Alle bilder</span></button>
+      <button class="item" id="navAlbum" aria-current="false"><svg class="ic" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg><span class="grow"><span id="navAlbumName">Se albumet</span><small id="navAlbumSub">Side for side</small></span></button>
     </div>
     <div class="grp">
       <div class="grp-h">Bildekilder</div>
@@ -204,19 +232,28 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
       </div>
       <div class="chips" id="yearChips" aria-label="Velg år"></div>
       <div class="toolbar">
-        <button class="btn btn--s" id="autoSel">Foreslå de beste bildene</button><button class="btn btn--g" id="toggleScore">Vis poeng</button>
-        <button class="btn btn--g" id="selAll">Velg alle i visningen</button>
-        <button class="btn btn--g" id="selNone">Fjern alle valg</button>
+        <button class="btn btn--g" id="toggleScore">Vis poeng</button>
       </div>
       <div id="skipped" class="warn hidden"></div>
       <div id="gridWrap"></div>
+    </section>
+
+    <!-- UTKAST -->
+    <section id="viewDraft" class="hidden" style="display:flex;flex-direction:column;gap:16px">
+      <div class="head">
+        <div><div class="crumb">Albumutkast</div><h1 id="draftTitle">Familiealbum</h1></div>
+        <div class="toolbar"><button class="btn btn--s" id="redraft">Lag nytt utkast med det appen har lært</button><button class="btn btn--g" id="seeAlbum">Se albumet side for side</button></div>
+      </div>
+      <div class="chips" id="draftYears" aria-label="Velg år"></div>
+      <div id="draftWrap" style="display:flex;flex-direction:column;gap:14px"></div>
+      <div class="dock hidden" id="dock" role="region" aria-label="Valgt bilde"></div>
     </section>
 
     <!-- ALBUM -->
     <section id="viewAlbum" class="hidden" style="display:flex;flex-direction:column;gap:18px">
       <div class="head">
         <div><div class="crumb">Albumutkast</div><h1 id="albumTitleH">Album</h1></div>
-        <div class="toolbar"><button class="btn btn--s" id="relayout">Lag oppsett på nytt</button><button class="btn btn--g" id="backPick">Endre utvalg</button></div>
+        <div class="toolbar"><button class="btn btn--s" id="relayout">Lag oppsett på nytt</button><button class="btn btn--g" id="backPick">Tilbake til utkastet</button></div>
       </div>
       <div class="spread" id="spread"></div>
       <div class="pager"><button class="btn btn--s" id="prev" aria-label="Forrige oppslag">‹ Forrige</button><span id="pageLabel"></span><button class="btn btn--s" id="next" aria-label="Neste oppslag">Neste ›</button></div>
@@ -238,8 +275,9 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
     <div class="field"><label for="albumSub">Undertittel</label><input id="albumSub" value="Året vårt"></div>
     <div class="mini" id="miniCover"><span class="crumb">Forsiden vises her</span></div>
     <dl class="facts">
-      <dt>Bilder valgt</dt><dd id="fSel">0</dd>
+      <dt>Bilder med</dt><dd id="fSel">0</dd>
       <dt>Sider</dt><dd id="fPages">–</dd>
+      <dt>Pris</dt><dd id="fPrice">–</dd>
       <dt>Format</dt><dd>Innbundet, 21 × 28 cm</dd>
       <dt>Kilder</dt><dd id="fFolder">–</dd>
     </dl>
@@ -262,7 +300,7 @@ const IMG_EXT = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
 const SKIP_EXT = /\.(heic|heif|dng|cr2|cr3|nef|arw|raf|orf)$/i;
 const MAX_PHOTOS = 3000;
 
-const state = { photos: [], folders: [], year: null, pages: [], spread: 0, sel: null, coverId: null, coverType: 'mood', view: 'start', pendingSource: 'PC' };
+const state = { photos: [], folders: [], year: null, pages: [], spread: 0, sel: null, coverId: null, coverType: 'mood', view: 'start', pendingSource: 'PC', draft: null, decisions: new Map(), pick: null, ask: null, thanks: false, actions: 0, skips: 0, ingesting: 0, analysing: false, openEvents: new Set() };
 let uid = 0;
 
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),2600); }
@@ -339,7 +377,7 @@ async function pickFolder(source){
   state.pendingSource = source || 'PC';
   if(window.showDirectoryPicker){
     try{
-      const dir = await window.showDirectoryPicker({ id: 'pho2album', mode: 'read' });
+      const dir = await window.showDirectoryPicker({ id: 'fo2album', mode: 'read' });
       const files = [];
       await walk(dir, '', files, 0);
       ingest(files, dir.name, guessSource(dir.name) || state.pendingSource);
@@ -369,7 +407,8 @@ async function ingest(files, folderName, source){
   state.folders.push(folder);
   const added = list.map(f => ({ id: ++uid, folder: folder.id, source, file: f, name: f.name, size: f.size, date: new Date(f.lastModified), exif: false, thumb: null, w: 0, h: 0, selected: false, failed: false, dup: false, q: null }));
   state.photos.push(...added); state.pages = []; state.coverId = null;
-  renderFolders(); showView('pick');
+  state.ingesting++; state.draft = null;
+  renderFolders(); showView('draft');
   $('loadBox').classList.remove('hidden');
   let done = 0; const total = added.length;
   const setP = (txt) => { $('loadText').textContent = txt; $('loadBar').style.width = (done/total*100)+'%'; };
@@ -389,6 +428,7 @@ async function ingest(files, folderName, source){
   });
   $('loadBox').classList.add('hidden');
   state.photos = state.photos.filter(p => !p.failed); scoreAll(); renderGrid();
+  state.ingesting--; if(state.view === 'draft' && !state.analysing) renderDraftView();
   const dups = added.filter(p => p.dup).length;
   toast(`${added.length} bilder fra ${source}${dups ? `, ${dups} dubletter funnet` : ''}`);
 }
@@ -433,6 +473,7 @@ function renderChips(){
   $('yearChips').innerHTML = years.map(y => `<button class="chip" data-y="${y}" aria-pressed="${y===state.year}">${y}</button>`).join('') + (years.length>1 ? `<button class="chip" data-y="all" aria-pressed="${state.year==null}">Alle år</button>` : '');
 }
 $('yearChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b) return; state.year = b.dataset.y === 'all' ? null : +b.dataset.y; renderChips(); renderGrid(); });
+$('draftYears').addEventListener('click', e => { const b = e.target.closest('.chip'); if(!b || state.analysing) return; state.year = +b.dataset.y; state.draft = null; state.pick = null; state.ask = null; state.pages = []; state.photos.forEach(p => p.selected = false); renderChips(); renderDraftView(); });
 function renderGrid(){
   const vis = visible();
   $('pickTitle').textContent = state.year ? `Familiealbum ${state.year}` : 'Velg bilder';
@@ -452,32 +493,7 @@ function thumbHtml(p){
   return `<button class="th${p.thumb?'':' loading'}${p.dup?' dup':''}" data-id="${p.id}" aria-pressed="${p.selected}" aria-label="${esc(p.name)}">${p.thumb?`<img src="${p.thumb}" alt="" loading="lazy">`:''}<span class="ck"><svg class="ic" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span class="sc">${p.score ?? ''}</span></button>`;
 }
 function updateThumb(p){ const el = document.querySelector(`.th[data-id="${p.id}"]`); if(!el) return; if(p.failed){ el.remove(); return; } el.classList.remove('loading'); if(!el.querySelector('img')) el.insertAdjacentHTML('afterbegin', `<img src="${p.thumb}" alt="" loading="lazy">`); }
-$('gridWrap').addEventListener('click', e => {
-  const mb = e.target.closest('[data-month]');
-  if(mb){ const [y,m] = mb.dataset.month.split('-').map(Number); const arr = visible().filter(p => p.date.getFullYear()===y && p.date.getMonth()===m); const all = arr.every(p=>p.selected); arr.forEach(p => p.selected = !all); renderGrid(); return; }
-  const b = e.target.closest('.th'); if(!b) return;
-  const p = state.photos.find(x => x.id === +b.dataset.id); p.selected = !p.selected; b.setAttribute('aria-pressed', p.selected); updateCounts();
-});
-$('selAll').onclick = () => { visible().forEach(p => p.selected = true); renderGrid(); };
-$('selNone').onclick = () => { state.photos.forEach(p => p.selected = false); renderGrid(); };
 $('toggleScore').onclick = () => { const on = $('gridWrap').classList.toggle('showscore'); $('toggleScore').textContent = on ? 'Skjul poeng' : 'Vis poeng'; };
-$('autoSel').onclick = () => {
-  // Prototype-utvalg: beste bilde per serie, deretter de høyest rangerte per måned (6–10 avhengig av hvor mye som skjedde),
-  // med minst 30 min mellom valgte bilder for variasjon. Se docs/SCORING.md for den ekte algoritmen.
-  scoreAll();
-  const vis = visible().filter(p => p.score != null); vis.forEach(p => p.selected = false);
-  const groups = new Map(); vis.forEach(p => { const k = p.date.getFullYear()+'-'+p.date.getMonth(); (groups.get(k) || groups.set(k, []).get(k)).push(p); });
-  const avg = vis.length / Math.max(1, groups.size); let n = 0;
-  for(const arr of groups.values()){
-    const want = Math.max(3, Math.min(10, Math.round(6 * Math.sqrt(arr.length / Math.max(1, avg)))));
-    const cands = arr.filter(p => p.burstBest !== false).sort((a,b) => b.score - a.score);
-    const picked = [];
-    for(const p of cands){ if(picked.length >= want) break; if(picked.every(q => Math.abs(q.date - p.date) > 1800000)) picked.push(p); }
-    for(const p of cands){ if(picked.length >= want) break; if(!picked.includes(p)) picked.push(p); }
-    picked.forEach(p => { p.selected = true; n++; });
-  }
-  renderGrid(); toast(`Foreslo ${n} bilder: de skarpeste og best eksponerte, med variasjon gjennom året.`);
-};
 function scoreAll(){
   // Prototype: 0–100. Skarphet veier tyngst, deretter eksponering og farger. Bilder i samme serie (innen 20 sek) får trekk utenom det beste.
   const ps = state.photos.filter(p => p.q);
@@ -490,48 +506,39 @@ function scoreAll(){
 function selected(){ return state.photos.filter(p => p.selected).sort((a,b) => a.date - b.date); }
 function updateCounts(){
   const n = selected().length;
-  $('pickCount').textContent = `${n} valgt av ${state.photos.filter(p => !p.dup).length}`;
-  $('fSel').textContent = n;
-  $('makeDraft').disabled = n < 1;
-  $('navAlbumSub').textContent = state.pages.length ? `${state.pages.length} sider` : 'Ikke laget ennå';
+  $('pickCount').textContent = `${visible().length} bilder`;
+  $('fSel').textContent = state.draft ? n : '–';
+  const sider = draftPages();
+  $('fPages').textContent = state.draft ? sider : '–';
+  $('fPrice').textContent = state.draft ? kr(pris(sider)) : '–';
+  $('makeDraft').disabled = !visible().length || state.analysing;
+  $('makeDraft').textContent = state.draft ? 'Lag nytt utkast' : 'Lag utkast';
+  $('navDraftSub').textContent = state.draft ? `Omtrent ${sider} sider` : 'Ikke laget ennå';
 }
 
 /* ---------- Lag utkast ---------- */
 function orient(p){ return p.w && p.h ? (p.w >= p.h ? 'L' : 'P') : 'L'; }
 function buildPages(){
-  let sel = selected(); if(!sel.length) return;
-  if(!state.coverId || !sel.find(p => p.id === state.coverId)){
+  if(!state.draft) return;
+  const sel = selected(); if(!sel.length) return;
+  if(!state.coverId || !byId(state.coverId)?.selected){
     const pref = coverCandidates(state.coverType)[0] || coverCandidates('mood')[0];
-    if(pref){ pref.selected = true; state.coverId = pref.id; }
-    else { const ls = sel.filter(p => orient(p)==='L'); state.coverId = (ls[Math.floor(ls.length/2)] || sel[0]).id; }
+    state.coverId = (pref || sel[Math.floor(sel.length/2)]).id;
   }
-  sel = selected();
-  const body = sel.filter(p => p.id !== state.coverId);
+  // Historiene i rekkefølge, med sidene utkastet laget. Teksten er av som standard: bare bilder.
   const pages = [{ type: 'cover', ids: [state.coverId] }];
-  // grupper per måned, fordel på sider med variert rytme
-  const groups = []; body.forEach(p => { const k = p.date.getFullYear()*12 + p.date.getMonth(); const g = groups[groups.length-1]; if(g && g.k === k) g.items.push(p); else groups.push({ k, items: [p] }); });
-  const scores = body.map(p => p.score ?? 0).sort((a,b) => b-a); const heroCut = scores.length >= 12 ? scores[Math.floor(scores.length*0.08)] : 101;
-  const rhythm = [3, 2, 4, 3, 2, 4];
-  let r = 0;
-  for(const g of groups){
-    let items = g.items.slice(); let first = true;
-    while(items.length){
-      // Spesielt gode bilder får en hel side (prototype: topp 8 % i poeng). Se SCORING.md for «sjeldne personer» o.l.
-      if(items[0].score != null && items[0].score >= heroCut){ pages.push({ type: 'photos', ids: [items.shift().id], caption: first ? `${CAP(MONTHS[g.k % 12])} ${Math.floor(g.k/12)}` : '' }); first = false; continue; }
-      let n = rhythm[r++ % rhythm.length];
-      if(items.length - n === 1) n = Math.min(4, n+1);
-      if(n > items.length) n = items.length;
-      const chunk = items.splice(0, n);
-      pages.push({ type: 'photos', ids: chunk.map(p => p.id), caption: first ? `${CAP(MONTHS[g.k % 12])} ${Math.floor(g.k/12)}` : '' });
-      first = false;
-    }
+  for(const e of state.draft.events) for(const pg of currentLayout(e)){
+    const ids = pg.ids.filter(id => id !== state.coverId);
+    for(let i = 0; i < ids.length; i += 12) pages.push({ type: 'photos', kind: pg.kind, ids: ids.slice(i, i + 12) });
   }
   pages.push({ type: 'end', ids: [] });
-  // trykte album har partall sider: legg inn tom side før siste ved behov
   if(pages.length % 2 === 1) pages.splice(pages.length-1, 0, { type: 'blank', ids: [] });
-  state.pages = pages; state.spread = 0; state.sel = null;
+  state.pages = pages.filter(p => p.type !== 'photos' || p.ids.length); state.spread = 0; state.sel = null;
 }
 function tmpl(pg){
+  if(pg.kind === 'full' && pg.ids.length === 1) return 'tfull';
+  if(pg.kind === 'air' && pg.ids.length === 1) return 'tair';
+  if(pg.ids.length > 4) return gridClass(pg.ids.length);
   const ps = pg.ids.map(id => byId(id));
   if(ps.length === 1) return 't1';
   if(ps.length === 2) return ps.every(p => orient(p)==='P') ? 't2h' : 't2v';
@@ -566,7 +573,7 @@ function renderCovers(){
 $('ctabs').addEventListener('click', e => { const b = e.target.closest('[data-ct]'); if(!b) return; state.coverType = b.dataset.ct; renderCovers(); });
 $('cgrid').addEventListener('click', e => {
   const b = e.target.closest('[data-cid]'); if(!b) return;
-  const p = byId(+b.dataset.cid); p.selected = true; state.coverId = p.id; buildPages(); renderAlbum(); toast('Forsiden er byttet');
+  const p = byId(+b.dataset.cid); state.coverId = p.id; buildPages(); renderAlbum(); toast('Forsiden er byttet');
 });
 function byId(id){ return state.photos.find(p => p.id === id); }
 function pageHtml(pg, idx, full){
@@ -575,8 +582,9 @@ function pageHtml(pg, idx, full){
   if(pg.type === 'cover'){
     return `<div class="pg cover"><div class="in">${ph(pg.ids[0])}<div class="ct"><h2>${esc($('albumName').value || 'Familiealbum')}</h2><p>${esc($('albumSub').value || '')}</p></div></div></div>`;
   }
-  if(pg.type === 'end') return `<div class="pg endp"><div class="in"><div class="logo-e">Pho2Album</div><div class="capsm">Laget på vår egen maskin, trykket for å bli bladd i.</div></div></div>`;
+  if(pg.type === 'end') return `<div class="pg endp"><div class="in"><div class="logo-e">Fo2Album</div><div class="capsm">Laget på vår egen maskin, trykket for å bli bladd i.</div></div></div>`;
   if(pg.type === 'blank') return `<div class="pg blank"></div>`;
+  if(pg.kind) return `<div class="pg ${tmpl(pg)}"><div class="in">${pg.ids.map(ph).join('')}</div></div>`;
   const ps = pg.ids.map(id => byId(id));
   const d0 = ps[0].date, d1 = ps[ps.length-1].date;
   const range = d0.toDateString() === d1.toDateString() ? `${d0.getDate()}. ${MONTHS[d0.getMonth()]}` : `${d0.getDate()}.–${d1.getDate()}. ${MONTHS[d1.getMonth()]}`;
@@ -601,9 +609,11 @@ function renderMini(){
   if(!state.pages.length){ $('miniCover').innerHTML = '<span class="crumb">Forsiden vises her</span>'; return; }
   $('miniCover').innerHTML = `<div style="width:120px;box-shadow:var(--shadow-lg)">${pageHtml(state.pages[0], 0, false).replace(/<button class="ph/g,'<span class="ph').replace(/<\/button>/g,'</span>')}</div>`;
 }
-$('makeDraft').onclick = () => { buildPages(); showView('album'); renderAlbum(); toast(`Utkast med ${state.pages.length} sider er klart`); };
+$('makeDraft').onclick = () => runAnalysis(state.draft?.cap ?? null);
+$('redraft').onclick = () => runAnalysis(state.draft?.cap ?? null);
+$('seeAlbum').onclick = () => { if(!state.draft) return toast('Lag utkastet først'); buildPages(); showView('album'); renderAlbum(); };
 $('relayout').onclick = () => { buildPages(); renderAlbum(); toast('Nytt oppsett laget'); };
-$('backPick').onclick = () => showView('pick');
+$('backPick').onclick = () => showView('draft');
 $('prev').onclick = () => { state.spread--; renderAlbum(); };
 $('next').onclick = () => { state.spread++; renderAlbum(); };
 $('strip').addEventListener('click', e => { const b = e.target.closest('[data-sp]'); if(b){ state.spread = +b.dataset.sp; renderAlbum(); } });
@@ -625,7 +635,7 @@ document.addEventListener('keydown', e => {
   if(e.key === 'ArrowLeft' && !$('prev').disabled){ state.spread--; renderAlbum(); }
   if(e.key === 'Escape' && state.sel){ state.sel = null; renderAlbum(); }
 });
-$('removePhoto').onclick = () => { if(!state.sel) return; const p = byId(state.sel.id); p.selected = false; if(state.coverId === p.id) state.coverId = null; const keep = state.spread; buildPages(); state.spread = keep; renderAlbum(); toast('Bildet er fjernet fra albumet'); };
+$('removePhoto').onclick = () => { if(!state.sel) return; const id = state.sel.id; if(state.coverId === id) state.coverId = null; choose('ta_bort', id); const keep = state.spread; buildPages(); state.spread = keep; renderAlbum(); };
 $('makeCover').onclick = () => { if(!state.sel) return; state.coverId = state.sel.id; buildPages(); renderAlbum(); toast('Forsidebildet er byttet'); };
 ['albumName','albumSub'].forEach(id => $(id).addEventListener('input', () => { if(state.pages.length && state.view==='album') renderAlbum(); else renderMini(); }));
 
@@ -639,22 +649,329 @@ $('exportPdf').onclick = async () => {
   setTimeout(() => { pr.querySelectorAll('img').forEach(img => URL.revokeObjectURL(img.src)); pr.innerHTML = ''; }, 1500);
 };
 
+/* ---------- Albumutkast: analyse, forslag, begrunnelser og læring ----------
+   Samme fremgangsmåte som appen (crates/p2a-core/src/select/draft.rs og layout.rs), forenklet:
+   hendelser, serier, nesten like bilder, kvalitet, sider per historie, og en kort begrunnelse
+   for hvert bilde, med eller ikke med. Brukerens bytter og svar på «Hvorfor?» lagres bare i
+   denne nettleseren og flytter noen få vekter (som learn.rs). */
+const CFG = { burst: 20e3, simMs: 600e3, gap: 3*3600e3, evMin: 3, ppsq: 0.6, maxPages: 16, ppp: 4, maxShare: 0.5, everyday: 1.5, unSharp: 0.15, unExpo: 0.1, blurry: 0.35 };
+const PREF0 = { ws: 0.5, we: 0.3, wc: 0.2, imp: 0.75, dens: 1, ham: 10 };
+const KR_PER_SIDE = 4, SIDETRINN = 50;
+const LOG_KEY = 'fo2album-laering';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function loadLog(){ try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch(e){ return []; } }
+function saveLog(log){ try { localStorage.setItem(LOG_KEY, JSON.stringify(log)); } catch(e){} }
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+function learn(log){
+  const p = { ...PREF0 };
+  for(const f of log){
+    switch(f.r){
+      case 'uskarpt': p.ws += .04; p.imp += .02; break;
+      case 'daarlig_lys': p.we += .04; break;
+      case 'for_likt': p.ham += 1; break;
+      case 'for_mange_herfra': p.dens -= .04; break;
+      case 'mangler_herfra': p.dens += .04; break;
+      case 'viktig_oyeblikk': p.imp -= .03; break;
+      case 'viktig_person': p.imp -= .02; break;
+      case 'fint_bilde': p.wc += .03; break;
+      case 'skarpere': p.ws += .03; break;
+      case 'liker_ikke': case 'privat': break;
+      default: if(f.a === 'ta_med') p.dens += .01; else if(f.a === 'ta_bort') p.dens -= .01;
+    }
+    p.ws = clamp(p.ws, .3, .8); p.we = clamp(p.we, .15, .6); p.wc = clamp(p.wc, .1, .5);
+    p.imp = clamp(p.imp, .4, .95); p.dens = clamp(p.dens, .6, 1.6); p.ham = clamp(p.ham, 6, 16);
+  }
+  return p;
+}
+const LESSONS = {
+  ws: ['Skarpe bilder betyr mye for dere.'], we: ['Godt lys betyr mye for dere.'], wc: ['Dere liker fargerike bilder.'],
+};
+function lessons(p){
+  const out = [];
+  if(p.ws - PREF0.ws >= .05) out.push(LESSONS.ws[0]);
+  if(p.we - PREF0.we >= .05) out.push(LESSONS.we[0]);
+  if(p.wc - PREF0.wc >= .05) out.push(LESSONS.wc[0]);
+  if(PREF0.imp - p.imp >= .05) out.push('Øyeblikket betyr mer enn om bildet er perfekt.');
+  if(p.imp - PREF0.imp >= .05) out.push('Dere vil helst ha teknisk gode bilder.');
+  if(p.ham - PREF0.ham >= 2) out.push('Dere vil ikke ha bilder som ligner hverandre.');
+  if(p.dens - PREF0.dens >= .05) out.push('Dere vil ha flere bilder fra hver hendelse.');
+  if(PREF0.dens - p.dens >= .05) out.push('Dere vil ha færre bilder fra hver hendelse.');
+  return out;
+}
+const prisTrinn = s => Math.max(SIDETRINN, Math.ceil(s / SIDETRINN) * SIDETRINN);
+const pris = s => prisTrinn(s) * KR_PER_SIDE;
+const kr = n => n.toLocaleString('nb-NO') + ' kr';
+
+/* Nesten like bilder: dHash (9 × 8) fra miniatyren. */
+async function dhash(p){
+  if(p.dh || !p.thumb) return;
+  const img = new Image(); img.src = p.thumb; await img.decode().catch(() => {});
+  const c = document.createElement('canvas'); c.width = 9; c.height = 8;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0, 9, 8);
+  const d = x.getImageData(0, 0, 9, 8).data; let bits = '';
+  for(let y = 0; y < 8; y++) for(let k = 0; k < 8; k++){ const i = (y*9 + k)*4, j = i + 4; bits += (d[i]+d[i+1]+d[i+2]) > (d[j]+d[j+1]+d[j+2]) ? '1' : '0'; }
+  p.dh = bits;
+}
+const ham = (a, b) => { let n = 0; for(let i = 0; i < 64; i++) if(a[i] !== b[i]) n++; return n; };
+
+/* Sideoppsett for én historie (layout.rs): de beste bildene får egen side, resten rutenett.
+   Enkeltbilder veksler mellom helside (hele rammen) og luft rundt. Store historier åpner med et enkeltbilde. */
+function story(q, pages){
+  const n = q.length; if(!n) return [];
+  pages = clamp(pages, 1, n);
+  if(pages === 1) return [{ kind: n === 1 ? 'air' : 'grid', idx: [...Array(n).keys()] }];
+  const singles = pages === n ? n : clamp(Math.max(Math.round(pages * .4), 2*pages - n), 1, pages - 1);
+  const order = [...Array(n).keys()].sort((a, b) => q[b] - q[a] || a - b);
+  const single = new Set(order.slice(0, singles));
+  const rest = [...Array(n).keys()].filter(i => !single.has(i)), grids = pages - singles;
+  const out = [...single].map(i => ({ kind: 'air', idx: [i] }));
+  for(let g = 0; g < grids; g++){ const ch = rest.slice(Math.floor(g*rest.length/grids), Math.floor((g+1)*rest.length/grids)); if(ch.length) out.push({ kind: 'grid', idx: ch }); }
+  out.sort((a, b) => a.idx[0] - b.idx[0]);
+  if(pages >= 3){ const f = out.findIndex(p => p.idx.length === 1); if(f > 0) out.unshift(out.splice(f, 1)[0]); }
+  let full = true;
+  out.filter(p => p.idx.length === 1).forEach(p => { const ok = q[p.idx[0]] >= .45; p.kind = full && ok ? 'full' : 'air'; if(ok) full = !full; });
+  return out;
+}
+
+function makeDraft(cap){
+  const prefs = learn(loadLog());
+  const qOf = q => (prefs.ws*q.sharp + prefs.we*q.expo + prefs.wc*q.color) / (prefs.ws + prefs.we + prefs.wc);
+  const items = visible().filter(p => p.q).map(p => ({ p, t: +p.date, q: qOf(p.q), raw: p.q, dec: state.decisions.get(p.id),
+    noise: /\.png$/i.test(p.name) && !p.exif ? 'skjermbilde' : p.q.expo < CFG.unExpo ? 'morkt' : p.q.sharp < CFG.unSharp ? 'uskarpt' : null }))
+    .sort((a, b) => a.t - b.t || a.p.id - b.p.id);
+  if(!items.length) return null;
+  // Hendelser: nytt treffpunkt etter 3 t. Små hendelser samles i «hverdager» per måned.
+  const groups = []; const everyday = new Map(); let start = 0;
+  for(let i = 1; i <= items.length; i++){
+    if(i < items.length && items[i].t - items[i-1].t <= CFG.gap) continue;
+    const m = [...Array(i - start).keys()].map(k => start + k);
+    if(m.length >= CFG.evMin) groups.push({ m, everyday: false });
+    else { const d = items[start].p.date, key = d.getFullYear()*12 + d.getMonth(); if(!everyday.has(key)){ everyday.set(key, groups.length); groups.push({ m: [], everyday: true }); } groups[everyday.get(key)].m.push(...m); }
+    start = i;
+  }
+  groups.sort((a, b) => a.m[0] - b.m[0]);
+  // Serier: bilder innen 20 sekunder.
+  items.forEach((it, i) => { it.burst = i === 0 ? 0 : (it.t - items[i-1].t <= CFG.burst ? items[i-1].burst : items[i-1].burst + 1); });
+  const burstSize = new Map(); items.forEach(it => burstSize.set(it.burst, (burstSize.get(it.burst) || 0) + 1));
+  const similar = (a, b) => a.p.dh && b.p.dh && Math.abs(a.t - b.t) <= CFG.simMs && ham(a.p.dh, b.p.dh) <= prefs.ham;
+  // Sider per historie: ≈ 0,6 · √bilder, store historier får stor plass. Med sidetak krymper alle likt.
+  const natural = g => g.everyday ? Math.ceil(CFG.everyday*Math.sqrt(g.m.length)/CFG.ppp) : clamp(Math.round(CFG.ppsq*Math.sqrt(g.m.length)), 1, CFG.maxPages);
+  const target = (g, s) => Math.max(1, Math.floor(natural(g) * s));
+  let scale = 1;
+  if(cap) for(let k = 0; k <= 19; k++){ scale = 1 - k*.05; if(groups.reduce((a, g) => a + target(g, scale), 0) <= cap) break; }
+  const inc = new Array(items.length).fill(false), first = [], jumped = new Set();
+  groups.forEach((g, gi) => {
+    g.target = target(g, scale);
+    let quota = Math.max(1, Math.round(Math.min(g.target*CFG.ppp*prefs.dens, Math.ceil(g.m.length*CFG.maxShare))));
+    const chosen = g.m.filter(i => items[i].dec === 'med');
+    let cands = g.m.filter(i => !items[i].noise && !items[i].dec);
+    if(!chosen.length && !cands.length){ cands = g.m.filter(i => !items[i].dec && items[i].noise !== 'skjermbilde'); quota = 1; }
+    const span = Math.max(1, items[g.m[g.m.length-1]].t - items[g.m[0]].t), step = Math.max(60e3, span/(quota + 1));
+    while(chosen.length < quota){
+      const open = cands.filter(i => !chosen.includes(i) && !chosen.some(j => items[j].burst === items[i].burst || similar(items[i], items[j])));
+      if(!open.length) break;
+      const val = i => { const d = chosen.length ? Math.min(...chosen.map(j => Math.abs(items[i].t - items[j].t))) : Infinity; return prefs.imp*items[i].q + (1 - prefs.imp)*Math.min(1, d/step); };
+      const best = open.reduce((a, b) => val(b) > val(a) ? b : a);
+      if(items[best].q + 1e-6 < Math.max(...open.map(i => items[i].q))) jumped.add(best);
+      if(first[gi] == null) first[gi] = best;
+      chosen.push(best);
+    }
+    chosen.forEach(i => inc[i] = true);
+    g.chosen = g.m.filter(i => inc[i]);
+  });
+  // Begrunnelser.
+  const reason = new Map(), related = new Map();
+  groups.forEach((g, gi) => g.m.forEach(i => {
+    const it = items[i], series = burstSize.get(it.burst);
+    if(inc[i]){
+      const weak = it.noise || it.raw.sharp < CFG.blurry;
+      reason.set(it.p.id, it.dec === 'med' ? 'valgt_av_deg' : g.chosen.length === 1 ? (weak ? 'svakt_men_eneste' : g.m.length === 1 ? 'eneste' : `beste_av:${g.m.length}`)
+        : series > 1 ? `serie:${series}` : first[gi] === i ? 'beste_herfra' : jumped.has(i) ? 'annen_del' : 'god_kvalitet');
+      return;
+    }
+    const near = g.chosen.length ? g.chosen.reduce((a, b) => Math.abs(items[b].t - it.t) < Math.abs(items[a].t - it.t) ? b : a) : null;
+    const sameBurst = g.chosen.find(j => items[j].burst === it.burst), like = g.chosen.find(j => similar(it, items[j]));
+    let r, rel = near;
+    if(it.dec === 'ikke') r = 'valgt_bort';
+    else if(it.noise) r = it.noise;
+    else if(sameBurst != null){ r = `samme_serie`; rel = sameBurst; }
+    else if(like != null){ r = 'nesten_likt'; rel = like; }
+    else if(it.raw.sharp < CFG.blurry) r = 'uskarpt';
+    else r = `ikke_plass:${g.chosen.length}`;
+    reason.set(it.p.id, r); if(rel != null) related.set(it.p.id, items[rel].p.id);
+  }));
+  items.forEach((it, i) => it.p.selected = inc[i]);
+  const events = groups.map(g => ({
+    everyday: g.everyday, start: items[g.m[0]].p.date, end: items[g.m[g.m.length-1]].p.date,
+    ids: g.m.map(i => items[i].p.id),
+    layout: story(g.chosen.map(i => items[i].q), g.target).map(pg => ({ kind: pg.kind, ids: pg.idx.map(k => items[g.chosen[k]].p.id) })),
+  }));
+  const pages = events.reduce((a, e) => a + e.layout.length, 0);
+  return { events, reason, related, pages, cap: cap || null, fullPages: cap ? (state.draft?.fullPages ?? pages) : pages, prefs, eventOf: new Map(events.flatMap((e, k) => e.ids.map(id => [id, k]))) };
+}
+
+const REASON = {
+  valgt_av_deg: () => 'Du valgte dette', svakt_men_eneste: () => 'Litt uskarpt eller mørkt, men det beste herfra',
+  eneste: () => 'Det eneste bildet herfra', beste_av: n => `Det beste av ${n} bilder herfra`, serie: n => `Beste bilde i en serie på ${n}`,
+  beste_herfra: () => 'Det beste bildet herfra', annen_del: () => 'Viser en annen del av dagen', god_kvalitet: () => 'Skarpt og godt lys',
+  valgt_bort: () => 'Du tok det bort', samme_serie: () => 'Et bedre bilde fra samme øyeblikk er med', nesten_likt: () => 'Nesten likt et bilde som er med',
+  uskarpt: () => 'Uskarpt', morkt: () => 'For mørkt eller for lyst', skjermbilde: () => 'Ser ut som et skjermbilde',
+  ikke_plass: n => `Ikke plass: ${n} ${n == 1 ? 'bedre bilde' : 'bedre bilder'} herfra er med`,
+};
+const reasonText = r => { const [k, n] = String(r).split(':'); return (REASON[k] || (() => ''))(n); };
+const ASK = {
+  ta_bort: ['Hvorfor tok du det bort?', [['uskarpt','Uskarpt'],['daarlig_lys','Dårlig lys'],['for_likt','For likt et annet'],['for_mange_herfra','For mange herfra'],['liker_ikke','Liker det ikke'],['privat','Skal ikke i albumet']]],
+  ta_med: ['Hva gjør dette bildet viktig?', [['viktig_oyeblikk','Viktig øyeblikk'],['viktig_person','Viktig person'],['fint_bilde','Fint bilde'],['mangler_herfra','Mangler noe herfra']]],
+  bytt: ['Hva var bedre med det nye bildet?', [['skarpere','Skarpere'],['viktig_oyeblikk','Viktig øyeblikk'],['viktig_person','Viktig person'],['fint_bilde','Fint bilde'],['for_likt','Det gamle var for likt et annet'],['liker_ikke','Likte ikke det gamle']]],
+};
+const PHASES = ['Venter til alle bildene er hentet og målt', 'Sammenligner bildene for å finne nesten like', 'Finner hendelsene i året', 'Finner serier tatt i samme øyeblikk', 'Velger de beste bildene fra hver hendelse', 'Lager sidene, med helsider og luft', 'Skriver en kort begrunnelse for hvert bilde'];
+
+async function runAnalysis(cap){
+  if(state.analysing) return;
+  state.analysing = true; state.dock = null; showView('draft');
+  const show = (k, extra) => { $('draftWrap').innerHTML = `<div class="analyse"><h2>Lager utkastet …</h2><div class="progress"><i style="width:${Math.round(k/PHASES.length*100)}%"></i></div><ol>${PHASES.map((t, i) => `<li class="${i < k ? 'done' : i === k ? 'now' : ''}">${t}${i === k && extra ? ` <span class="count">${extra}</span>` : ''}</li>`).join('')}</ol><p class="crumb">Det tar litt tid, og alt skjer på denne maskinen.</p></div>`; };
+  try{
+    show(0); while(state.ingesting > 0) await sleep(300); await sleep(400);
+    const vis = visible().filter(p => p.thumb); let done = 0;
+    show(1, `0 av ${vis.length}`);
+    await pool(vis, 6, async p => { await dhash(p); if(++done % 40 === 0) show(1, `${done} av ${vis.length}`); });
+    for(const k of [2, 3, 4]){ show(k); await sleep(500); }
+    const d = makeDraft(cap);
+    for(const k of [5, 6]){ show(k); await sleep(450); }
+    state.draft = d; state.pages = [];
+  } finally { state.analysing = false; }
+  renderDraftView();
+  if(state.draft) toast(`Utkastet er klart: ${state.draft.pages} sider`);
+}
+
+function miniPage(pg){
+  const cls = pg.kind === 'full' ? 'tfull' : pg.kind === 'air' ? 'tair' : gridClass(pg.ids.length);
+  return `<div class="pg ${cls}"><div class="in">${pg.ids.map(id => `<span class="ph"><img src="${byId(id)?.thumb || ''}" alt=""></span>`).join('')}</div></div>`;
+}
+function gridClass(n){ return n === 1 ? 't1' : n === 2 ? 't2h' : n === 3 ? 't3' : n === 4 ? 't4' : n <= 6 ? 't6' : n <= 9 ? 't9' : 't12'; }
+/* Sidene etter brukerens valg: et bilde som er byttet inn tar plassen til det som gikk ut. */
+function currentLayout(e){
+  const med = e.ids.filter(id => byId(id)?.selected), inLayout = new Set(e.layout.flatMap(p => p.ids));
+  const nye = med.filter(id => !inLayout.has(id)); const out = [];
+  for(const pg of e.layout){ const ids = []; pg.ids.forEach(id => { if(byId(id)?.selected) ids.push(id); else { const n = nye.shift(); if(n) ids.push(n); } }); if(ids.length) out.push({ kind: ids.length === 1 ? pg.kind : 'grid', ids }); }
+  if(nye.length) out.push({ kind: 'grid', ids: nye });
+  return out;
+}
+function draftPages(){ return state.draft ? state.draft.events.reduce((a, e) => a + currentLayout(e).length, 0) : 0; }
+const fmtDay = d => `${d.getDate()}. ${MONTHS[d.getMonth()]}`;
+function eventTitle(e){
+  if(e.everyday) return `Hverdager i ${MONTHS[e.start.getMonth()]}`;
+  if(e.start.toDateString() === e.end.toDateString()) return fmtDay(e.start);
+  return e.start.getMonth() === e.end.getMonth() ? `${e.start.getDate()}.–${fmtDay(e.end)}` : `${fmtDay(e.start)}–${fmtDay(e.end)}`;
+}
+function card(id, small){
+  const p = byId(id), sel = state.pick === id;
+  return `<button class="dc${small ? ' dc--s' : ''}" data-dc="${id}" aria-pressed="${sel}" aria-label="${p.selected ? 'Med' : 'Ikke med'}: ${esc(reasonText(state.draft.reason.get(id)))}"><span class="th"><img src="${p.thumb || ''}" alt="" loading="lazy"></span><span class="why">${esc(reasonText(state.draft.reason.get(id)))}</span></button>`;
+}
+function renderDraft(){
+  const d = state.draft;
+  if(!d){
+    const n = visible().length;
+    $('draftWrap').innerHTML = `<div class="intro"><p class="lead">Appen går gjennom alle bildene fra året, finner hendelsene og lager et komplett forslag til album. Etterpå ser du hva som er med og hva som ikke er med, og hvorfor. Du bytter der du er uenig.</p><p class="crumb">Det tar litt tid, og alt skjer på denne maskinen.${state.ingesting ? ' Appen henter fortsatt bilder; utkastet venter til alle er med.' : ''}</p><button class="btn btn--p btn--lg" id="startDraft" ${n ? '' : 'disabled'}>Lag utkast</button></div>`;
+    return;
+  }
+  const pages = draftPages(), included = visible().filter(p => p.selected).length;
+  const tiers = [{ cap: null, s: d.fullPages }]; for(let t = prisTrinn(d.fullPages) - SIDETRINN; t >= SIDETRINN && tiers.length < 4; t -= SIDETRINN) tiers.push({ cap: t, s: t });
+  const les = lessons(learn(loadLog())), log = loadLog();
+  let html = `<p class="crumb">${included} bilder på omtrent ${pages} sider, fra ${d.events.filter(e => e.ids.some(id => byId(id)?.selected)).length} hendelser.</p>
+  <div class="price"><b>Albumet er nå på ${pages} sider og koster ${kr(pris(pages))}.</b><span class="crumb">Prisen går i trinn på ${SIDETRINN} sider (${KR_PER_SIDE} kr per side). Vil du ha et mindre album, krymper appen alle historiene litt, men hver hendelse beholder minst én side.</span>
+  <div class="chips">${tiers.map(t => `<button class="chip" data-cap="${t.cap ?? ''}" aria-pressed="${t.cap === d.cap}">${t.cap === null ? `Hele historien: ${t.s} sider · ${kr(pris(t.s))}` : `${t.s} sider · ${kr(pris(t.s))}`}</button>`).join('')}</div></div>
+  <details class="learned"><summary>Dette har appen lært om dere</summary>${les.length ? `<ul>${les.map(l => `<li>${l}</li>`).join('')}</ul>` : '<p>Ingenting ennå. Når du tar med, tar bort eller bytter bilder, lærer appen litt etter litt hva dere liker.</p>'}${log.length ? `<p class="crumb">Basert på ${log.length} valg og ${log.filter(f => f.r).length} svar. Lagres bare i denne nettleseren.</p>` : ''}</details>
+  <p class="crumb">Til venstre er bildene appen foreslår, til høyre de som ikke er med. Klikk et bilde for å se hvorfor, og for å ta det med, ta det bort eller bytte.</p>`;
+  let lastMonth = -1;
+  d.events.forEach((e, k) => {
+    const m = e.start.getFullYear()*12 + e.start.getMonth();
+    if(m !== lastMonth){ html += `<h2 class="month-h">${CAP(MONTHS[e.start.getMonth()])} ${e.start.getFullYear()}</h2>`; lastMonth = m; }
+    const med = e.ids.filter(id => byId(id)?.selected), ut = e.ids.filter(id => !byId(id)?.selected), lay = currentLayout(e);
+    const showAll = state.openEvents.has(k), vis = showAll ? ut : ut.slice(0, 8);
+    html += `<section class="ev"><div class="ev-h"><h3>${eventTitle(e)}</h3><span class="count">${e.ids.length} bilder · ${lay.length} ${lay.length === 1 ? 'side' : 'sider'}</span></div>
+      <div class="pgs">${lay.map(miniPage).join('')}</div>
+      <div class="cols"><div><h4>Med i albumet · ${med.length}</h4><div class="dgrid">${med.map(id => card(id)).join('')}</div></div>
+      <div class="out"><h4>Ikke med · ${ut.length}</h4>${ut.length ? `<div class="dgrid dgrid--s">${vis.map(id => card(id, true)).join('')}</div>` : '<p class="crumb">Alle bildene herfra er med.</p>'}${ut.length > 8 ? `<button class="btn btn--g" data-more="${k}">${showAll ? 'Vis færre' : `Vis alle ${ut.length}`}</button>` : ''}</div></div></section>`;
+  });
+  $('draftWrap').innerHTML = html;
+  renderDock();
+}
+function renderDock(){
+  const dk = $('dock'), d = state.draft;
+  if(state.ask){
+    const [q, opts] = ASK[state.ask.a];
+    dk.innerHTML = `<b>${q}</b><span class="crumb">Valgfritt. Svaret hjelper appen å forstå hva dere bryr dere om.</span><div class="chips">${opts.map(([v, t]) => `<button class="chip" data-why="${v}">${t}</button>`).join('')}<button class="btn btn--g" data-why="">Hopp over</button></div>`;
+  } else if(state.pick && d){
+    const p = byId(state.pick), rel = d.related.get(state.pick), relInc = rel && byId(rel)?.selected;
+    dk.innerHTML = `<b>${esc(reasonText(d.reason.get(state.pick)))}</b><div class="toolbar">${p.selected ? '<button class="btn btn--s" data-act="ta_bort">Ta bort</button>' : `<button class="btn btn--s" data-act="ta_med">Ta med</button>${relInc ? '<button class="btn btn--s" data-act="bytt">Bytt med bildet som er med</button>' : ''}`}<button class="btn btn--g" data-act="lukk">Lukk</button></div><span class="crumb">Eller klikk et bilde i den andre kolonnen for å bytte.</span>`;
+  } else if(state.thanks){
+    dk.innerHTML = `<b>Takk! Appen husker det til neste utkast.</b>`;
+  }
+  dk.classList.toggle('hidden', !(state.ask || state.pick || state.thanks) || state.view !== 'draft');
+}
+/* Spør forsiktig: de tre første gangene, så hver tredje. Etter tre «Hopp over» på rad: ikke mer i denne økten. */
+const askNow = () => state.skips < 3 && (state.actions <= 3 || state.actions % 3 === 0);
+function choose(a, id, other){
+  const d = state.draft, log = loadLog();
+  const set = (pid, inc) => { byId(pid).selected = inc; state.decisions.set(pid, inc ? 'med' : 'ikke'); d.reason.set(pid, inc ? 'valgt_av_deg' : 'valgt_bort'); };
+  if(a === 'ta_med') set(id, true); else if(a === 'ta_bort') set(id, false); else { set(id, true); set(other, false); }
+  log.push({ a, r: null }); saveLog(log);
+  state.actions++; state.pick = null; state.thanks = false; state.pages = [];
+  state.ask = askNow() ? { a, i: log.length - 1 } : null;
+  toast(a === 'bytt' ? 'Bildene er byttet' : a === 'ta_med' ? 'Bildet er med' : 'Bildet er tatt bort');
+  renderDraft(); updateCounts();
+}
+$('draftWrap').addEventListener('click', e => {
+  if(e.target.closest('#startDraft')){ runAnalysis(null); return; }
+  const c = e.target.closest('[data-cap]'); if(c){ runAnalysis(c.dataset.cap ? +c.dataset.cap : null); return; }
+  const mo = e.target.closest('[data-more]'); if(mo){ const k = +mo.dataset.more; state.openEvents.has(k) ? state.openEvents.delete(k) : state.openEvents.add(k); renderDraft(); return; }
+  const b = e.target.closest('[data-dc]'); if(!b) return;
+  const id = +b.dataset.dc, d = state.draft;
+  if(state.pick && state.pick !== id && d.eventOf.get(state.pick) === d.eventOf.get(id) && byId(state.pick).selected !== byId(id).selected){
+    const inn = byId(id).selected ? state.pick : id, ut = byId(id).selected ? id : state.pick;
+    choose('bytt', inn, ut); return;
+  }
+  state.pick = state.pick === id ? null : id; state.ask = null; state.thanks = false; renderDraft();
+});
+$('dock').addEventListener('click', e => {
+  const w = e.target.closest('[data-why]');
+  if(w && state.ask){ const log = loadLog(); if(w.dataset.why){ log[state.ask.i].r = w.dataset.why; saveLog(log); state.skips = 0; state.thanks = true; } else state.skips++; state.ask = null; renderDraft(); return; }
+  const a = e.target.closest('[data-act]'); if(!a || !state.pick) return;
+  if(a.dataset.act === 'lukk'){ state.pick = null; renderDraft(); return; }
+  if(a.dataset.act === 'bytt') choose('bytt', state.pick, state.draft.related.get(state.pick)); else choose(a.dataset.act, state.pick);
+});
+
+function renderDraftView(){
+  const years = [...new Set(state.photos.filter(p => !p.dup).map(p => p.date.getFullYear()))].sort();
+  if(state.year == null && years.length) state.year = years[years.length-1];
+  $('draftTitle').textContent = state.draft ? `Utkast til Familiealbum ${state.year}` : `Familiealbum ${state.year ?? ''}`;
+  $('draftYears').innerHTML = years.length > 1 ? years.map(y => `<button class="chip" data-y="${y}" aria-pressed="${y===state.year}">${y}</button>`).join('') : '';
+  $('redraft').classList.toggle('hidden', !state.draft); $('seeAlbum').classList.toggle('hidden', !state.draft);
+  if(!state.analysing) renderDraft();
+  updateCounts();
+}
+
 /* ---------- Visninger ---------- */
 function showView(v){
   state.view = v;
   $('viewStart').classList.toggle('hidden', v !== 'start');
   $('viewPick').classList.toggle('hidden', v !== 'pick');
+  $('viewDraft').classList.toggle('hidden', v !== 'draft');
+  $('navDraft').setAttribute('aria-current', v === 'draft');
   $('viewAlbum').classList.toggle('hidden', v !== 'album');
-  $('navPick').setAttribute('aria-current', v !== 'album');
+  $('navPick').setAttribute('aria-current', v === 'pick');
   $('navAlbum').setAttribute('aria-current', v === 'album');
   $('makeDraft').classList.toggle('hidden', v === 'album');
   $('exportPdf').classList.toggle('hidden', v !== 'album');
   $('exportPdf').classList.toggle('btn--p', v === 'album'); $('exportPdf').classList.toggle('btn--s', v !== 'album');
   $('panelHint').textContent = v === 'album' ? 'Velg «Lagre som PDF» i utskriftsvinduet. Filen lagres bare på din maskin.' : 'Utkastet lages lokalt på maskinen';
   if(v === 'pick') renderGrid();
+  if(v === 'draft') renderDraftView(); else $('dock').classList.add('hidden');
 }
 $('navPick').onclick = () => showView(state.photos.length ? 'pick' : 'start');
-$('navAlbum').onclick = () => { if(state.pages.length){ showView('album'); renderAlbum(); } else toast('Velg bilder og trykk «Lag utkast» først'); };
+$('navDraft').onclick = () => showView(state.photos.length ? 'draft' : 'start');
+$('navAlbum').onclick = () => { if(state.pages.length){ showView('album'); renderAlbum(); } else if(state.draft){ buildPages(); showView('album'); renderAlbum(); } else toast('Trykk «Lag utkast» først'); };
 $('sources').addEventListener('click', e => { const b = e.target.closest('[data-src]'); if(b) pickFolder(b.dataset.src); });
 $('addFolder').onclick = () => { if(state.view === 'start') toast('Velg en kilde under'); else pickFolder('PC'); };
 $('albumName').addEventListener('input', () => $('albumName').dataset.touched = '1');

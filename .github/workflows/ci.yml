@@ -71,7 +71,7 @@ jobs:
         run: pnpm tauri build --debug --no-bundle
       - name: Røyktest (starter appen)
         shell: bash
-        run: node scripts/smoke-test.mjs "target/debug/pho2album${{ runner.os == 'Windows' && '.exe' || '' }}"
+        run: node scripts/smoke-test.mjs "target/debug/fo2album${{ runner.os == 'Windows' && '.exe' || '' }}"
 
   verktoy:
     name: Verktøyet p2a (${{ matrix.os }})

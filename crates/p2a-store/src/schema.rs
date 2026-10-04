@@ -98,6 +98,37 @@ const MIGRATIONS: &[&str] = &[
         updated_at  TEXT NOT NULL
     );
     "#,
+    // 3: brukerens valg i utkastet og det appen lærer av dem (SCORING.md §6.3).
+    r#"
+    -- Ett gjeldende valg per bilde og album-år (lagt_til | fjernet).
+    DELETE FROM overrides WHERE id NOT IN
+        (SELECT MAX(id) FROM overrides GROUP BY album_year, content_hash);
+    CREATE UNIQUE INDEX overrides_photo ON overrides(album_year, content_hash);
+
+    -- Logg over handlinger og svarene på «Hvorfor?». Lever fra år til år.
+    CREATE TABLE feedback (
+        id            INTEGER PRIMARY KEY,
+        album_year    INTEGER NOT NULL,
+        action        TEXT NOT NULL,             -- learn::Action::as_str
+        content_hash  BLOB NOT NULL,             -- bildet som ble tatt med eller tatt bort
+        other_hash    BLOB,                      -- ved bytte: bildet som ble byttet ut
+        reason        TEXT,                      -- learn::FeedbackReason::as_str
+        created_at    TEXT NOT NULL
+    );
+
+    -- Relasjoner mellom personer i familieprofilen, f.eks. hvem som er fadder for hvem.
+    -- Appen foreslår (ut fra hendelser som dåp), brukeren bekrefter.
+    CREATE TABLE person_relations (
+        id            INTEGER PRIMARY KEY,
+        person_id     INTEGER NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+        kind          TEXT NOT NULL,             -- RelationKind::as_str
+        other_id      INTEGER NOT NULL REFERENCES persons(id) ON DELETE CASCADE,
+        status        TEXT NOT NULL,             -- RelationStatus::as_str
+        learned_year  INTEGER,                   -- albumåret relasjonen ble lært
+        created_at    TEXT NOT NULL,
+        UNIQUE (person_id, kind, other_id)
+    );
+    "#,
 ];
 
 pub const CURRENT_VERSION: i64 = MIGRATIONS.len() as i64;

@@ -1,22 +1,22 @@
-PHO2ALBUM – NETTSIDE
+FO2ALBUM – NETTSIDE
 
 Publiser (Netlify, gratis):
 1. Gå til app.netlify.com/drop og logg inn (eller opprett konto).
-2. Pakk ut zip-filen og dra mappen "pho2album-nettside" inn i nettleservinduet.
+2. Pakk ut zip-filen og dra mappen "fo2album-nettside" inn i nettleservinduet.
 3. Siden får en adresse som noe.netlify.app. Sjekk at alt ser riktig ut.
 
-Koble til pho2album.no:
-4. I Netlify: Domain management -> Add a domain -> pho2album.no (www legges til automatisk).
-5. Hos Domeneshop: Mine domener -> pho2album.no -> DNS. Legg inn verdiene Netlify viser, vanligvis:
+Koble til fo2album.no (hovedadressen):
+4. I Netlify: Domain management -> Add a domain -> fo2album.no (www legges til automatisk).
+5. Hos Domeneshop: Mine domener -> fo2album.no -> DNS. Legg inn verdiene Netlify viser, vanligvis:
      A-post      (tomt vertsnavn / @)   75.2.60.5
      CNAME-post  www                    <ditt-nettstednavn>.netlify.app
    Fjern eventuelle gamle A-/CNAME-poster for samme navn først.
 6. Vent til DNS er oppdatert (minutter til noen timer). Netlify lager HTTPS automatisk.
 
-Koble til fo2album.no (videresending til pho2album.no):
-7. I Netlify: legg til fo2album.no som ekstra domene (domain alias) på samme nettsted.
-8. Hos Domeneshop: samme A- og CNAME-poster for fo2album.no.
-   Filen _redirects sender alle besøk videre til pho2album.no.
+Koble til pho2album.no (videresending til fo2album.no):
+7. I Netlify: legg til pho2album.no som ekstra domene (domain alias) på samme nettsted.
+8. Hos Domeneshop: samme A- og CNAME-poster for pho2album.no.
+   Filen _redirects sender alle besøk videre til fo2album.no.
 
 Venteliste:
 9. Påmeldinger ligger i Netlify under Forms -> venteliste.

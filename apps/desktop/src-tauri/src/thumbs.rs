@@ -11,15 +11,7 @@ use crate::commands::AppState;
 pub const SCHEME: &str = "miniatyr";
 
 fn parse_hash(path: &str) -> Option<ContentHash> {
-    let hex = path.trim_start_matches('/');
-    if hex.len() != 64 {
-        return None;
-    }
-    let mut out = [0u8; 32];
-    for (i, b) in out.iter_mut().enumerate() {
-        *b = u8::from_str_radix(hex.get(i * 2..i * 2 + 2)?, 16).ok()?;
-    }
-    Some(ContentHash(out))
+    ContentHash::from_hex(path.trim_start_matches('/'))
 }
 
 pub fn handle<R: Runtime>(

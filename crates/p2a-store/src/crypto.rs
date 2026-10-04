@@ -22,6 +22,8 @@ pub enum Purpose {
 }
 
 impl Purpose {
+    /// Etikettene beholder det gamle navnet med vilje: de er en del av krypteringen, og
+    /// endres de, kan eksisterende data ikke åpnes.
     fn info(self) -> &'static [u8] {
         match self {
             Purpose::Database => b"pho2album/database/v1",

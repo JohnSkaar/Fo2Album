@@ -1,11 +1,12 @@
 # Overlevering mellom økter
 
-Sist oppdatert 4. oktober 2026, etter M2. Les `CLAUDE.md` først, så denne filen, så `docs/PRODUCT.md` og `docs/SCORING.md`.
+Sist oppdatert 4. oktober 2026, etter M2.5 (komplett utkast å vurdere) og navnebyttet til Fo2Album. Les `CLAUDE.md` først, så denne filen, så `docs/PRODUCT.md` og `docs/SCORING.md`.
 
 ## Hvor vi er
 
-- **Gren:** `claude/pho2album-architecture-plan-trvgs9` (all kode og alle dokumenter). Ingen pull request er opprettet; eieren har ikke bedt om det.
-- **Ferdig:** M0 (oppsett), M1 (kilder og innlesing), M2 (evalueringsoppsett). Se `docs/ROADMAP.md`.
+- **Gren:** `claude/dazzling-johnson-6zkxf3` (bygger på `claude/pho2album-architecture-plan-trvgs9`). Ingen pull request er opprettet; eieren har ikke bedt om det.
+- **Ferdig:** M0 (oppsett), M1 (kilder og innlesing), M2 (evalueringsoppsett), M2.5 (komplett utkast å vurdere). Se `docs/ROADMAP.md`.
+- **Navn:** Fo2Album (bekreftet av eieren). Appnavn, tekster, dokumenter, nettside (fo2album.no er hovedadressen, pho2album.no videresendes i `website/_redirects`), app-ID `no.fo2album.app` (ny datamappe og nøkkelring), prototypen heter `prototype/fo2album-prototype.html`. Bevisst **ikke** endret: pakkenavnene `p2a-*`, miljøvariablene `P2A_*` og etikettene i krypteringen (`pho2album/database/v1` o.l.; endres de, kan data ikke åpnes).
 - **CI:** Grønn til og med M1.5 på Mac og Windows. For M2 (commit `3fca1c9`) ble push-kjøringen avbrutt av en manuell kjøring (`workflow_dispatch`, run 10), som også bygger `p2a` for Mac og Windows som nedlasting (*Artifacts*: `p2a-macos`, `p2a-windows`). **Sjekk at run 10 ble grønn** før du går videre.
 
 ## Hva som finnes
@@ -19,7 +20,9 @@ Sist oppdatert 4. oktober 2026, etter M2. Les `CLAUDE.md` først, så denne file
 | `crates/p2a-eval` | Bilder ut av album-PDF (lopdf), matching mot biblioteket som tåler beskjæring, gullsett, målinger (hendelsesdekning er hovedmålet) |
 | `crates/p2a-cli` | `p2a bench`, `demo`, `les-inn`, `eval lag-gullsett/liste/kjor` |
 | `crates/p2a-keychain` | Nøkkelring (Mac/Windows), nøkkelfil på Linux (bare utvikling) |
-| `apps/desktop` | Tauri 2 + React: velkomst, gjenopprettingsnøkkel, gjenoppretting, kilder (mappevelger, forslag etter samtykke), «Velg bilder» (år, måneder, fremdrift, merknader), «Slett alle data». Miniatyrer via `miniatyr://`-protokollen |
+| `apps/desktop` | Tauri 2 + React: velkomst, gjenopprettingsnøkkel, gjenoppretting, kilder (mappevelger, forslag etter samtykke), **Albumutkast** (hovedvisningen: «Lag utkast» med analyse steg for steg, hendelser med sider, med/ikke med og begrunnelser, bytter, «Hvorfor?», «Dette har appen lært», pris i trinn), «Alle bilder» (år, måneder, fremdrift, merknader), «Slett alle data». Miniatyrer via `miniatyr://`-protokollen |
+| `crates/p2a-core` (nytt) | `select::draft` (hendelsesstyrt utkast med begrunnelser og sidetak), `layout` (sider per historie: helside, luft, rutenett), `learn` (vekter fra brukerens svar), `RelationKind` (f.eks. fadder) |
+| `crates/p2a-store` (skjema v3) | `overrides` (gjeldende valg per bilde og år), `feedback` (logg over valg og svar, alle år), `person_relations` (f.eks. hvem som er fadder for hvem) |
 | `crates/p2a-policy` | Tester som feiler hvis en `p2a-*`-pakke får nettverksavhengigheter eller bruker `std::net` |
 
 Ytelse: 10 000 bilder lest inn på 108 s (4 tråder); 12 MP: 20 ms per bilde.
@@ -36,16 +39,28 @@ Ytelse: 10 000 bilder lest inn på 108 s (4 tråder); 12 MP: 20 ms per bilde.
 8. **Redigeringsvisning:** albumet kronologisk, med bilder som ikke er med ved siden av, hver med kort begrunnelse.
 9. **Personvern:** alt personlig kryptert hos kunden; minimalt hos oss (adresse, ordre, PDF til levering). Gjenopprettingsnøkkel og kryptert sikkerhetskopi.
 
+Nye føringer (4. oktober 2026, fra dåpsalbumet):
+
+10. **«Lag utkast» kjører en grundig analyse** og viser et komplett forslag. «Velg bilder» er ikke første steg; prototypens «Foreslå de beste bildene» er fjernet.
+11. **Brukeren vurderer forslaget**: bildene som er med og ikke med, med kort begrunnelse for begge, og bytter der hun er uenig.
+12. **Appen lærer forsiktig** ved å spørre hvorfor, og bygger kundeforståelse over tid.
+13. **Store historier får stor plass** (grensen på 4 sider er borte). En dåp for eget barn kan få 10+ sider. Brukeren velger selv et mindre album.
+14. **Varier oppsettet**: helside uten marg og bilder med luft rundt.
+15. **Pris regnes ut automatisk, i trinn** (foreløpig 4 kr per side, trinn på 50 sider), og alternativene vises.
+16. **Dåpsmønsteret**: seremonien åpner, fadderne får ett portrett hver (de står ved døpefonten), gjestene i portrettgallerier til slutt. Slike læringer (hvem som er fadder) skal familieprofilen ta med seg.
+
 ## Åpne spørsmål til eieren
 
-1. **Navnebytte til Fo2Album?** Eieren synes Fo2Album er bedre på norsk og vil lansere i Norge først. Ikke bekreftet ennå. Hvis ja: appnavn, `tekster.ts`, dokumenter, nettside, domene (fo2album.no som hoved, pho2album.no videresender) og app-ID `no.pho2album.app` → `no.fo2album.app` (endrer datamappe og nøkkelring; billig nå, dyrt senere). `p2a`-verktøyets standard datamappe må følge med (`crates/p2a-cli/src/main.rs`, `data_dir`).
+1. **Pristrinnene:** eksempelet ditt (350 sider = 1 400 kr, 300 sider = 1 000 kr) passer ikke helt med 4 kr per side (300 sider blir 1 200 kr). Nå er prisen 4 kr per side i trinn på 50 sider. Skal trinnene ha egne priser (f.eks. en fast pris per trinn med rabatt nedover)? Tabellen ligger i `apps/desktop/src/pris.ts` og øverst i prototypen.
 2. **Alternativ B for maskinbytte:** ende-til-ende-kryptert kopi hos oss (bryter prinsippet om at bare trykk-PDF forlater maskinen). Anbefalt: vent; bruk lokal kryptert sikkerhetskopi. Se ARCHITECTURE.md, «Identitet, historikk og bytte av maskin».
 3. **Minimum OS** (macOS 12, Windows 10 22H2/11) er arbeidshypotese, ikke bekreftet.
 
 ## Neste steg
 
+0. **Eieren prøver den nye flyten** i prototypen (`prototype/fo2album-prototype.html`, Chrome/Edge): legg til en mappe, trykk «Lag utkast», bytt noen bilder og svar på «Hvorfor?». Hva læringen har fanget opp, lagres bare i nettleseren (`localStorage`, nøkkel `fo2album-laering`).
 1. **Eieren kjører evalueringen lokalt** (album-PDF-ene på ca. 260 MB skal ikke lastes opp noe sted): `p2a les-inn`, `p2a eval lag-gullsett --pdf … --aar 2010 --navn familie-2010` for 2006–2010, så `p2a eval kjor --resultater eval/RESULTS.md`. Se `eval/LES-MEG.md`. Be om oppsummeringslinjene (treffprosent) og om kontrollsiden ser riktig ut. Er treffprosenten lav, kan BookSmart-PDF-ene ha bildene lagt inn annerledes (f.eks. hele sider som ett bilde); da trengs et lite utdrag.
-2. **M3 (bildekvalitet) og hendelsesstyrt utvalg:** bygg utvalget etter føringene over, ikke «beste per måned». Første rapport i `eval/RESULTS.md` er utgangspunktet å slå. Kjent svakhet: prototypens skarphetsmål går i metning (straffer uskarphet svakt).
+2. **M3 (bildekvalitet):** det hendelsesstyrte utkastet finnes nå (`select::draft`), og `p2a eval kjor` måler det ved siden av utgangspunktet (rad «… (utkast)»). Neste: bedre Q_tech og estetikk, og kalibrere `pages_per_sqrt_photo`/`photos_per_page` mot gullsettet (familiens album har ca. 4–5 bilder per side). Kjent svakhet: prototypens skarphetsmål går i metning (straffer uskarphet svakt).
+2b. **M4 (personer) med dåpsmønsteret:** fadderne (ved døpefonten) foreslås som `fadder_for`-relasjon og får portrettside hver; gjestene i portrettgalleri til slutt.
 3. **M1b (Apple Bilder via PhotoKit)** er vedtatt for v1, ikke startet.
 4. Kjente mangler: virtualisering av rutenettet ved mange tusen bilder per år; Windows-HEIC og ekte sky-plassholdere er ikke prøvd på ekte maskiner; nøkkelringen er ikke prøvd på ekte Mac/Windows.
 

@@ -1,4 +1,4 @@
-//! Prototypens utvalg (prototype/pho2album-prototype.html, «Foreslå de beste bildene»),
+//! Prototypens utvalg (prototype/fo2album-prototype.html, «Foreslå de beste bildene»),
 //! oversatt til Rust og justert til å velge nøyaktig `k` bilder, så det kan sammenlignes
 //! rettferdig med familiens eget album.
 //!

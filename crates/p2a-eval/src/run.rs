@@ -3,7 +3,11 @@
 use std::path::Path;
 
 use image::DynamicImage;
+use std::collections::HashMap;
+
+use p2a_core::learn::Preferences;
 use p2a_core::select::baseline;
+use p2a_core::select::draft::{make_draft, DraftConfig};
 use p2a_core::ContentHash;
 use p2a_store::Store;
 use rayon::prelude::*;
@@ -83,11 +87,14 @@ pub fn create_gold_set(
 
 pub struct EvalResult {
     pub gold: GoldSet,
+    /// Utgangspunktet (prototypens utvalg) med like mange bilder som familien valgte.
     pub metrics: Metrics,
+    /// Det hendelsesstyrte utkastet, med så mange bilder det selv foreslår.
+    pub draft_metrics: Metrics,
 }
 
-/// Kjører utgangspunktet (prototypens utvalg) mot hvert gullsett, med like mange bilder
-/// som familien valgte.
+/// Kjører utgangspunktet (prototypens utvalg, med like mange bilder som familien valgte) og
+/// det hendelsesstyrte utkastet mot hvert gullsett.
 pub fn evaluate_all(store: &Store) -> Result<Vec<EvalResult>, EvalError> {
     let mut out = Vec::new();
     for gold in GoldSet::load_all(store)? {
@@ -95,7 +102,21 @@ pub fn evaluate_all(store: &Store) -> Result<Vec<EvalResult>, EvalError> {
         let chosen = gold.chosen();
         let selection = baseline::select(&library, chosen.len());
         let metrics = metrics::evaluate(&library, &chosen, &selection);
-        out.push(EvalResult { gold, metrics });
+        let draft = make_draft(
+            &library,
+            &HashMap::new(),
+            &Preferences::default(),
+            &DraftConfig::default(),
+            None,
+            &mut |_| {},
+        );
+        let draft_selection: Vec<ContentHash> = draft.included().map(|p| p.hash).collect();
+        let draft_metrics = metrics::evaluate(&library, &chosen, &draft_selection);
+        out.push(EvalResult {
+            gold,
+            metrics,
+            draft_metrics,
+        });
     }
     Ok(out)
 }

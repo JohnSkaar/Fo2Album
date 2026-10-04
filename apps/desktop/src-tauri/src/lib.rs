@@ -1,4 +1,4 @@
-//! Tauri-skallet for Pho2Album. Tynt lag: kommandoene kaller videre inn i
+//! Tauri-skallet for Fo2Album. Tynt lag: kommandoene kaller videre inn i
 //! `p2a-*`-pakkene, som gjør selve arbeidet.
 
 mod commands;
@@ -70,7 +70,10 @@ pub fn run() {
             commands::catalog_summary,
             commands::list_years,
             commands::photos_in_year,
+            commands::make_album_draft,
+            commands::choose_photo,
+            commands::answer_why,
         ])
         .run(tauri::generate_context!())
-        .expect("kunne ikke starte Pho2Album");
+        .expect("kunne ikke starte Fo2Album");
 }

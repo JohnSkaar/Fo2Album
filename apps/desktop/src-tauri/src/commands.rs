@@ -2,12 +2,16 @@
 //!
 //! Feil returneres som en stabil kode (`kode`) som grensesnittet oversetter til norsk tekst.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use p2a_core::config::DedupConfig;
-use p2a_core::SourceKind;
+use p2a_core::layout::PageKind;
+use p2a_core::learn::{learn, Action, Feedback, FeedbackReason, Lesson, Preferences};
+use p2a_core::select::draft::{make_draft, Decision, DraftConfig, Phase, Reason};
+use p2a_core::{ContentHash, SourceKind};
 use p2a_ingest::pipeline::{ingest_all, IngestReport, Progress};
 use p2a_ingest::sources;
 use p2a_store::{CatalogSummary, PhotoSummary, RecoveryKey, Store, StoreError, VaultStatus};
@@ -383,4 +387,318 @@ pub fn photos_in_year(state: State<'_, AppState>, year: i32) -> CmdResult<Vec<Ph
         .into_iter()
         .map(PhotoDto::from)
         .collect())
+}
+
+// ---------- Utkast ----------
+
+/// Fremdrift mens utkastet lages, sendt som hendelsen `analyse`.
+#[derive(Debug, Clone, Serialize)]
+pub struct AnalysePhaseDto {
+    fase: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReasonDto {
+    kode: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    antall: Option<usize>,
+}
+
+impl From<Reason> for ReasonDto {
+    fn from(r: Reason) -> Self {
+        let (kode, antall) = match r {
+            Reason::ValgtAvDeg => ("valgt_av_deg", None),
+            Reason::BesteFraHendelsen => ("beste_fra_hendelsen", None),
+            Reason::EnesteFraHendelsen => ("eneste_fra_hendelsen", None),
+            Reason::SvaktMenEneste => ("svakt_men_eneste", None),
+            Reason::BesteISerie { antall } => ("beste_i_serie", Some(antall)),
+            Reason::AnnenDelAvHendelsen => ("annen_del_av_hendelsen", None),
+            Reason::GodKvalitet => ("god_kvalitet", None),
+            Reason::ValgtBortAvDeg => ("valgt_bort_av_deg", None),
+            Reason::SammeSerie { antall } => ("samme_serie", Some(antall)),
+            Reason::NestenLikt => ("nesten_likt", None),
+            Reason::Uskarpt => ("uskarpt", None),
+            Reason::MorktEllerUtbrent => ("morkt_eller_utbrent", None),
+            Reason::Skjermbilde => ("skjermbilde", None),
+            Reason::IkkePlass { med } => ("ikke_plass", Some(med)),
+        };
+        ReasonDto { kode, antall }
+    }
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftPhotoDto {
+    id: String,
+    taken_at: String,
+    event: usize,
+    included: bool,
+    reason: ReasonDto,
+    related: Option<String>,
+    has_thumbnail: bool,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftEventDto {
+    start: String,
+    end: String,
+    photos: usize,
+    included: usize,
+    pages: usize,
+    everyday: bool,
+    layout: Vec<PageDto>,
+}
+
+/// En side i historien. `kind` er helside (hele rammen), luft (ett bilde med marg) eller
+/// rutenett.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageDto {
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kolonner: Option<u8>,
+    photos: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnedDto {
+    /// Det appen har lært, som koder grensesnittet gjør om til setninger.
+    lessons: Vec<&'static str>,
+    /// Antall bytter og antall svar på «Hvorfor?», alle år.
+    choices: usize,
+    answers: usize,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DraftDto {
+    year: i32,
+    pages: usize,
+    /// Sidene albumet får uten sidetak (hele historien), så prisvalgene kan vises.
+    full_pages: usize,
+    page_cap: Option<usize>,
+    events: Vec<DraftEventDto>,
+    photos: Vec<DraftPhotoDto>,
+    learned: LearnedDto,
+}
+
+fn lesson_code(l: Lesson) -> &'static str {
+    match l {
+        Lesson::SkarphetTellerMer => "skarphet_teller_mer",
+        Lesson::LysTellerMer => "lys_teller_mer",
+        Lesson::FargerTellerMer => "farger_teller_mer",
+        Lesson::OyeblikkFremforKvalitet => "oyeblikk_fremfor_kvalitet",
+        Lesson::KvalitetFremforOyeblikk => "kvalitet_fremfor_oyeblikk",
+        Lesson::FaerreLikeBilder => "faerre_like_bilder",
+        Lesson::FlereFraHverHendelse => "flere_fra_hver_hendelse",
+        Lesson::FaerreFraHverHendelse => "faerre_fra_hver_hendelse",
+    }
+}
+
+fn learned_from(log: &[Feedback]) -> (Preferences, LearnedDto) {
+    let prefs = learn(log);
+    let dto = LearnedDto {
+        lessons: prefs.lessons().into_iter().map(lesson_code).collect(),
+        choices: log.len(),
+        answers: log.iter().filter(|f| f.reason.is_some()).count(),
+    };
+    (prefs, dto)
+}
+
+fn draft_for(
+    store: &Store,
+    year: i32,
+    page_cap: Option<usize>,
+    progress: &mut dyn FnMut(&'static str),
+) -> Result<DraftDto, StoreError> {
+    progress("henter");
+    let metas = store.photo_metas_in_year(year)?;
+    let summaries: HashMap<ContentHash, PhotoSummary> = store
+        .photos_in_year(year)?
+        .into_iter()
+        .map(|p| (p.hash, p))
+        .collect();
+    let decisions = store.decisions(year)?;
+    let (prefs, learned) = learned_from(&store.feedback_log()?);
+    // Med sidetak regnes også hele historien ut, så brukeren ser hva den ville kostet.
+    let full_pages = page_cap.map(|_| {
+        make_draft(
+            &metas,
+            &decisions,
+            &prefs,
+            &DraftConfig::default(),
+            None,
+            &mut |_| {},
+        )
+        .pages()
+    });
+    let draft = make_draft(
+        &metas,
+        &decisions,
+        &prefs,
+        &DraftConfig::default(),
+        page_cap,
+        &mut |phase| {
+            progress(match phase {
+                Phase::Hendelser => "hendelser",
+                Phase::Serier => "serier",
+                Phase::Velger => "velger",
+                Phase::Begrunnelser => "begrunnelser",
+            })
+        },
+    );
+    let id = |i: usize| draft.photos[i].hash.to_hex();
+    Ok(DraftDto {
+        year,
+        pages: draft.pages(),
+        full_pages: full_pages.unwrap_or_else(|| draft.pages()),
+        page_cap,
+        events: draft
+            .events
+            .iter()
+            .map(|e| DraftEventDto {
+                start: e.start.to_iso(),
+                end: e.end.to_iso(),
+                photos: e.photos,
+                included: e.included,
+                pages: e.pages,
+                everyday: e.everyday,
+                layout: e
+                    .layout
+                    .iter()
+                    .map(|p| {
+                        let (kind, kolonner) = match p.kind {
+                            PageKind::Helside => ("helside", None),
+                            PageKind::Luft => ("luft", None),
+                            PageKind::Rutenett { kolonner } => ("rutenett", Some(kolonner)),
+                        };
+                        PageDto {
+                            kind,
+                            kolonner,
+                            photos: p.photos.iter().map(|&i| id(i)).collect(),
+                        }
+                    })
+                    .collect(),
+            })
+            .collect(),
+        photos: draft
+            .photos
+            .into_iter()
+            .map(|p| {
+                let s = summaries.get(&p.hash);
+                DraftPhotoDto {
+                    id: p.hash.to_hex(),
+                    taken_at: p.taken_at.to_iso(),
+                    event: p.event,
+                    included: p.included,
+                    reason: p.reason.into(),
+                    related: p.related.map(|h| h.to_hex()),
+                    has_thumbnail: s.is_some_and(|s| s.has_thumbnail),
+                    width: s.and_then(|s| s.width),
+                    height: s.and_then(|s| s.height),
+                }
+            })
+            .collect(),
+        learned,
+    })
+}
+
+/// «Lag utkast»: venter til bildene er lest inn, går gjennom hele året og lager et komplett
+/// forslag. Fremdrift sendes som hendelsen `analyse`.
+#[tauri::command]
+pub async fn make_album_draft(
+    app: AppHandle,
+    year: i32,
+    page_cap: Option<usize>,
+) -> CmdResult<DraftDto> {
+    use tauri::Manager;
+    let emit = {
+        let app = app.clone();
+        move |fase: &'static str| {
+            let _ = app.emit("analyse", AnalysePhaseDto { fase });
+        }
+    };
+    let (data_dir, keys) = {
+        let state = app.state::<AppState>();
+        drop(state.store()?); // må være åpnet
+        (state.data_dir.clone(), state.keys.clone())
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut emit = emit;
+        // Utkastet skal bygge på alle bildene, så det venter på innlesingen.
+        let mut waited = false;
+        while app.state::<AppState>().ingest_running() {
+            if !waited {
+                emit("venter");
+                waited = true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(250));
+        }
+        // Egen tilkobling, så grensesnittet kan vise miniatyrer mens analysen går.
+        let store = Store::open(&data_dir, keys.as_ref())?;
+        let draft = draft_for(&store, year, page_cap, &mut emit)?;
+        emit("ferdig");
+        Ok(draft)
+    })
+    .await
+    .map_err(|e| CommandError::new("ukjent", e.to_string()))?
+}
+
+fn parse_id(id: &str) -> CmdResult<ContentHash> {
+    ContentHash::from_hex(id).ok_or_else(|| CommandError::new("ukjent_bilde", id.to_string()))
+}
+
+/// Brukeren tar med, tar bort eller bytter et bilde. Lagrer valget og logger handlingen.
+/// Returnerer id-en til loggføringen, så svaret på «Hvorfor?» kan legges til.
+#[tauri::command]
+pub fn choose_photo(
+    state: State<'_, AppState>,
+    year: i32,
+    action: String,
+    id: String,
+    other: Option<String>,
+) -> CmdResult<i64> {
+    let action: Action = action
+        .parse()
+        .map_err(|_| CommandError::new("ukjent_handling", action.clone()))?;
+    let hash = parse_id(&id)?;
+    let other = other.as_deref().map(parse_id).transpose()?;
+    let guard = state.store()?;
+    let store = guard.as_ref().expect("sjekket");
+    match (action, other) {
+        (Action::TaMed, _) => store.set_decision(year, &hash, Some(Decision::Med))?,
+        (Action::TaBort, _) => store.set_decision(year, &hash, Some(Decision::IkkeMed))?,
+        (Action::Bytt, Some(out)) => {
+            store.set_decision(year, &hash, Some(Decision::Med))?;
+            store.set_decision(year, &out, Some(Decision::IkkeMed))?;
+        }
+        (Action::Bytt, None) => {
+            return Err(CommandError::new("ukjent_handling", "bytte mangler bilde"))
+        }
+    }
+    Ok(store.add_feedback(year, action, &hash, other.as_ref())?)
+}
+
+/// Svaret på «Hvorfor?». `None` betyr at brukeren hoppet over.
+#[tauri::command]
+pub fn answer_why(
+    state: State<'_, AppState>,
+    feedback_id: i64,
+    reason: Option<String>,
+) -> CmdResult<LearnedDto> {
+    let reason = reason
+        .map(|r| {
+            r.parse::<FeedbackReason>()
+                .map_err(|_| CommandError::new("ukjent_svar", r.clone()))
+        })
+        .transpose()?;
+    let guard = state.store()?;
+    let store = guard.as_ref().expect("sjekket");
+    store.set_feedback_reason(feedback_id, reason)?;
+    Ok(learned_from(&store.feedback_log()?).1)
 }

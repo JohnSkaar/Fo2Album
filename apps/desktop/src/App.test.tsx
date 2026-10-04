@@ -1,9 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Aar, Bilde, Sammendrag } from "./api";
+import type { Aar, Bilde, Sammendrag, Utkast } from "./api";
 import { api } from "./api";
 import { App, standardAar } from "./App";
 import { tekster } from "./tekster";
+import { spoerOmHvorfor } from "./utkast";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -30,6 +31,12 @@ vi.mock("./api", async (importOriginal) => {
       aar: vi.fn(() => Promise.resolve([])),
       bilderIAar: vi.fn(() => Promise.resolve([])),
       miniatyrUrl: (id: string) => `miniatyr://localhost/${id}`,
+      lagUtkast: vi.fn(),
+      paAnalyse: vi.fn(noop),
+      velgBilde: vi.fn(() => Promise.resolve(7)),
+      svarHvorfor: vi.fn(() =>
+        Promise.resolve({ lessons: ["oyeblikk_fremfor_kvalitet"], choices: 1, answers: 1 }),
+      ),
     },
   };
 });
@@ -155,6 +162,9 @@ describe("velg bilder", () => {
     expect(mock.aapneLagring).toHaveBeenCalled();
     await waitFor(() => expect(mock.startInnlesing).toHaveBeenCalled());
 
+    // Albumutkastet er hovedvisningen; alle bildene ligger under «Alle bilder».
+    await userEvent.click(screen.getByRole("button", { name: tekster.nav.alleBilder }));
+
     const mars = screen.getByRole("region", { name: "Mars 2011" });
     expect(within(mars).getAllByRole("listitem")).toHaveLength(2);
     expect(within(mars).getByText(tekster.bilder.ingenMiniatyr)).toBeInTheDocument();
@@ -173,6 +183,122 @@ describe("velg bilder", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /2010/ }));
     expect(mock.bilderIAar).toHaveBeenLastCalledWith(2010);
+  });
+});
+
+describe("albumutkast", () => {
+  const h = (c: string) => c.repeat(64);
+  const utkast: Utkast = {
+    year: 2011,
+    pages: 312,
+    fullPages: 312,
+    pageCap: null,
+    events: [
+      {
+        start: "2011-06-05T11:00:00",
+        end: "2011-06-05T15:00:00",
+        photos: 3,
+        included: 1,
+        pages: 1,
+        everyday: false,
+        layout: [{ kind: "luft", photos: [h("a")] }],
+      },
+    ],
+    photos: [
+      {
+        id: h("a"),
+        takenAt: "2011-06-05T11:00:00",
+        event: 0,
+        included: true,
+        reason: { kode: "beste_i_serie", antall: 4 },
+        related: null,
+        hasThumbnail: true,
+        width: 4032,
+        height: 3024,
+      },
+      {
+        id: h("b"),
+        takenAt: "2011-06-05T11:00:05",
+        event: 0,
+        included: false,
+        reason: { kode: "samme_serie", antall: 4 },
+        related: h("a"),
+        hasThumbnail: true,
+        width: 4032,
+        height: 3024,
+      },
+      {
+        id: h("c"),
+        takenAt: "2011-06-05T15:00:00",
+        event: 0,
+        included: false,
+        reason: { kode: "ikke_plass", antall: 1 },
+        related: h("a"),
+        hasThumbnail: true,
+        width: 4032,
+        height: 3024,
+      },
+    ],
+    learned: { lessons: [], choices: 0, answers: 0 },
+  };
+
+  beforeEach(() => {
+    mock.lagringStatus.mockResolvedValue("klar");
+    mock.kilder.mockResolvedValue([
+      { id: 1, kind: "icloud", path: "/x", label: "Bilder", finnes: true },
+    ]);
+    mock.aar.mockResolvedValue([{ year: 2011, count: 3 } satisfies Aar]);
+    mock.lagUtkast.mockResolvedValue(utkast);
+  });
+
+  it("lager et komplett forslag med begrunnelse for det som er med og ikke med", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: tekster.utkast.lag }));
+    expect(mock.lagUtkast).toHaveBeenCalledWith(2011, null);
+
+    expect(
+      await screen.findByRole("heading", { name: tekster.utkast.utkastTittel(2011) }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Beste bilde i en serie på 4")).toBeInTheDocument();
+    expect(screen.getByText("Et bedre bilde fra samme øyeblikk er med")).toBeInTheDocument();
+    expect(screen.getByText(/Albumet er nå på 312 sider og koster 1\s400 kr/)).toBeInTheDocument();
+
+    // Mindre album: utkastet lages på nytt med sidetak.
+    await userEvent.click(screen.getByRole("button", { name: tekster.pris.valg(300, 1200) }));
+    expect(mock.lagUtkast).toHaveBeenLastCalledWith(2011, 300);
+  });
+
+  it("bytter bilder og spør forsiktig hvorfor", async () => {
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: tekster.utkast.lag }));
+    const ut = await screen.findByRole("button", { name: /med\. Beste bilde i en serie/ });
+    const inn = screen.getByRole("button", { name: /ikke med\. Ikke plass/ });
+
+    await userEvent.click(ut);
+    await userEvent.click(inn);
+    expect(mock.velgBilde).toHaveBeenCalledWith(2011, "bytt", h("c"), h("a"));
+    expect(await screen.findByText(tekster.hvorfor.bytt)).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: tekster.hvorfor.svar.viktig_oyeblikk }),
+    );
+    expect(mock.svarHvorfor).toHaveBeenCalledWith(7, "viktig_oyeblikk");
+    expect(await screen.findByText(tekster.hvorfor.takk)).toBeInTheDocument();
+    expect(screen.getAllByText("Du valgte dette").length).toBe(1);
+  });
+});
+
+describe("spoerOmHvorfor", () => {
+  it("spør de første gangene, så sjeldnere, og slutter når brukeren hopper over", () => {
+    expect([1, 2, 3, 4, 5, 6].map((n) => spoerOmHvorfor(n, 0))).toEqual([
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+    ]);
+    expect(spoerOmHvorfor(1, 3)).toBe(false);
   });
 });
 

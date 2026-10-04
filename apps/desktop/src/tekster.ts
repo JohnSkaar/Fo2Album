@@ -2,7 +2,7 @@
  * All tekst i grensesnittet, på norsk bokmål (CLAUDE.md, «Språk og tekst»).
  * Du-form, varm og konkret, setningsstor bokstav. Si aldri «last opp bildene».
  */
-import type { KildeType } from "./api";
+import type { Analysefase, Begrunnelse, KildeType, Laerdom, Svar } from "./api";
 
 const tall = new Intl.NumberFormat("nb-NO");
 /** 8412 → «8 412» */
@@ -26,12 +26,13 @@ export const maaneder = [
 ] as const;
 
 export const tekster = {
-  appNavn: "Pho2Album",
+  appNavn: "Fo2Album",
   nav: {
     album: "Album",
-    velgBilder: "Velg bilder",
+    alleBilder: "Alle bilder",
     albumutkast: "Albumutkast",
     ikkeLaget: "Ikke laget ennå",
+    sider: (n: number) => `Omtrent ${antall(n, "side", "sider")}`,
     bildekilder: "Bildekilder",
     leggTilMappe: "Legg til mappe",
     hovedmeny: "Hovedmeny",
@@ -47,7 +48,7 @@ export const tekster = {
       "Også bilder fra Dropbox, iCloud og Google Disk hentes fra maskinen. Bare det ferdige albumet sendes til trykk.",
   },
   velkommen: {
-    tittel: "Velkommen til Pho2Album.",
+    tittel: "Velkommen til Fo2Album.",
     ingress:
       "Minnene blir sterkere når dere blar i dem sammen. Appen finner de beste bildene fra året og lager et album dere kan holde i.",
     trygt:
@@ -98,8 +99,8 @@ export const tekster = {
     apple_photos: { navn: "Apple Bilder", hint: "Bilder-biblioteket på Mac" },
   } satisfies Record<KildeType, { navn: string; hint: string }>,
   bilder: {
-    tittel: (aar: number) => `Familiealbum ${aar}`,
-    ingenAar: "Velg bilder",
+    tittel: (aar: number) => `Alle bilder fra ${aar}`,
+    ingenAar: "Alle bilder",
     antall: (n: number) => antall(n, "bilde", "bilder"),
     aarEtikett: "Velg år",
     tom: "Ingen bilder her ennå. Legg til en mappe, eller velg et annet år.",
@@ -108,6 +109,139 @@ export const tekster = {
     usikkerDato: "Usikker dato",
     maaned: (m: number, aar: number) => `${stor(maaneder[m] ?? "")} ${aar}`,
     bildeEtikett: (dato: string) => `Bilde fra ${dato}`,
+  },
+  utkast: {
+    tittel: (aar: number) => `Familiealbum ${aar}`,
+    ingress:
+      "Appen går gjennom alle bildene fra året, finner hendelsene og lager et komplett forslag til album. Etterpå ser du hva som er med og hva som ikke er med, og hvorfor. Du bytter der du er uenig.",
+    tid: "Det tar litt tid, og alt skjer på denne maskinen.",
+    lag: "Lag utkast",
+    venterInnlesing:
+      "Appen henter fortsatt bilder fra maskinen. Utkastet tar med alle bildene når den er ferdig.",
+    ingenBilder: "Ingen bilder fra dette året ennå.",
+    analyseTittel: "Lager utkastet …",
+    faser: {
+      venter: "Venter til alle bildene er hentet fra maskinen",
+      henter: "Henter årets bilder",
+      hendelser: "Finner hendelsene i året",
+      serier: "Finner serier og bilder som ligner hverandre",
+      velger: "Velger de beste bildene fra hver hendelse",
+      begrunnelser: "Skriver en kort begrunnelse for hvert bilde",
+      ferdig: "Ferdig",
+    } satisfies Record<Analysefase, string>,
+    utkastTittel: (aar: number) => `Utkast til Familiealbum ${aar}`,
+    sammendrag: (bilder: number, sider: number, hendelser: number) =>
+      `${antall(bilder, "bilde", "bilder")} på omtrent ${antall(sider, "side", "sider")}, fra ${antall(hendelser, "hendelse", "hendelser")}.`,
+    hjelp:
+      "Til venstre er bildene appen foreslår, til høyre de som ikke er med. Klikk et bilde for å se hvorfor, og for å ta det med, ta det bort eller bytte.",
+    med: "Med i albumet",
+    ikkeMed: "Ikke med",
+    ingenIkkeMed: "Alle bildene herfra er med.",
+    visAlle: (n: number) => `Vis alle ${fmt(n)}`,
+    visFaerre: "Vis færre",
+    hverdager: (m: number) => `Hverdager i ${maaneder[m]}`,
+    hendelseInfo: (bilder: number, sider: number) =>
+      `${antall(bilder, "bilde", "bilder")} · ${antall(sider, "side", "sider")}`,
+    taMed: "Ta med",
+    taBort: "Ta bort",
+    byttMedLignende: "Bytt med bildet som er med",
+    byttHjelp: "Eller klikk et bilde i den andre kolonnen for å bytte.",
+    lukk: "Lukk",
+    bildeEtikett: (dato: string, med: boolean) => `Bilde fra ${dato}, ${med ? "med" : "ikke med"}`,
+    nyttUtkast: "Lag nytt utkast med det du har lært appen",
+    lagtTil: "Bildet er med",
+    tattBort: "Bildet er tatt bort",
+    byttet: "Bildene er byttet",
+  },
+  pris: {
+    naa: (sider: number, kr: number) =>
+      `Albumet er nå på ${antall(sider, "side", "sider")} og koster ${fmt(kr)} kr.`,
+    trinn:
+      "Prisen går i trinn på 50 sider. Vil du ha et mindre album, krymper appen alle historiene litt, men hver hendelse beholder minst én side.",
+    hele: (sider: number, kr: number) => `Hele historien: ${fmt(sider)} sider · ${fmt(kr)} kr`,
+    valg: (sider: number, kr: number) => `${fmt(sider)} sider · ${fmt(kr)} kr`,
+    etikett: "Velg størrelse på albumet",
+  },
+  sider: {
+    tittel: "Slik blir sidene",
+    helside: "Helside",
+    luft: "Ett bilde med luft rundt",
+    rutenett: (n: number) => `${antall(n, "bilde", "bilder")} på siden`,
+    side: (n: number) => `Side ${fmt(n)}`,
+    endret: "Sidene ordnes på nytt når du lager utkastet igjen.",
+  },
+  begrunnelse: (b: Begrunnelse, bilderIHendelsen: number): string => {
+    const n = b.antall ?? 0;
+    switch (b.kode) {
+      case "valgt_av_deg":
+        return "Du valgte dette";
+      case "beste_fra_hendelsen":
+        return "Det beste bildet herfra";
+      case "eneste_fra_hendelsen":
+        return bilderIHendelsen === 1
+          ? "Det eneste bildet herfra"
+          : `Det beste av ${antall(bilderIHendelsen, "bilde", "bilder")} herfra`;
+      case "svakt_men_eneste":
+        return "Litt uskarpt eller mørkt, men det beste herfra";
+      case "beste_i_serie":
+        return `Beste bilde i en serie på ${fmt(n)}`;
+      case "annen_del_av_hendelsen":
+        return "Viser en annen del av dagen";
+      case "god_kvalitet":
+        return "Skarpt og godt lys";
+      case "valgt_bort_av_deg":
+        return "Du tok det bort";
+      case "samme_serie":
+        return "Et bedre bilde fra samme øyeblikk er med";
+      case "nesten_likt":
+        return "Nesten likt et bilde som er med";
+      case "uskarpt":
+        return "Uskarpt";
+      case "morkt_eller_utbrent":
+        return "For mørkt eller for lyst";
+      case "skjermbilde":
+        return "Ser ut som et skjermbilde";
+      case "ikke_plass":
+        return `Ikke plass: ${antall(n, "bedre bilde", "bedre bilder")} herfra er med`;
+    }
+  },
+  hvorfor: {
+    taBort: "Hvorfor tok du det bort?",
+    taMed: "Hva gjør dette bildet viktig?",
+    bytt: "Hva var bedre med det nye bildet?",
+    hjelp: "Valgfritt. Svaret hjelper appen å forstå hva dere bryr dere om.",
+    hoppOver: "Hopp over",
+    takk: "Takk! Appen husker det til neste utkast.",
+    svar: {
+      uskarpt: "Uskarpt",
+      daarlig_lys: "Dårlig lys",
+      for_likt: "For likt et annet",
+      for_mange_herfra: "For mange herfra",
+      liker_ikke: "Liker det ikke",
+      privat: "Skal ikke i albumet",
+      viktig_oyeblikk: "Viktig øyeblikk",
+      viktig_person: "Viktig person",
+      fint_bilde: "Fint bilde",
+      mangler_herfra: "Mangler noe herfra",
+      skarpere: "Skarpere",
+    } satisfies Record<Svar, string>,
+  },
+  laert: {
+    tittel: "Dette har appen lært om dere",
+    ingenting:
+      "Ingenting ennå. Når du tar med, tar bort eller bytter bilder, lærer appen litt etter litt hva dere liker.",
+    grunnlag: (valg: number, svar: number) =>
+      `Basert på ${antall(valg, "valg", "valg")} og ${antall(svar, "svar", "svar")}.`,
+    laerdom: {
+      skarphet_teller_mer: "Skarpe bilder betyr mye for dere.",
+      lys_teller_mer: "Godt lys betyr mye for dere.",
+      farger_teller_mer: "Dere liker fargerike bilder.",
+      oyeblikk_fremfor_kvalitet: "Øyeblikket betyr mer enn om bildet er perfekt.",
+      kvalitet_fremfor_oyeblikk: "Dere vil helst ha teknisk gode bilder.",
+      faerre_like_bilder: "Dere vil ikke ha bilder som ligner hverandre.",
+      flere_fra_hver_hendelse: "Dere vil ha flere bilder fra hver hendelse.",
+      faerre_fra_hver_hendelse: "Dere vil ha færre bilder fra hver hendelse.",
+    } satisfies Record<Laerdom, string>,
   },
   innlesing: {
     skanner: "Går gjennom mappene …",
@@ -145,7 +279,7 @@ export const tekster = {
     ugyldig_kode: "Det ser ut som det er en skrivefeil i nøkkelen. Sjekk tegnene og prøv igjen.",
     innlesing_pagar: "Vent til appen er ferdig med å lese bildene.",
     ikke_mappe: "Fant ikke mappen.",
-    nyere_versjon: "Dataene er laget av en nyere versjon av appen. Oppdater Pho2Album.",
+    nyere_versjon: "Dataene er laget av en nyere versjon av appen. Oppdater Fo2Album.",
     ukjent: "Noe gikk galt. Prøv igjen.",
   } as Record<string, string>,
   melding: {

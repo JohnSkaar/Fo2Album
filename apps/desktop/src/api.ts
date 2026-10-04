@@ -74,6 +74,107 @@ export interface InnlesingFerdig {
   feil: string | null;
 }
 
+/** Begrunnelse for et bilde i utkastet. Teksten ligger i tekster.ts. */
+export type Begrunnelseskode =
+  | "valgt_av_deg"
+  | "beste_fra_hendelsen"
+  | "eneste_fra_hendelsen"
+  | "svakt_men_eneste"
+  | "beste_i_serie"
+  | "annen_del_av_hendelsen"
+  | "god_kvalitet"
+  | "valgt_bort_av_deg"
+  | "samme_serie"
+  | "nesten_likt"
+  | "uskarpt"
+  | "morkt_eller_utbrent"
+  | "skjermbilde"
+  | "ikke_plass";
+
+export interface Begrunnelse {
+  kode: Begrunnelseskode;
+  antall?: number;
+}
+
+export interface UtkastBilde {
+  id: string;
+  takenAt: string;
+  /** Indeks i `Utkast.events`. */
+  event: number;
+  included: boolean;
+  reason: Begrunnelse;
+  /** Bildet dette henger sammen med (samme serie, likt, eller nærmest i tid). */
+  related: string | null;
+  hasThumbnail: boolean;
+  width: number | null;
+  height: number | null;
+}
+
+export interface UtkastHendelse {
+  start: string;
+  end: string;
+  photos: number;
+  included: number;
+  pages: number;
+  /** Små hendelser i en måned, samlet. */
+  everyday: boolean;
+  /** Sidene historien får. */
+  layout: Side[];
+}
+
+/** «helside» fyller hele rammen, «luft» er ett bilde med marg, «rutenett» flere bilder. */
+export interface Side {
+  kind: "helside" | "luft" | "rutenett";
+  kolonner?: number;
+  /** Bilde-id-er. */
+  photos: string[];
+}
+
+export type Laerdom =
+  | "skarphet_teller_mer"
+  | "lys_teller_mer"
+  | "farger_teller_mer"
+  | "oyeblikk_fremfor_kvalitet"
+  | "kvalitet_fremfor_oyeblikk"
+  | "faerre_like_bilder"
+  | "flere_fra_hver_hendelse"
+  | "faerre_fra_hver_hendelse";
+
+export interface Laert {
+  lessons: Laerdom[];
+  choices: number;
+  answers: number;
+}
+
+export interface Utkast {
+  year: number;
+  pages: number;
+  /** Sider uten sidetak (hele historien). */
+  fullPages: number;
+  pageCap: number | null;
+  events: UtkastHendelse[];
+  photos: UtkastBilde[];
+  learned: Laert;
+}
+
+export type Analysefase =
+  "venter" | "henter" | "hendelser" | "serier" | "velger" | "begrunnelser" | "ferdig";
+
+export type Handling = "ta_med" | "ta_bort" | "bytt";
+
+export type Svar =
+  | "uskarpt"
+  | "daarlig_lys"
+  | "for_likt"
+  | "for_mange_herfra"
+  | "liker_ikke"
+  | "privat"
+  | "viktig_oyeblikk"
+  | "viktig_person"
+  | "fint_bilde"
+  | "mangler_herfra"
+  | "skarpere";
+
 /** Feil fra Rust-kjernen: en stabil kode og en teknisk melding. */
 export interface Kommandofeil {
   kode: string;
@@ -112,4 +213,14 @@ export const api = {
   aar: () => invoke<Aar[]>("list_years"),
   bilderIAar: (year: number) => invoke<Bilde[]>("photos_in_year", { year }),
   miniatyrUrl: (id: string) => convertFileSrc(id, "miniatyr"),
+
+  lagUtkast: (year: number, pageCap: number | null = null) =>
+    invoke<Utkast>("make_album_draft", { year, pageCap }),
+  paAnalyse: (cb: (fase: Analysefase) => void): Promise<UnlistenFn> =>
+    listen<{ fase: Analysefase }>("analyse", (e) => cb(e.payload.fase)),
+  /** Ved bytte er `id` bildet som tas med og `other` bildet som tas ut. */
+  velgBilde: (year: number, action: Handling, id: string, other?: string) =>
+    invoke<number>("choose_photo", { year, action, id, other: other ?? null }),
+  svarHvorfor: (feedbackId: number, reason: Svar | null) =>
+    invoke<Laert>("answer_why", { feedbackId, reason }),
 };

@@ -82,6 +82,38 @@ impl Role {
     }
 }
 
+/// Relasjon mellom to personer i familieprofilen. Læres av hendelser (f.eks. hvem som står
+/// ved døpefonten) og lever fra år til år, så neste års album vet hvem som er hvem.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RelationKind {
+    /// Personen er fadder for den andre (barnet).
+    FadderFor,
+}
+
+impl RelationKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RelationKind::FadderFor => "fadder_for",
+        }
+    }
+}
+
+/// Om appen har foreslått relasjonen, eller brukeren har bekreftet den.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RelationStatus {
+    Foreslatt,
+    Bekreftet,
+}
+
+impl RelationStatus {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RelationStatus::Foreslatt => "foreslatt",
+            RelationStatus::Bekreftet => "bekreftet",
+        }
+    }
+}
+
 /// Type kommentar på et utkast (SCORING.md §6.3). Fritekst lagres, men tolkes ikke i v1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CommentKind {
@@ -149,6 +181,11 @@ impl_from_str!(
         Role::Annen,
     ]
 );
+impl_from_str!(RelationKind, [RelationKind::FadderFor]);
+impl_from_str!(
+    RelationStatus,
+    [RelationStatus::Foreslatt, RelationStatus::Bekreftet]
+);
 impl_from_str!(
     CommentKind,
     [
@@ -167,6 +204,18 @@ pub struct ContentHash(pub [u8; 32]);
 impl ContentHash {
     pub fn to_hex(&self) -> String {
         self.0.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    /// Tolker 64 heksadesimale tegn (det `to_hex` lager).
+    pub fn from_hex(hex: &str) -> Option<Self> {
+        if hex.len() != 64 {
+            return None;
+        }
+        let mut out = [0u8; 32];
+        for (i, b) in out.iter_mut().enumerate() {
+            *b = u8::from_str_radix(hex.get(i * 2..i * 2 + 2)?, 16).ok()?;
+        }
+        Some(ContentHash(out))
     }
 }
 
@@ -443,5 +492,7 @@ mod tests {
         let h = ContentHash([0xab; 32]);
         assert_eq!(h.to_hex().len(), 64);
         assert!(h.to_hex().starts_with("abab"));
+        assert_eq!(ContentHash::from_hex(&h.to_hex()), Some(h));
+        assert_eq!(ContentHash::from_hex("ab"), None);
     }
 }

@@ -1,6 +1,6 @@
 //! Familieprofilen: personer, kommentarer og innstillinger som lever fra år til år.
 
-use p2a_core::{CommentKind, Role};
+use p2a_core::{CommentKind, RelationKind, RelationStatus, Role};
 use rusqlite::{params, OptionalExtension};
 
 use crate::{now_iso, Store, StoreError};
@@ -30,6 +30,16 @@ pub struct Comment {
     pub id: i64,
     pub created_at: String,
     pub comment: NewComment,
+}
+
+/// «Kari er fadder for Ella», foreslått eller bekreftet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Relation {
+    pub person_id: i64,
+    pub kind: RelationKind,
+    pub other_id: i64,
+    pub status: RelationStatus,
+    pub learned_year: Option<i32>,
 }
 
 fn bad_value(e: p2a_core::model::UnknownValue) -> rusqlite::Error {
@@ -122,5 +132,43 @@ impl Store {
                 r.get(0)
             })
             .optional()?)
+    }
+
+    /// Legger til eller oppdaterer en relasjon. En bekreftet relasjon blir aldri foreslått
+    /// tilbake til «foreslått».
+    pub fn set_relation(&self, r: &Relation) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT INTO person_relations
+                 (person_id, kind, other_id, status, learned_year, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(person_id, kind, other_id) DO UPDATE SET
+                 status = CASE WHEN status = 'bekreftet' THEN status ELSE excluded.status END",
+            params![
+                r.person_id,
+                r.kind.as_str(),
+                r.other_id,
+                r.status.as_str(),
+                r.learned_year,
+                now_iso()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn relations(&self) -> Result<Vec<Relation>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT person_id, kind, other_id, status, learned_year
+             FROM person_relations ORDER BY id",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(Relation {
+                person_id: r.get(0)?,
+                kind: r.get::<_, String>(1)?.parse().map_err(bad_value)?,
+                other_id: r.get(2)?,
+                status: r.get::<_, String>(3)?.parse().map_err(bad_value)?,
+                learned_year: r.get(4)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
     }
 }

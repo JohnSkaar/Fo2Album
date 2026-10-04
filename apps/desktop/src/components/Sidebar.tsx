@@ -9,6 +9,9 @@ export function Sidebar({
   onRemoveSource,
   onDeleteAll,
   locked,
+  view,
+  onView,
+  draftPages,
 }: {
   sources: Kilde[];
   onAddFolder: () => void;
@@ -16,6 +19,11 @@ export function Sidebar({
   onDeleteAll: () => void;
   /** Før lagringen er åpnet vises bare logo og låsmerknad. */
   locked: boolean;
+  /** Valgt visning; `null` før det finnes bildekilder. */
+  view: "utkast" | "alle" | null;
+  onView: (v: "utkast" | "alle") => void;
+  /** Sider i utkastet, eller `null` før det er laget. */
+  draftPages: number | null;
 }) {
   return (
     <aside className="side">
@@ -24,16 +32,30 @@ export function Sidebar({
         <nav aria-label={tekster.nav.hovedmeny} className="side__nav">
           <div className="grp">
             <h2 className="grp-h">{tekster.nav.album}</h2>
-            <button type="button" className="item" aria-current="page">
-              <Icon name="image" />
-              <span className="grow">{tekster.nav.velgBilder}</span>
-            </button>
-            <button type="button" className="item" disabled>
+            <button
+              type="button"
+              className="item"
+              aria-current={view === "utkast" ? "page" : undefined}
+              disabled={view === null}
+              onClick={() => onView("utkast")}
+            >
               <Icon name="album" />
               <span className="grow">
                 {tekster.nav.albumutkast}
-                <small>{tekster.nav.ikkeLaget}</small>
+                <small>
+                  {draftPages === null ? tekster.nav.ikkeLaget : tekster.nav.sider(draftPages)}
+                </small>
               </span>
+            </button>
+            <button
+              type="button"
+              className="item"
+              aria-current={view === "alle" ? "page" : undefined}
+              disabled={view === null}
+              onClick={() => onView("alle")}
+            >
+              <Icon name="image" />
+              <span className="grow">{tekster.nav.alleBilder}</span>
             </button>
           </div>
           <div className="grp">

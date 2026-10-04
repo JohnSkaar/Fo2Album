@@ -3,15 +3,20 @@ import {
   api,
   erKommandofeil,
   type Aar,
+  type Analysefase,
   type Bilde,
   type Forslag,
   type Fremdrift,
   type Innlesingsrapport,
   type Kilde,
   type KildeType,
+  type Handling,
   type Sammendrag,
+  type Svar,
+  type Utkast,
 } from "./api";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { DraftScreen } from "./components/DraftScreen";
 import { PickScreen } from "./components/PickScreen";
 import { RecoverScreen } from "./components/RecoverScreen";
 import { RecoveryKeyScreen } from "./components/RecoveryKeyScreen";
@@ -20,6 +25,7 @@ import { StartScreen } from "./components/StartScreen";
 import { Toast } from "./components/Toast";
 import { Welcome } from "./components/Welcome";
 import { feiltekst, tekster } from "./tekster";
+import { brukValg } from "./utkast";
 
 const TOAST_MS = 3200;
 /** Hvor ofte rutenettet oppdateres mens bilder leses inn. */
@@ -56,6 +62,10 @@ export function App() {
   const [fremdrift, setFremdrift] = useState<Fremdrift | null>(null);
   const [rapport, setRapport] = useState<Innlesingsrapport | null>(null);
   const [bekreftSlett, setBekreftSlett] = useState(false);
+  // Albumutkastet er hovedvisningen; «Alle bilder» er for den som vil se alt.
+  const [visning, setVisning] = useState<"utkast" | "alle">("utkast");
+  const [utkast, setUtkast] = useState<Utkast | null>(null);
+  const [analyse, setAnalyse] = useState<Analysefase | null>(null);
   // Valgt år leses av lastKatalog, som ikke skal lages på nytt hver gang året endres.
   const valgtAarRef = useRef<number | null>(null);
   useEffect(() => {
@@ -150,7 +160,52 @@ export function App() {
 
   const velgAar = async (y: number) => {
     setValgtAar(y);
+    if (utkast && utkast.year !== y) setUtkast(null);
     setBilder(await api.bilderIAar(y));
+  };
+
+  // ---------- Utkast ----------
+  const lagUtkast = async (sidetak: number | null = utkast?.pageCap ?? null) => {
+    if (valgtAar === null || analyse) return;
+    setAnalyse("henter");
+    const stopp = api.paAnalyse((f) => setAnalyse(f));
+    try {
+      setUtkast(await api.lagUtkast(valgtAar, sidetak));
+      setVisning("utkast");
+    } catch (e) {
+      visMelding(feiltekst(e));
+    } finally {
+      void stopp.then((s) => s());
+      setAnalyse(null);
+    }
+  };
+
+  const velgBilde = async (action: Handling, id: string, other?: string) => {
+    if (!utkast) return null;
+    try {
+      const feedbackId = await api.velgBilde(utkast.year, action, id, other);
+      setUtkast((u) => (u ? brukValg(u, action, id, other) : u));
+      visMelding(
+        action === "bytt"
+          ? tekster.utkast.byttet
+          : action === "ta_med"
+            ? tekster.utkast.lagtTil
+            : tekster.utkast.tattBort,
+      );
+      return feedbackId;
+    } catch (e) {
+      visMelding(feiltekst(e));
+      return null;
+    }
+  };
+
+  const svarHvorfor = async (feedbackId: number, reason: Svar | null) => {
+    try {
+      const learned = await api.svarHvorfor(feedbackId, reason);
+      setUtkast((u) => (u ? { ...u, learned } : u));
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
   };
 
   // ---------- Handlinger ----------
@@ -223,6 +278,7 @@ export function App() {
       setRapport(null);
       setForslag(null);
       setValgtAar(null);
+      setUtkast(null);
       setFase({ type: "velkommen" });
       visMelding(tekster.slett.ferdig);
     } catch (e) {
@@ -258,6 +314,20 @@ export function App() {
             onAddSuggestion={(f) => void leggTil(f.path, f.kind)}
             suggestions={forslag}
           />
+        ) : visning === "utkast" ? (
+          <DraftScreen
+            years={aar}
+            year={valgtAar}
+            onYear={(y) => void velgAar(y)}
+            draft={utkast}
+            phase={analyse}
+            ingest={fremdrift}
+            onMake={() => void lagUtkast()}
+            onSize={(sidetak) => void lagUtkast(sidetak)}
+            onChoose={velgBilde}
+            onAnswer={(id, r) => void svarHvorfor(id, r)}
+            thumbUrl={api.miniatyrUrl}
+          />
         ) : (
           <PickScreen
             years={aar}
@@ -279,6 +349,9 @@ export function App() {
       <Sidebar
         sources={kilder}
         locked={fase.type !== "klar"}
+        view={kilder.length === 0 ? null : visning}
+        onView={setVisning}
+        draftPages={utkast?.pages ?? null}
         onAddFolder={() => void velgMappe()}
         onRemoveSource={(k) => void fjernKilde(k)}
         onDeleteAll={() => setBekreftSlett(true)}

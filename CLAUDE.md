@@ -1,4 +1,4 @@
-# Pho2Album
+# Fo2Album
 
 Desktop-app for Mac og Windows som lager **årets familiealbum** av bildene familien allerede har, spredt over PC, Dropbox, iCloud og Google Disk. Appen finner de beste og mest meningsfulle bildene, lager et ferdig utkast og sender kun den ferdige trykkfilen til trykk.
 
@@ -7,7 +7,7 @@ Les dette først, deretter **`docs/OVERLEVERING.md`** (status, eierens føringer
 ## Ufravikelige prinsipper
 
 1. **Lokalt først.** Bilder, miniatyrer, analyse, ansiktsgjenkjenning og poengsetting skjer på brukerens maskin. Ingen bilder, embeddings, ansiktsdata eller metadata sendes til noen server. Det eneste som forlater maskinen er den ferdige trykk-PDF-en, og bare når brukeren selv bestiller. Telemetri: av som standard, aldri innhold.
-2. **Algoritmen er produktet.** Kvaliteten på utvalget, variasjonen og hvem som får plass er hovedgrunnen til at kunden velger Pho2Album. Alle endringer i poengsettingen skal være forklarbare (hvert bilde har en begrunnelse) og testes mot evalueringssettet (se `docs/SCORING.md`, «Evaluering»).
+2. **Algoritmen er produktet.** Kvaliteten på utvalget, variasjonen og hvem som får plass er hovedgrunnen til at kunden velger Fo2Album. Alle endringer i poengsettingen skal være forklarbare (hvert bilde har en begrunnelse) og testes mot evalueringssettet (se `docs/SCORING.md`, «Evaluering»).
 3. **v1 = ett årsalbum per familie.** Ikke bygg generelle fotoalbum, kalendere eller deling før v1 er god.
 4. **Brukeren har siste ord.** Algoritmen foreslår, brukeren bestemmer. Alle valg kan overstyres, og overstyringer brukes som signal.
 
@@ -37,7 +37,7 @@ docs/ROADMAP.md      ← milepæler
 docs/DESIGN.md       ← designsystem og UI-regler
 design/              ← tokens
 prototype/           ← klikkbar HTML-prototype (referanse for flyt og UI, ikke kode å bygge videre på)
-website/             ← markedsside for pho2album.no (statisk, Netlify)
+website/             ← markedsside for fo2album.no (statisk, Netlify)
 eval/RESULTS.md      ← logg over evalueringskjøringer
 apps/desktop/        ← Tauri-appen: src-tauri/ (Rust) + src/ (React). All UI-tekst i src/tekster.ts
 crates/p2a-*/        ← Rust-kjernen: core (domene, dubletter), store (kryptert lagring),

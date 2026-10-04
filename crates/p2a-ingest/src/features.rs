@@ -1,4 +1,4 @@
-//! Prototypens enkle kvalitetsmål (prototype/pho2album-prototype.html, `analyze`), oversatt
+//! Prototypens enkle kvalitetsmål (prototype/fo2album-prototype.html, `analyze`), oversatt
 //! til Rust så M3 har et ærlig utgangspunkt å slå på gullsettet. Erstattes av Q_tech
 //! (SCORING.md §3.1) i M3.
 

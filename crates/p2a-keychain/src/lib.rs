@@ -14,7 +14,7 @@ pub use dev::DevFileKeyStore as PlatformKeyStore;
 mod os {
     use super::*;
 
-    const SERVICE: &str = "no.pho2album.app";
+    const SERVICE: &str = "no.fo2album.app";
     const ACCOUNT: &str = "hovednokkel";
 
     /// Nøkkelring på Mac, Credential Manager på Windows.

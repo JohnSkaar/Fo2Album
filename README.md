@@ -1,7 +1,7 @@
-# Pho2Album – overlevering til Claude Code
+# Fo2Album – overlevering til Claude Code
 
 ## Kom i gang
-1. Pakk ut denne mappen der du vil ha prosjektet, f.eks. `Dokumenter\pho2album`.
+1. Pakk ut denne mappen der du vil ha prosjektet, f.eks. `Dokumenter\fo2album`.
 2. (Anbefalt) Gjør den til et git-repo: `git init` og første commit, så alle endringer kan spores.
 3. Åpne mappen i Claude Code (Claude-desktopappen › Code, eller `claude` i terminalen fra mappen).
 4. Lim inn teksten i `FIRST_PROMPT.md` som første melding.
@@ -17,7 +17,7 @@ Claude Code leser `CLAUDE.md` automatisk. Den beskriver prinsippene (lokalt før
 - `docs/DESIGN.md` – designsystem og UI-regler
 - `design/` – tokens (CSS og JSON)
 - `prototype/` – klikkbar HTML-prototype
-- `website/` – markedssiden for pho2album.no (se `website/LES-MEG.txt`)
+- `website/` – markedssiden for fo2album.no (se `website/LES-MEG.txt`)
 
 ## Utvikling
 
