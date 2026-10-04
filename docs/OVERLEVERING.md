@@ -62,11 +62,24 @@ Føringer etter at eieren prøvde prototypen (4. oktober 2026):
 25. Hele motivet skal være med; forhåndsvisningen viser hele bildet. Enkle rammevalg med symboler (kvadratisk, liggende, to delt vannrett/loddrett, tre, fire kvadratiske/liggende …).
 26. Alle bilder kan vises stort med en rask vurdering og en merknad om at det er en forhåndsvisning.
 
+Føringer fra eierens andre runde (4. oktober 2026):
+
+27. **Ingen tak** i første forslag (500-bildersgrensen er fjernet). 500 er en mulig **sidegrense** hos trykkeriet; blir albumet større, foreslår appen å redusere etter at forslaget er sett, og kunden velger hvor mye.
+28. Stemningsbilder setter omgivelsene mellom personpresentasjonene, de skal ikke ta to sider på rad. Personer først. Et flott oversiktsbilde kan få en hel side innimellom, men en side med bare ting skal ikke skje i første forslag.
+29. Turer uten barn (gutte-/jenteturer, jobbturer, kamerat-/venninneturer): 2–4 sider som myk maks. Portrettside + stemningsbilder rundt. Kjenner appen få av personene, skal alle få et eget bilde (M4). Se etter gruppebilder uten barn (M4).
+30. Marker mange sider og si «presenter dette på x sider»; et nytt forslag, ikke nødvendigvis direkte endelig. Rask korrekturlesing og nye revisjoner.
+31. «Fornøyd» på sider: beholdes i neste revisjon og forblir merket, helt til siden endres.
+32. Barna (M4): finn ut hvem barna er; omtrent lik fordeling av bilder per historie.
+33. Forsiden: forslag fra de beste bildene gjennom året, minst to med personer og minst fire oversiktsbilder. Kandidater kan merkes hvor som helst i prosessen. Baksiden fra de samme kandidatene.
+34. Kilder og «Lag utkast» på samme side, så det er lett å legge til flere kilder før utkastet lages. Albumutkastet vises først når analysen er startet.
+
+Status 27–34: alt er i **prototypen** (turer krever GPS i bildene; spørsmålet «Var det en tur uten barn?» erstatter ansiktsgjenkjenning til M4). I Rust-kjernen: ingen tak, stemningsbilder bare alene når de er blant årets flotteste, turer slått sammen med GPS, turer uten barn med myk maks og portrettside, «Fornøyd»-sider og «presenter på x sider» (`DraftHints`), og forsideforslag (`select::cover`). I appen: kilder og «Lag utkast» på samme side. Ikke i appen ennå: lagring av «Fornøyd», turtype, x-sider og forsidekandidater (ny tabell i `p2a-store`), og grensesnittet for dem.
+
 Status: 17–26 er gjort i **prototypen**. I Rust-kjernen er algoritmedelen gjort (17–20, 24: personer via hudtoner, ting bare når de er flotte, skarphet på motivet rangert mot året, maks 500, fremhev/demp i oppsettet). Appens grensesnitt har albumnavn, uskarphetsmerke og like store bilder uten beskjæring; **markering av mange, fjern dag/side, bildemeny, rammevalg, helskjerm og stor visning er ikke bygd i appen ennå** (se neste steg).
 
 ## Åpne spørsmål til eieren
 
-1. **Øvre grense for antall bilder** hos trykkeriene (nå 500, `max_photos` i `select/draft.rs` og `CFG.maxPhotos` i prototypen).
+1. **Sidegrensen** hos trykkeriene (nå antatt 500 sider, `MAX_SIDER` i prototypen). Ingen grense i første forslag; grensen brukes bare til å foreslå en reduksjon.
 1b. **Pristrinnene:** eksempelet ditt (350 sider = 1 400 kr, 300 sider = 1 000 kr) passer ikke helt med 4 kr per side (300 sider blir 1 200 kr). Nå er prisen 4 kr per side i trinn på 50 sider. Skal trinnene ha egne priser (f.eks. en fast pris per trinn med rabatt nedover)? Tabellen ligger i `apps/desktop/src/pris.ts` og øverst i prototypen.
 2. **Alternativ B for maskinbytte:** ende-til-ende-kryptert kopi hos oss (bryter prinsippet om at bare trykk-PDF forlater maskinen). Anbefalt: vent; bruk lokal kryptert sikkerhetskopi. Se ARCHITECTURE.md, «Identitet, historikk og bytte av maskin».
 3. **Minimum OS** (macOS 12, Windows 10 22H2/11) er arbeidshypotese, ikke bekreftet.

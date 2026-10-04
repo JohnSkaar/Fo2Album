@@ -4,6 +4,8 @@ import type {
   Analysefase,
   Fremdrift,
   Handling,
+  Kilde,
+  KildeType,
   Laert,
   Side,
   Svar,
@@ -12,6 +14,7 @@ import type {
   UtkastHendelse,
 } from "../api";
 import { pris, prisvalg } from "../pris";
+import { Kildekort } from "./StartScreen";
 import { datoTekst, fmt, tekster } from "../tekster";
 import { datoSpenn, HVORFOR_VALG, oppdaterSider, spoerOmHvorfor } from "../utkast";
 
@@ -297,6 +300,8 @@ export function DraftScreen({
   year,
   onYear,
   draft,
+  sources,
+  onPickSource,
   phase,
   ingest,
   onMake,
@@ -309,6 +314,9 @@ export function DraftScreen({
   year: number | null;
   onYear: (y: number) => void;
   draft: Utkast | null;
+  /** Bildekildene som er lagt til; flere kan legges til før utkastet lages. */
+  sources: Kilde[];
+  onPickSource: (kilde: KildeType) => void;
   phase: Analysefase | null;
   ingest: Fremdrift | null;
   onMake: () => void;
@@ -352,6 +360,18 @@ export function DraftScreen({
         <h1 id="utkast-tittel" className="head__title">
           {year ? t.tittel(year) : tekster.nav.albumutkast}
         </h1>
+        <div className="intro">
+          <h2 className="intro__h">{t.flereKilder}</h2>
+          <p className="intro__note">{t.flereKilderTekst}</p>
+          <ul className="intro__sources" aria-label={t.kilderLagtTil}>
+            {sources.map((k) => (
+              <li key={k.id}>
+                {k.label} <span className="count">· {tekster.kilder[k.kind].navn}</span>
+              </li>
+            ))}
+          </ul>
+          <Kildekort onPickSource={onPickSource} />
+        </div>
         <Aarvelger years={years} year={year} onYear={onYear} />
         <div className="intro">
           <p className="intro__lead">{t.ingress}</p>

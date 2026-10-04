@@ -374,7 +374,19 @@ fn demo(args: &[String]) -> Result<(), String> {
     (0..count).into_par_iter().for_each(|i| {
         let year = if i % 5 == 0 { 2010 } else { 2011 };
         let (month, day) = (1 + (i * 7) % 12, 1 + (i * 3) % 28);
-        let taken = if year == 2011 && i % 4 == 1 {
+        // Hjemme i Oslo, unntatt på turen.
+        let mut gps = (59.91 + (i % 7) as f64 * 0.002, 10.75);
+        let taken = if year == 2011 && i % 8 == 2 {
+            // En tur over tre dager langt hjemmefra (som en gutte- eller jentetur).
+            gps = (61.1 + (i % 5) as f64 * 0.01, 8.5);
+            let k = i / 8;
+            format!(
+                "2011:08:{:02} {:02}:{:02}:00",
+                12 + k % 3,
+                10 + (k / 3) % 8,
+                (k * 7) % 60
+            )
+        } else if year == 2011 && i % 4 == 1 {
             // Én stor hendelse (som en dåp): mange bilder samme dag, så historien får
             // flere sider i utkastet.
             let min = i / 4;
@@ -394,6 +406,7 @@ fn demo(args: &[String]) -> Result<(), String> {
         let spec = ExifSpec {
             taken: Some(&taken),
             make: Some("Apple"),
+            gps: Some(gps),
             ..Default::default()
         };
         let (w, h) = if i % 4 == 0 { (900, 1200) } else { (1200, 900) };
@@ -404,6 +417,15 @@ fn demo(args: &[String]) -> Result<(), String> {
             let v = ((x / 6 + y / 6 + i) % 2) as f32 * detail - detail / 2.0;
             for c in p.0.iter_mut() {
                 *c = (*c as f32 + v).clamp(0.0, 255.0) as u8;
+            }
+        }
+        // Hudtoner i halvparten av bildene: appens stedfortreder for «personer i bildet».
+        if i % 2 == 0 {
+            let (fw, fh) = (w / 4, h / 3);
+            for y in h / 3..h / 3 + fh {
+                for x in w / 3..w / 3 + fw {
+                    img.get_pixel_mut(x, y).0 = [224, 172, 140];
+                }
             }
         }
         let jpeg = insert_exif(&encode_jpeg(&img, 85), &tiff(&spec));

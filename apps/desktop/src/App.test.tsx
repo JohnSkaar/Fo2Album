@@ -201,6 +201,8 @@ describe("albumutkast", () => {
         included: 1,
         pages: 1,
         everyday: false,
+        looksLikeTrip: false,
+        adultTrip: false,
         layout: [{ kind: "luft", photos: [h("a")] }],
       },
     ],
@@ -256,6 +258,11 @@ describe("albumutkast", () => {
 
   it("lager et komplett forslag med begrunnelse for det som er med og ikke med", async () => {
     render(<App />);
+    // Før utkastet: kildene og muligheten til å legge til flere, på samme side.
+    expect(await screen.findByText(tekster.utkast.flereKilder)).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: tekster.utkast.kilderLagtTil })).toHaveTextContent(
+      "Bilder",
+    );
     await userEvent.click(await screen.findByRole("button", { name: tekster.utkast.lag }));
     expect(mock.lagUtkast).toHaveBeenCalledWith(2011, null);
 

@@ -84,6 +84,7 @@ export type Begrunnelseskode =
   | "annen_del_av_hendelsen"
   | "god_kvalitet"
   | "stemningsbilde"
+  | "fornoyd"
   | "valgt_bort_av_deg"
   | "samme_serie"
   | "nesten_likt"
@@ -123,6 +124,10 @@ export interface UtkastHendelse {
   pages: number;
   /** Små hendelser i en måned, samlet. */
   everyday: boolean;
+  /** Ser ut som en tur over flere dager. */
+  looksLikeTrip: boolean;
+  /** Brukeren har sagt at dette er en tur uten barn. */
+  adultTrip: boolean;
   /** Sidene historien får. */
   layout: Side[];
 }

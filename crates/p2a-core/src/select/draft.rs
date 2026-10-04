@@ -6,7 +6,8 @@
 //! 1. Hendelser: nytt treffpunkt når det går mer enn 3 t mellom bildene (`events`). Små
 //!    hendelser (færre enn `event_min_photos` bilder) samles i «hverdager» per måned.
 //! 2. Sider per hendelse ≈ 0,6 · √(antall bilder), store historier får stor plass (SCORING.md
-//!    §4.2, §7). Maks `max_photos` bilder i albumet; sidetak og bildetak krymper alle likt.
+//!    §4.2, §7). Ingen tak i utgangspunktet; velger brukeren et sidetak etter å ha sett
+//!    forslaget, krymper alle historiene likt. Turer uten barn får 2–4 sider (myk maks).
 //! 3. Serier (innen 20 s) og nesten like bilder (pHash) gir bare ett bilde hver.
 //! 4. Skarphet måles mot resten av året (rangering), så «uskarpt» betyr uskarpt for denne
 //!    familiens kamera og lys.
@@ -15,15 +16,17 @@
 //!    hendelse; på en tur der nesten ingen bilder har personer, er naturen selve historien.
 //! 6. Innen hendelsen: grådig valg som veier kvalitet mot å vise flere deler av hendelsen.
 //!    Vektene kommer fra det appen har lært (`learn::Preferences`).
-//! 7. Brukerens egne valg (`Decision`) går alltid foran, også «fremhev» og «demp».
+//! 7. Brukerens egne valg (`Decision`) går alltid foran, også «fremhev» og «demp», sider hun
+//!    er fornøyd med (beholdes som de er) og «presenter denne hendelsen på x sider»
+//!    (`DraftHints`).
 //!
 //! Helhetsvurdering (SCORING.md §3.6): et ubrukelig bilde holdes ute, men er det det eneste
 //! fra en hendelse, kommer det med og sier fra.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::events::EVENT_GAP_SECONDS;
-use crate::layout::{self, Page, Single};
+use crate::layout::{self, Page, PageKind, Single};
 use crate::learn::Preferences;
 use crate::{BasicQuality, ContentHash, PhotoMeta, TakenAt};
 
@@ -43,8 +46,17 @@ pub struct DraftConfig {
     pub max_share: f32,
     /// Hverdager: bilder ≈ faktor · √(antall bilder i måneden).
     pub everyday_factor: f32,
-    /// Maks bilder i albumet (foreløpig; avklares med trykkeriet).
-    pub max_photos: usize,
+    /// Dager slås sammen til én tur når det går høyst så lenge mellom dem …
+    pub trip_gap_seconds: i64,
+    /// … og stedene er nærmere enn dette (km), og langt hjemmefra.
+    pub trip_km: f64,
+    /// Tur uten barn: myk maks for sider, som økes med ett per `adult_trip_extra_per`
+    /// bilder over `adult_trip_extra_from`.
+    pub adult_trip_pages: (usize, usize),
+    pub adult_trip_extra_from: usize,
+    pub adult_trip_extra_per: usize,
+    /// Tur uten barn: så mange nærbilder av personer på portrettsiden.
+    pub portrait_page_max: usize,
     pub unusable_sharp: f32,
     pub unusable_exposure: f32,
     /// Uskarpt: blant de svakeste `blurry_rank` av årets bilder og under `blurry_sharp`.
@@ -69,13 +81,18 @@ impl Default for DraftConfig {
             photos_per_page: 4.0,
             max_share: 0.5,
             everyday_factor: 1.5,
-            max_photos: 500,
+            trip_gap_seconds: 36 * 3600,
+            trip_km: 30.0,
+            adult_trip_pages: (2, 4),
+            adult_trip_extra_from: 200,
+            adult_trip_extra_per: 100,
+            portrait_page_max: 9,
             unusable_sharp: 0.15,
             unusable_exposure: 0.1,
             blurry_rank: 0.2,
             blurry_sharp: 0.55,
             people_skin: 0.02,
-            people_bonus: 0.2,
+            people_bonus: 0.3,
             nature_people_share: 0.25,
         }
     }
@@ -114,6 +131,8 @@ pub enum Reason {
     GodKvalitet,
     /// Ingen personer, men et flott stemningsbilde.
     Stemningsbilde,
+    /// På en side brukeren er fornøyd med.
+    Fornoyd,
     // Ikke med
     ValgtBortAvDeg,
     SammeSerie {
@@ -170,6 +189,33 @@ pub struct DraftEvent {
     pub layout: Vec<Page>,
     /// Små hendelser i en måned, samlet («hverdager»).
     pub everyday: bool,
+    /// Brukeren har sagt at dette er en tur uten barn.
+    pub adult_trip: bool,
+    /// Ser ut som en tur over flere dager: appen spør om den var uten barn.
+    pub looks_like_trip: bool,
+    /// Indekser (i `layout`) til sider brukeren er fornøyd med.
+    pub locked_pages: Vec<usize>,
+}
+
+/// En side brukeren er fornøyd med. Beholdes som den er i neste revisjon.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LockedPage {
+    pub kind: PageKind,
+    pub photos: Vec<ContentHash>,
+}
+
+/// Det brukeren har bestemt utover enkeltbilder. Hendelser er nøklet med et bilde i
+/// hendelsen, så valgene overlever at utkastet lages på nytt.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct DraftHints {
+    /// Brukerens valg av et mindre album, etter at forslaget er sett.
+    pub page_cap: Option<usize>,
+    /// Hendelser som er turer uten barn (gutte- og jenteturer, jobbturer).
+    pub adult_trips: HashSet<ContentHash>,
+    /// «Presenter denne hendelsen på x sider.»
+    pub page_targets: HashMap<ContentHash, usize>,
+    /// Sider brukeren er fornøyd med.
+    pub locked_pages: Vec<LockedPage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -201,19 +247,21 @@ struct Item<'a> {
     /// `None` når bildet ikke er målt ennå.
     people: Option<bool>,
     mood: bool,
+    /// Blant årets aller flotteste bilder (estetikk).
+    exceptional: bool,
     blurry: bool,
     aesthetic: f32,
 }
 
-/// Lager utkastet. `page_cap` er brukerens valg av et mindre album: da krymper alle
-/// historiene likt, men hver hendelse beholder minst én side. Deterministisk: samme bilder,
-/// valg og preferanser gir samme utkast.
+/// Lager utkastet. Med sidetak (`hints.page_cap`) krymper alle historiene likt, men hver
+/// hendelse beholder minst én side. Deterministisk: samme bilder, valg og preferanser gir
+/// samme utkast.
 pub fn make_draft(
     photos: &[PhotoMeta],
     decisions: &HashMap<ContentHash, Decision>,
     prefs: &Preferences,
     cfg: &DraftConfig,
-    page_cap: Option<usize>,
+    hints: &DraftHints,
     progress: &mut dyn FnMut(Phase),
 ) -> Draft {
     progress(Phase::Hendelser);
@@ -258,6 +306,7 @@ pub fn make_draft(
                 decision,
                 people,
                 mood: false,
+                exceptional: false,
                 blurry: raw
                     .is_some_and(|r| rank(r.sharp) < cfg.blurry_rank && r.sharp < cfg.blurry_sharp),
                 aesthetic: rel.map_or(0.0, |q| 0.4 * q.color + 0.3 * q.exposure + 0.3 * q.sharp),
@@ -268,8 +317,42 @@ pub fn make_draft(
     if items.is_empty() {
         return Draft::default();
     }
-    let groups = group_events(&items, cfg);
+    let mut groups = group_events(&items, cfg);
     let nature = mark_things(&mut items, &groups, prefs, cfg);
+    let index: HashMap<ContentHash, usize> = items
+        .iter()
+        .enumerate()
+        .map(|(i, it)| (it.p.hash, i))
+        .collect();
+    for g in &mut groups {
+        g.adult_trip = g
+            .members
+            .iter()
+            .any(|&i| hints.adult_trips.contains(&items[i].p.hash));
+        g.target = g
+            .members
+            .iter()
+            .find_map(|&i| hints.page_targets.get(&items[i].p.hash).copied());
+    }
+    // Sider brukeren er fornøyd med, som indekser, i den hendelsen de hører til.
+    let mut locked_in: Vec<Vec<(PageKind, Vec<usize>)>> = vec![Vec::new(); groups.len()];
+    let mut fixed = vec![false; items.len()];
+    for lp in &hints.locked_pages {
+        let idx: Vec<usize> = lp
+            .photos
+            .iter()
+            .filter_map(|h| index.get(h).copied())
+            .collect();
+        let Some(&first) = idx.first() else { continue };
+        if let Some(g) = groups.iter().position(|g| g.members.contains(&first)) {
+            let idx: Vec<usize> = idx
+                .into_iter()
+                .filter(|i| groups[g].members.contains(i))
+                .collect();
+            idx.iter().for_each(|&i| fixed[i] = true);
+            locked_in[g].push((lp.kind, idx));
+        }
+    }
 
     progress(Phase::Serier);
     let mut burst = 0;
@@ -288,11 +371,40 @@ pub fn make_draft(
     let mut included = vec![false; items.len()];
     let mut first_pick: Vec<Option<usize>> = vec![None; groups.len()];
     let mut out_of_order = vec![false; items.len()];
-    let scale = page_scale(&groups, prefs, cfg, page_cap);
+    let scale = page_scale(&groups, cfg, hints.page_cap);
     let targets: Vec<usize> = groups.iter().map(|g| target_pages(g, cfg, scale)).collect();
+    let mut left_pages = vec![0; groups.len()];
     for (g, group) in groups.iter().enumerate() {
-        let quota = quota(group, targets[g], prefs, cfg);
-        let (picked, first, jumped) = pick(&group.members, &items, quota, nature[g], prefs, cfg);
+        for (_, idx) in &locked_in[g] {
+            idx.iter().for_each(|&i| included[i] = true);
+        }
+        let locked = locked_in[g].len();
+        left_pages[g] = targets[g]
+            .saturating_sub(locked)
+            .max(usize::from(locked == 0));
+        if left_pages[g] == 0 {
+            continue;
+        }
+        let pool: Vec<usize> = group
+            .members
+            .iter()
+            .copied()
+            .filter(|&i| !fixed[i])
+            .collect();
+        if pool.is_empty() {
+            continue;
+        }
+        let quota = quota(pool.len(), left_pages[g], prefs, cfg);
+        // Personer først: stemningsbilder er drypp. Høyst ett per hendelse (tre på turer uten
+        // barn), og i naturen høyst fire, så ingen side blir fylt av bare ting.
+        let mood_max = if nature[g] {
+            4
+        } else if group.adult_trip {
+            3
+        } else {
+            1
+        };
+        let (picked, first, jumped) = pick(&pool, &items, quota, mood_max, prefs, cfg);
         for &i in &picked {
             included[i] = true;
         }
@@ -314,33 +426,44 @@ pub fn make_draft(
                 .members
                 .iter()
                 .copied()
-                .filter(|&i| included[i])
+                .filter(|&i| included[i] && !fixed[i])
                 .collect(),
         );
     }
     let events: Vec<DraftEvent> = groups
         .iter()
-        .zip(&chosen_in)
-        .zip(&targets)
-        .map(|((group, chosen), &target)| {
-            let quality: Vec<f32> = chosen.iter().map(|&i| items[i].q).collect();
-            let single: Vec<Single> = chosen
+        .enumerate()
+        .map(|(g, group)| {
+            let chosen = &chosen_in[g];
+            let mut pages: Vec<(bool, Page)> = locked_in[g]
                 .iter()
-                .map(|&i| match items[i].decision {
-                    Some(Decision::Fremhev) => Single::Must,
-                    // Ting er fyll, aldri helside (eierens føring).
-                    Some(Decision::Demp) => Single::Never,
-                    _ if items[i].people == Some(false) && !items[i].mood => Single::Never,
-                    _ => Single::Free,
+                .map(|(kind, idx)| {
+                    (
+                        true,
+                        Page {
+                            kind: *kind,
+                            photos: idx.clone(),
+                        },
+                    )
                 })
                 .collect();
-            let layout: Vec<Page> = layout::story_with(&quality, &single, target)
-                .into_iter()
-                .map(|p| Page {
-                    kind: p.kind,
-                    photos: p.photos.into_iter().map(|k| chosen[k]).collect(),
-                })
+            pages.extend(
+                story_pages(&items, chosen, left_pages[g], group.adult_trip, cfg)
+                    .into_iter()
+                    .map(|p| (false, p)),
+            );
+            pages.sort_by_key(|(_, p)| p.photos.iter().min().copied().unwrap_or(usize::MAX));
+            let locked_pages = pages
+                .iter()
+                .enumerate()
+                .filter(|(_, (l, _))| *l)
+                .map(|(k, _)| k)
                 .collect();
+            let layout: Vec<Page> = pages.into_iter().map(|(_, p)| p).collect();
+            let days = (items[*group.members.last().expect("ikke tom")].t
+                - items[group.members[0]].t)
+                / 86_400
+                + 1;
             DraftEvent {
                 start: items[group.members[0]].p.taken_at.expect("har dato"),
                 end: items[*group.members.last().expect("ikke tom")]
@@ -348,10 +471,13 @@ pub fn make_draft(
                     .taken_at
                     .expect("har dato"),
                 photos: group.members.len(),
-                included: chosen.len(),
+                included: group.members.iter().filter(|&&i| included[i]).count(),
                 pages: layout.len(),
                 layout,
                 everyday: group.everyday,
+                adult_trip: group.adult_trip,
+                looks_like_trip: !group.everyday && !nature[g] && days >= 2,
+                locked_pages,
             }
         })
         .collect();
@@ -362,7 +488,9 @@ pub fn make_draft(
         .map(|(i, it)| {
             let g = event_of[i];
             let chosen = &chosen_in[g];
-            let (reason, related) = if included[i] {
+            let (reason, related) = if fixed[i] {
+                (Reason::Fornoyd, None)
+            } else if included[i] {
                 let first = first_pick[g] == Some(i);
                 let r = reason_in(it, chosen.len(), &burst_size, first, out_of_order[i]);
                 (r, None)
@@ -417,7 +545,7 @@ fn mark_things(
     }
     aes.sort_by(f32::total_cmp);
     let at = |share: f32| aes[((aes.len() - 1) as f32 * share).round() as usize];
-    let (mood_cut, median) = (at(prefs.mood_percentile), at(0.5));
+    let (mood_cut, median, top) = (at(prefs.mood_percentile), at(0.5), at(0.97));
     let mut natures = Vec::with_capacity(groups.len());
     for g in groups {
         let measured = g.members.iter().filter(|&&i| items[i].people.is_some());
@@ -432,6 +560,7 @@ fn mark_things(
             }
             if it.aesthetic >= if nature { median } else { mood_cut } {
                 it.mood = true;
+                it.exceptional = it.aesthetic >= top;
             } else {
                 it.noise = Some(Reason::Gjenstand);
             }
@@ -453,10 +582,82 @@ fn raw_events(items: &[Item]) -> Vec<(usize, usize)> {
     out
 }
 
+/// Avstand i km mellom to punkter (breddegrad, lengdegrad).
+fn km(a: (f64, f64), b: (f64, f64)) -> f64 {
+    let (la1, lo1, la2, lo2) = (
+        a.0.to_radians(),
+        a.1.to_radians(),
+        b.0.to_radians(),
+        b.1.to_radians(),
+    );
+    let h = ((la2 - la1) / 2.0).sin().powi(2)
+        + la1.cos() * la2.cos() * ((lo2 - lo1) / 2.0).sin().powi(2);
+    12_742.0 * h.sqrt().asin()
+}
+
+/// Midtpunktet (median) for bildene med GPS i en hendelse.
+fn place(items: &[Item], a: usize, b: usize) -> Option<(f64, f64)> {
+    let mut la: Vec<f64> = items[a..b]
+        .iter()
+        .filter_map(|it| it.p.gps.map(|g| g.0))
+        .collect();
+    let mut lo: Vec<f64> = items[a..b]
+        .iter()
+        .filter_map(|it| it.p.gps.map(|g| g.1))
+        .collect();
+    if la.is_empty() {
+        return None;
+    }
+    la.sort_by(f64::total_cmp);
+    lo.sort_by(f64::total_cmp);
+    Some((la[la.len() / 2], lo[lo.len() / 2]))
+}
+
+/// Påfølgende dager på samme sted, langt hjemmefra, er én tur (SCORING.md §4.2). «Hjemme» er
+/// stedet med flest bilder (ruter på ca. 10 km). Uten GPS slås ingenting sammen.
+fn merge_trips(items: &[Item], raw: Vec<(usize, usize)>, cfg: &DraftConfig) -> Vec<(usize, usize)> {
+    let mut cells: HashMap<(i32, i32), usize> = HashMap::new();
+    for it in items {
+        if let Some((la, lo)) = it.p.gps {
+            *cells
+                .entry(((la * 10.0).floor() as i32, (lo * 10.0).floor() as i32))
+                .or_default() += 1;
+        }
+    }
+    let Some((&(cla, clo), _)) = cells
+        .iter()
+        .max_by_key(|(c, n)| (**n, std::cmp::Reverse(**c)))
+    else {
+        return raw;
+    };
+    let home = ((cla as f64 + 0.5) / 10.0, (clo as f64 + 0.5) / 10.0);
+    let mut out: Vec<(usize, usize)> = Vec::with_capacity(raw.len());
+    for (a, b) in raw {
+        if let Some(last) = out.last_mut() {
+            let gap = items[a].t - items[last.1 - 1].t;
+            if let (Some(p), Some(q)) = (place(items, last.0, last.1), place(items, a, b)) {
+                if gap <= cfg.trip_gap_seconds
+                    && km(p, q) <= cfg.trip_km
+                    && km(p, home) > cfg.trip_km
+                    && km(q, home) > cfg.trip_km
+                {
+                    last.1 = b;
+                    continue;
+                }
+            }
+        }
+        out.push((a, b));
+    }
+    out
+}
+
 struct Group {
     /// Indekser i `items`, i tidsrekkefølge.
     members: Vec<usize>,
     everyday: bool,
+    adult_trip: bool,
+    /// Brukerens «presenter på x sider».
+    target: Option<usize>,
 }
 
 /// Hendelser med minst `event_min_photos` bilder blir egne grupper; de små samles per
@@ -464,11 +665,13 @@ struct Group {
 fn group_events(items: &[Item], cfg: &DraftConfig) -> Vec<Group> {
     let mut groups: Vec<Group> = Vec::new();
     let mut everyday: HashMap<(i32, u8), usize> = HashMap::new();
-    for (a, b) in raw_events(items) {
+    for (a, b) in merge_trips(items, raw_events(items), cfg) {
         if b - a >= cfg.event_min_photos {
             groups.push(Group {
                 members: (a..b).collect(),
                 everyday: false,
+                adult_trip: false,
+                target: None,
             });
         } else {
             let t = items[a].p.taken_at.expect("har dato");
@@ -476,6 +679,8 @@ fn group_events(items: &[Item], cfg: &DraftConfig) -> Vec<Group> {
                 groups.push(Group {
                     members: Vec::new(),
                     everyday: true,
+                    adult_trip: false,
+                    target: None,
                 });
                 groups.len() - 1
             });
@@ -492,38 +697,111 @@ fn usable(it: &Item) -> bool {
 
 /// Sider hendelsen får før et eventuelt sidetak.
 fn natural_pages(group: &Group, cfg: &DraftConfig) -> f32 {
+    if let Some(t) = group.target {
+        return t.max(1) as f32;
+    }
     let n = group.members.len() as f32;
     if group.everyday {
-        (cfg.everyday_factor * n.sqrt() / cfg.photos_per_page).ceil()
-    } else {
-        (cfg.pages_per_sqrt_photo * n.sqrt())
-            .round()
-            .clamp(1.0, cfg.event_max_pages as f32)
+        return (cfg.everyday_factor * n.sqrt() / cfg.photos_per_page).ceil();
     }
+    let free = (cfg.pages_per_sqrt_photo * n.sqrt())
+        .round()
+        .clamp(1.0, cfg.event_max_pages as f32);
+    if group.adult_trip {
+        // Myk maks: brytes bare når det er svært mange bilder å ta av.
+        let (lo, hi) = cfg.adult_trip_pages;
+        let extra = group
+            .members
+            .len()
+            .saturating_sub(cfg.adult_trip_extra_from)
+            / cfg.adult_trip_extra_per;
+        return free.clamp(lo as f32, (hi + extra) as f32);
+    }
+    free
+}
+
+/// Sidene for de valgte bildene. Stemningsbilder, ting og dempede bilder står aldri alene: de
+/// setter omgivelsene mellom personbildene. Tur uten barn: én side med nærbilder av personene,
+/// og resten med stemning rundt.
+fn story_pages(
+    items: &[Item],
+    chosen: &[usize],
+    pages: usize,
+    adult_trip: bool,
+    cfg: &DraftConfig,
+) -> Vec<Page> {
+    if chosen.is_empty() || pages == 0 {
+        return Vec::new();
+    }
+    let mut out = Vec::new();
+    let mut rest: Vec<usize> = chosen.to_vec();
+    let mut pages = pages;
+    if adult_trip && pages >= 2 {
+        let mut faces: Vec<usize> = chosen
+            .iter()
+            .copied()
+            .filter(|&i| items[i].people == Some(true))
+            .collect();
+        faces.sort_by(|&a, &b| {
+            let skin = |i: usize| items[i].raw.map_or(0.0, |q| q.skin);
+            skin(b).total_cmp(&skin(a)).then(a.cmp(&b))
+        });
+        faces.truncate(cfg.portrait_page_max);
+        faces.sort();
+        if faces.len() >= 3 {
+            rest.retain(|i| !faces.contains(i));
+            out.push(Page {
+                kind: PageKind::Rutenett { kolonner: 3 },
+                photos: faces,
+            });
+            pages -= 1;
+        }
+    }
+    let quality: Vec<f32> = rest.iter().map(|&i| items[i].q).collect();
+    let single: Vec<Single> = rest
+        .iter()
+        .map(|&i| match items[i].decision {
+            Some(Decision::Fremhev) => Single::Must,
+            Some(Decision::Demp) => Single::Never,
+            // Et virkelig flott stemningsbilde (natur, oversikt) kan få en hel side innimellom.
+            _ if items[i].mood && items[i].exceptional => Single::Free,
+            // Ellers er ting og stemningsbilder fyll mellom personbildene.
+            _ if items[i].people == Some(false) => Single::Never,
+            _ => Single::Free,
+        })
+        .collect();
+    out.extend(
+        layout::story_with(&quality, &single, pages)
+            .into_iter()
+            .map(|p| Page {
+                kind: p.kind,
+                photos: p.photos.into_iter().map(|k| rest[k]).collect(),
+            }),
+    );
+    out
 }
 
 fn target_pages(group: &Group, cfg: &DraftConfig, scale: f32) -> usize {
     ((natural_pages(group, cfg) * scale).floor() as usize).max(1)
 }
 
-/// Største skala (i steg på 5 %) som holder albumet innenfor sidetaket og bildetaket.
-fn page_scale(groups: &[Group], prefs: &Preferences, cfg: &DraftConfig, cap: Option<usize>) -> f32 {
+/// Største skala (i steg på 5 %) som holder albumet innenfor brukerens sidetak.
+fn page_scale(groups: &[Group], cfg: &DraftConfig, cap: Option<usize>) -> f32 {
+    let Some(cap) = cap else { return 1.0 };
     (0..=19)
         .map(|k| 1.0 - k as f32 * 0.05)
         .find(|&s| {
-            let pages: usize = groups.iter().map(|g| target_pages(g, cfg, s)).sum();
-            let photos: usize = groups
+            groups
                 .iter()
-                .map(|g| quota(g, target_pages(g, cfg, s), prefs, cfg))
-                .sum();
-            cap.is_none_or(|c| pages <= c) && photos <= cfg.max_photos
+                .map(|g| target_pages(g, cfg, s))
+                .sum::<usize>()
+                <= cap
         })
         .unwrap_or(0.05)
 }
 
-/// Hvor mange bilder gruppen skal ha.
-fn quota(group: &Group, pages: usize, prefs: &Preferences, cfg: &DraftConfig) -> usize {
-    let n = group.members.len();
+/// Hvor mange bilder en gruppe med `n` mulige bilder skal ha.
+fn quota(n: usize, pages: usize, prefs: &Preferences, cfg: &DraftConfig) -> usize {
     let want = pages as f32 * cfg.photos_per_page * prefs.event_density;
     let most = (n as f32 * cfg.max_share).ceil().max(1.0);
     (want.min(most).round() as usize).max(1)
@@ -545,7 +823,7 @@ fn pick(
     members: &[usize],
     items: &[Item],
     quota: usize,
-    nature: bool,
+    mood_max: usize,
     prefs: &Preferences,
     cfg: &DraftConfig,
 ) -> (Vec<usize>, Option<usize>, Vec<usize>) {
@@ -574,7 +852,7 @@ fn pick(
     let imp = prefs.quality_importance;
     let mut first = None;
     let mut jumped = Vec::new();
-    // Høyst ett stemningsbilde per hendelse, unntatt på turer i naturen.
+    // Høyst ett stemningsbilde per hendelse (tre på turer uten barn), unntatt i naturen.
     let mut moods = chosen.iter().filter(|&&i| items[i].mood).count();
 
     while chosen.len() < quota {
@@ -587,7 +865,7 @@ fn pick(
             .iter()
             .copied()
             .filter(|&i| !chosen.contains(&i) && !blocked(i, &chosen))
-            .filter(|&i| nature || !items[i].mood || moods == 0)
+            .filter(|&i| !items[i].mood || moods < mood_max)
             .collect();
         let value = |i: usize| {
             let spread = chosen
@@ -720,7 +998,7 @@ mod tests {
             decisions,
             &Preferences::default(),
             &DraftConfig::default(),
-            None,
+            &DraftHints::default(),
             &mut |_| {},
         )
     }
@@ -882,7 +1160,7 @@ mod tests {
             &HashMap::new(),
             &prefs,
             &DraftConfig::default(),
-            None,
+            &DraftHints::default(),
             &mut |_| {},
         )
         .included()
@@ -927,7 +1205,10 @@ mod tests {
             &HashMap::new(),
             &Preferences::default(),
             &DraftConfig::default(),
-            Some(cap),
+            &DraftHints {
+                page_cap: Some(cap),
+                ..DraftHints::default()
+            },
             &mut |_| {},
         );
         assert!(small.pages() <= cap, "{} > {cap}", small.pages());
@@ -1004,8 +1285,8 @@ mod tests {
     }
 
     #[test]
-    fn album_is_capped_at_max_photos() {
-        // 40 store dager à 300 bilder ville gitt langt over 500 bilder.
+    fn no_cap_by_default_even_for_a_big_year() {
+        // 40 store dager à 300 bilder: ingen tak på bilder eller sider i første utkast.
         let mut photos = Vec::new();
         for day in 0..40u16 {
             for k in 0..300u16 {
@@ -1023,13 +1304,149 @@ mod tests {
             }
         }
         let d = draft(&photos, &HashMap::new());
-        assert!(
-            d.included().count() <= DraftConfig::default().max_photos,
-            "{}",
-            d.included().count()
-        );
+        assert!(d.included().count() > 500, "{}", d.included().count());
         assert_eq!(d.events.len(), 40);
-        assert!(d.events.iter().all(|e| e.included >= 1));
+    }
+
+    fn hints(
+        adult: &[ContentHash],
+        target: Option<(ContentHash, usize)>,
+        locked: Vec<LockedPage>,
+    ) -> DraftHints {
+        DraftHints {
+            adult_trips: adult.iter().copied().collect(),
+            page_targets: target.into_iter().collect(),
+            locked_pages: locked,
+            ..DraftHints::default()
+        }
+    }
+
+    fn with(photos: &[PhotoMeta], h: &DraftHints) -> Draft {
+        make_draft(
+            photos,
+            &HashMap::new(),
+            &Preferences::default(),
+            &DraftConfig::default(),
+            h,
+            &mut |_| {},
+        )
+    }
+
+    /// En tur over tre dager med 300 bilder.
+    fn trip() -> Vec<PhotoMeta> {
+        let home = (1000..1400u16).map(|k| {
+            let mut p = photo(
+                k,
+                3,
+                1 + (k % 20) as u8,
+                9 + (k % 9) as u8,
+                (k % 60) as u8,
+                0,
+                0.6,
+            );
+            p.gps = Some((59.91, 10.75));
+            p
+        });
+        (0..300u16)
+            .map(|k| {
+                let mut p = photo(
+                    k,
+                    6,
+                    10 + (k / 100) as u8,
+                    9 + ((k % 100) / 10) as u8,
+                    (k % 10) as u8 * 5,
+                    0,
+                    0.5 + (k % 5) as f32 / 10.0,
+                );
+                if let Some(q) = p.quality.as_mut() {
+                    q.skin = if k % 3 == 0 {
+                        0.0
+                    } else {
+                        0.05 + (k % 7) as f32 / 50.0
+                    };
+                    q.color = if k % 3 == 0 { 0.9 } else { 0.5 };
+                }
+                p.gps = Some((61.1 + (k % 5) as f64 * 0.01, 8.5));
+                p
+            })
+            .chain(home)
+            .collect()
+    }
+
+    fn trip_event(d: &Draft) -> &DraftEvent {
+        d.events.iter().find(|e| e.start.month == 6).expect("turen")
+    }
+
+    #[test]
+    fn days_away_from_home_become_one_trip() {
+        let d = draft(&trip(), &HashMap::new());
+        let e = trip_event(&d);
+        assert_eq!(e.photos, 300, "tre dager på samme sted er én tur");
+        assert!(e.looks_like_trip);
+    }
+
+    #[test]
+    fn adult_trip_gets_few_pages_and_a_portrait_page() {
+        let photos = trip();
+        let free = trip_event(&draft(&photos, &HashMap::new())).pages;
+        let d = with(&photos, &hints(&[photos[0].hash], None, vec![]));
+        let e = trip_event(&d);
+        assert!(e.adult_trip);
+        // 300 bilder: myk maks 4, pluss 1 fordi det er mange bilder å ta av.
+        assert!(
+            (2..=5).contains(&e.pages),
+            "tur uten barn: {} sider (ellers {free})",
+            e.pages
+        );
+        let first = &e.layout[0];
+        assert!(first.photos.len() >= 3);
+        assert!(first
+            .photos
+            .iter()
+            .all(|&i| d.photos[i].reason != Reason::Stemningsbilde));
+    }
+
+    #[test]
+    fn ordinary_mood_photos_never_stand_alone() {
+        let d = draft(&trip(), &HashMap::new());
+        for e in &d.events {
+            for p in e.layout.iter().filter(|p| p.photos.len() == 1) {
+                assert!(d.photos[p.photos[0]].reason != Reason::Stemningsbilde);
+            }
+        }
+    }
+
+    #[test]
+    fn page_target_overrides_and_locked_pages_are_kept() {
+        let photos = day(0, 9, 9, 120);
+        let auto = draft(&photos, &HashMap::new());
+        let d = with(&photos, &hints(&[], Some((photos[5].hash, 2)), vec![]));
+        assert_eq!(d.pages(), 2, "auto hadde {}", auto.pages());
+
+        let keep = &auto.events[0].layout[1];
+        let locked = LockedPage {
+            kind: keep.kind,
+            photos: keep.photos.iter().map(|&i| auto.photos[i].hash).collect(),
+        };
+        let d = with(
+            &photos,
+            &hints(&[], Some((photos[5].hash, 3)), vec![locked.clone()]),
+        );
+        let e = &d.events[0];
+        assert_eq!(e.pages, 3);
+        assert_eq!(e.locked_pages.len(), 1);
+        let page = &e.layout[e.locked_pages[0]];
+        assert_eq!(
+            page.photos
+                .iter()
+                .map(|&i| d.photos[i].hash)
+                .collect::<Vec<_>>(),
+            locked.photos
+        );
+        assert!(page
+            .photos
+            .iter()
+            .all(|&i| d.photos[i].reason == Reason::Fornoyd));
     }
 
     #[test]

@@ -115,6 +115,10 @@ export const tekster = {
     ingress:
       "Appen går gjennom alle bildene fra året, finner hendelsene og lager et komplett forslag til album. Etterpå ser du hva som er med og hva som ikke er med, og hvorfor. Du bytter der du er uenig.",
     tid: "Det tar litt tid, og alt skjer på denne maskinen.",
+    flereKilder: "Har dere bilder flere steder?",
+    flereKilderTekst:
+      "Legg til alle kildene før du lager utkastet: mobilen til begge foreldrene, Dropbox, iCloud, Google Disk og mapper på PC-en. Appen blander dem og fjerner dubletter.",
+    kilderLagtTil: "Bildekilder som er lagt til",
     lag: "Lag utkast",
     venterInnlesing:
       "Appen henter fortsatt bilder fra maskinen. Utkastet tar med alle bildene når den er ferdig.",
@@ -193,6 +197,8 @@ export const tekster = {
         return "Skarpt og godt lys";
       case "stemningsbilde":
         return "Et flott stemningsbilde";
+      case "fornoyd":
+        return "På en side du er fornøyd med";
       case "valgt_bort_av_deg":
         return "Du tok det bort";
       case "samme_serie":

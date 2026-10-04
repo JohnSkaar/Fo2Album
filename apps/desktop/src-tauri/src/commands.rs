@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use p2a_core::config::DedupConfig;
 use p2a_core::layout::PageKind;
 use p2a_core::learn::{learn, Action, Feedback, FeedbackReason, Lesson, Preferences};
-use p2a_core::select::draft::{make_draft, Decision, DraftConfig, Phase, Reason};
+use p2a_core::select::draft::{make_draft, Decision, DraftConfig, DraftHints, Phase, Reason};
 use p2a_core::{ContentHash, SourceKind};
 use p2a_ingest::pipeline::{ingest_all, IngestReport, Progress};
 use p2a_ingest::sources;
@@ -416,6 +416,7 @@ impl From<Reason> for ReasonDto {
             Reason::AnnenDelAvHendelsen => ("annen_del_av_hendelsen", None),
             Reason::GodKvalitet => ("god_kvalitet", None),
             Reason::Stemningsbilde => ("stemningsbilde", None),
+            Reason::Fornoyd => ("fornoyd", None),
             Reason::Gjenstand => ("gjenstand", None),
             Reason::EnStemningHolder => ("en_stemning_holder", None),
             Reason::ValgtBortAvDeg => ("valgt_bort_av_deg", None),
@@ -455,6 +456,9 @@ pub struct DraftEventDto {
     included: usize,
     pages: usize,
     everyday: bool,
+    /// Ser ut som en tur over flere dager; appen kan spørre om den var uten barn.
+    looks_like_trip: bool,
+    adult_trip: bool,
     layout: Vec<PageDto>,
 }
 
@@ -539,7 +543,7 @@ fn draft_for(
             &decisions,
             &prefs,
             &DraftConfig::default(),
-            None,
+            &DraftHints::default(),
             &mut |_| {},
         )
         .pages()
@@ -549,7 +553,10 @@ fn draft_for(
         &decisions,
         &prefs,
         &DraftConfig::default(),
-        page_cap,
+        &DraftHints {
+            page_cap,
+            ..DraftHints::default()
+        },
         &mut |phase| {
             progress(match phase {
                 Phase::Hendelser => "hendelser",
@@ -575,6 +582,8 @@ fn draft_for(
                 included: e.included,
                 pages: e.pages,
                 everyday: e.everyday,
+                looks_like_trip: e.looks_like_trip,
+                adult_trip: e.adult_trip,
                 layout: e
                     .layout
                     .iter()

@@ -24,7 +24,9 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 - Analyse og poengsetting lokalt, med forklaring per bilde.
 - Personer: lokal ansiktsgjenkjenning og gruppering; brukeren navngir de viktigste og kan markere roller (barn, besteforeldre, venner) og «viktig for oss».
 - Utkast: forside, kapitler per hendelse (hvert treffpunkt eller besøk minst én side, flere når det er mange bilder) samlet i måneder, variert layout (helside uten marg, ett bilde med luft rundt, rutenett med 2–12 bilder, serie-oppslag), bildetekster med måned/dato og stedsnavn. **Store historier får stor plass i første utkast** (eierens føring 4. oktober 2026: en dåp for eget barn kan få 10 sider eller mer); brukeren velger selv et mindre album.
-- **Maks ca. 500 bilder i et album** (foreløpig, eieren avklarer grensen med trykkeriene). Når grensen nås, krymper alle historiene likt; utgangspunktet er fortsatt et album med mange bilder fremfor få.
+- **Ingen tak i første forslag.** Blir albumet større enn trykkeriets grense (foreløpig antatt 500 sider, avklares), foreslår appen å redusere, men først etter at kunden har sett forslaget. Kunden velger hvor mange sider; alle historiene krymper likt, og sider hun er fornøyd med, beholdes.
+- **Revisjoner («lese korrektur»).** Kunden går gjennom forslaget, merker sider hun er fornøyd med («Fornøyd»), og lager en ny revisjon. Sidene hun er fornøyd med, beholdes uendret og forblir merket til hun endrer dem. Hun kan markere flere sider (også over flere dager) og si «presenter dette på x sider», så lager appen et nytt forslag for akkurat de sidene, med «Angre».
+- **Forside og bakside.** Appen foreslår fra de beste bildene gjennom hele året: minst to med personer (familien eller barna) og minst fire oversiktsbilder. Kunden kan når som helst merke bilder som kandidater (☆), og de kommer først. Baksiden velges normalt fra de samme kandidatene.
 - **Pris regnes ut automatisk og vises i trinn** (foreløpig 4 kr per side, trinn på 50 sider). Brukeren ser alternativene: «Albumet er nå på 350 sider og koster 1 400 kr. Med 300 sider: 1 200 kr.» Velger hun et mindre album, krymper alle historiene likt, og hver hendelse beholder minst én side. Endelige priser kommer fra trykkeriet.
 - Alle personer med navn og profilbilde er med minst én gang.
 - Forsidehjelp (se under).
@@ -42,7 +44,7 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 
 ## Brukerflyt
 
-1. **Velkommen** → «Velg bildemappene dere vil lage årets familiealbum av». Kort med kilder: PC, Dropbox, iCloud, Google Disk. Hjelpetekst om hvor mappene vanligvis ligger. Appen kan foreslå kjente stier automatisk (med samtykke).
+1. **Velkommen** → «Velg bildemappene dere vil lage årets familiealbum av». Når første kilde er lagt til, blir samme side «Har dere bilder flere steder?» med kildene som er lagt til, kortene for å legge til flere og «Lag utkast». Albumutkastet vises først når analysen er startet. Kort med kilder: PC, Dropbox, iCloud, Google Disk. Hjelpetekst om hvor mappene vanligvis ligger. Appen kan foreslå kjente stier automatisk (med samtykke).
 2. **Velg år** (standard: forrige kalenderår, eller året med flest bilder).
 3. **«Lag utkast» starter analysen** (kan ta tid; vis hva som skjer, steg for steg: henter årets bilder, finner hendelsene, finner serier og nesten like bilder, velger de beste fra hver hendelse, lager sidene, skriver begrunnelser). Det er ingen «Velg bilder»-skjerm før dette; alle bildene ligger under «Alle bilder» for den som vil se dem.
 3b. **Komplett utkast først (eierens føring).** Appen foreslår et ferdig album, med alle sider, før brukeren har valgt noe som helst. Brukeren justerer etterpå; hun skal aldri måtte bygge albumet fra et tomt utvalg. Stegene under forbedrer utkastet, de er ikke forutsetninger for det.

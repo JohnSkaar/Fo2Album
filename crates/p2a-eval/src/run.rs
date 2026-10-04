@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use p2a_core::learn::Preferences;
 use p2a_core::select::baseline;
-use p2a_core::select::draft::{make_draft, DraftConfig};
+use p2a_core::select::draft::{make_draft, DraftConfig, DraftHints};
 use p2a_core::ContentHash;
 use p2a_store::Store;
 use rayon::prelude::*;
@@ -107,7 +107,7 @@ pub fn evaluate_all(store: &Store) -> Result<Vec<EvalResult>, EvalError> {
             &HashMap::new(),
             &Preferences::default(),
             &DraftConfig::default(),
-            None,
+            &DraftHints::default(),
             &mut |_| {},
         );
         let draft_selection: Vec<ContentHash> = draft.included().map(|p| p.hash).collect();

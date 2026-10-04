@@ -320,6 +320,8 @@ export function App() {
             year={valgtAar}
             onYear={(y) => void velgAar(y)}
             draft={utkast}
+            sources={kilder}
+            onPickSource={(k) => void velgMappe(k)}
             phase={analyse}
             ingest={fremdrift}
             onMake={() => void lagUtkast()}

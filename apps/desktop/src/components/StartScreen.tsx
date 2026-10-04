@@ -10,6 +10,27 @@ const kort: { id: KildeType; ikon: IconName }[] = [
   { id: "google_disk", ikon: "drive" },
 ];
 
+/** Kortene for å velge en bildekilde. Brukes også på utkastsiden før utkastet er laget. */
+export function Kildekort({ onPickSource }: { onPickSource: (kilde: KildeType) => void }) {
+  return (
+    <ul className="sources" aria-label={tekster.start.kilderEtikett}>
+      {kort.map(({ id, ikon }) => (
+        <li key={id}>
+          <button type="button" className="src" onClick={() => onPickSource(id)}>
+            <span className="src__icon">
+              <Icon name={ikon} />
+            </span>
+            <span>
+              <b>{tekster.kilder[id].navn}</b>
+              <span>{tekster.kilder[id].hint}</span>
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function StartScreen({
   onPickSource,
   onFindSuggestions,
@@ -29,21 +50,7 @@ export function StartScreen({
         {tekster.start.tittel}
       </h1>
       <p className="start__lead">{tekster.start.ingress}</p>
-      <ul className="sources" aria-label={tekster.start.kilderEtikett}>
-        {kort.map(({ id, ikon }) => (
-          <li key={id}>
-            <button type="button" className="src" onClick={() => onPickSource(id)}>
-              <span className="src__icon">
-                <Icon name={ikon} />
-              </span>
-              <span>
-                <b>{tekster.kilder[id].navn}</b>
-                <span>{tekster.kilder[id].hint}</span>
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <Kildekort onPickSource={onPickSource} />
 
       {suggestions === null ? (
         <div className="suggest">

@@ -649,6 +649,16 @@ h3 {
   font-size: 17px;
   line-height: 26px;
 }
+.intro__h {
+  font: 600 20px/28px var(--font-display);
+}
+.intro__sources {
+  margin: 0;
+  padding-left: 20px;
+}
+.intro .sources {
+  width: 100%;
+}
 .intro__note {
   margin: 0;
   font-size: 14px;
