@@ -1111,6 +1111,34 @@ function logAct(a, ask = true){
   state.actions++; state.thanks = false; state.pages = [];
   state.ask = ask && ASK[a] && state.skips < 3 && (state.actions <= 3 || state.actions % 3 === 0) ? { a, i: log.length - 1 } : null;
 }
+/* «Sett på én side»: de markerte bildene samles på en ny side (flere sider hvis det er over
+   12), i dagen til det første bildet. Siden er brukerens eget valg, så den merkes «Fornøyd» og
+   beholdes i neste revisjon; rammevalget åpnes med en gang. */
+function gatherOnPage(ids){
+  const d = state.draft; if(!d || !ids.length) return;
+  state.undo = snapshot();
+  ids = [...ids].sort((a, b) => byId(a).date - byId(b).date);
+  const k = d.eventOf.get(ids[0]), e = d.events[k];
+  let at = e.pages.findIndex(pg => pg.ids.includes(ids[0]));
+  ids.forEach(id => {
+    const where = pageOf(id);
+    if(where){ touch(where.pg); where.pg.ids = where.pg.ids.filter(x => x !== id); if(where.pg.tpl !== 'auto' && where.pg.ids.length < TEMPLATES[where.pg.tpl].n) where.pg.tpl = 'auto'; }
+    const p = byId(id); p.selected = true; state.decisions.set(id, 'med'); d.reason.set(id, 'valgt_av_deg');
+  });
+  d.events.forEach(tidy);
+  if(at < 0) at = e.pages.findIndex(pg => byId(pg.ids[0]).date > byId(ids[0]).date);
+  if(at < 0) at = e.pages.length;
+  at = Math.min(at, e.pages.length);
+  const fresh = [];
+  for(let i = 0; i < ids.length; i += 12){ const chunk = ids.slice(i, i + 12); fresh.push({ id: ++pageUid, kind: chunk.length === 1 ? 'full' : 'grid', tpl: 'auto', ids: chunk }); }
+  e.pages.splice(at, 0, ...fresh); e.removed = false;
+  fresh.forEach(pg => setLocked(pg, true));
+  logAct('samle_side', false);
+  state.sel.clear(); state.menu = null; state.pageSel = fresh[0].id;
+  state.note = { text: fresh.length === 1 ? `${ids.length} ${ids.length === 1 ? 'bilde er' : 'bilder er'} samlet på én side, merket «Fornøyd». Velg gjerne rammer for siden.` : `${ids.length} bilder er samlet på ${fresh.length} sider, merket «Fornøyd».`, undo: true };
+  refresh();
+  document.querySelector(`.pg2[data-pgid="${fresh[0].id}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
 function clearMarks(){ state.sel.clear(); state.pgMarked.clear(); state.dayMarked.clear(); state.presentN = null; }
 /* Opprioriter: med, og høyere prioritet når sidene lages (ikke nødvendigvis egen side). */
 function boost(id){ const p = byId(id); p.emph = 'opp'; if(!p.selected) setIn(id); else state.decisions.set(id, 'med'); }
@@ -1301,7 +1329,7 @@ function renderDock(){
     const parts = [n && `${n} ${n === 1 ? 'bilde' : 'bilder'}`, m && `${m} ${m === 1 ? 'side' : 'sider'}`, dd && `${dd} ${dd === 1 ? 'dag' : 'dager'}`].filter(Boolean).join(' · ');
     const x = state.presentN ?? m;
     dk.innerHTML = `<div class="dockhead"><b>Markert: ${parts}</b><button class="btn btn--g" data-all="av">Fjern all markering</button></div>
-      ${n ? `<div class="dockrow"><span class="docklbl">Bildene</span>${inn.length ? `<button class="btn btn--s" data-act="ta_bort">Ta bort (${inn.length})</button>` : ''}${ut.length ? `<button class="btn btn--s" data-act="ta_med">Ta med (${ut.length})</button>` : ''}<button class="btn btn--s" data-act="opp">Opprioriter (${n})</button>${inn.length ? `<button class="btn btn--s" data-act="demp">Nedprioriter (${inn.length})</button>` : ''}<button class="btn btn--s" data-act="kandidat">☆ Forsidekandidat</button>${swap ? '<button class="btn btn--s" data-act="bytt">Bytt dem</button>' : ''}${n === 1 ? '<button class="btn btn--g" data-act="stort">Vis stort</button>' : ''}</div>` : ''}
+      ${n ? `<div class="dockrow"><span class="docklbl">Bildene</span>${inn.length ? `<button class="btn btn--s" data-act="ta_bort">Ta bort (${inn.length})</button>` : ''}${ut.length ? `<button class="btn btn--s" data-act="ta_med">Ta med (${ut.length})</button>` : ''}<button class="btn btn--s" data-act="side">Sett på én side (${n})</button><button class="btn btn--s" data-act="opp">Opprioriter (${n})</button>${inn.length ? `<button class="btn btn--s" data-act="demp">Nedprioriter (${inn.length})</button>` : ''}<button class="btn btn--s" data-act="kandidat">☆ Forsidekandidat</button>${swap ? '<button class="btn btn--s" data-act="bytt">Bytt dem</button>' : ''}${n === 1 ? '<button class="btn btn--g" data-act="stort">Vis stort</button>' : ''}</div>` : ''}
       ${m ? `<div class="dockrow"><span class="docklbl">Sidene</span><button class="btn btn--s" data-pg="fjern">Fjern sidene og bildene i dem</button><span>Presenter på</span><button class="btn btn--s" data-pg="minus" aria-label="Færre sider">−</button><b class="xn">${x}</b><button class="btn btn--s" data-pg="pluss" aria-label="Flere sider">+</button><span>${x === 1 ? 'side' : 'sider'}</span><button class="btn btn--s" data-pg="lag">Lag forslag</button><button class="btn btn--s" data-pg="fornoyd">Fornøyd</button></div>` : ''}
       ${dd ? `<div class="dockrow"><span class="docklbl">Dagene</span>${dd >= 2 ? '<button class="btn btn--s" data-days="slaa">Slå sammen til én historie</button>' : ''}<button class="btn btn--s" data-days="fornoyd">Fornøyd med dagene</button><button class="btn btn--s" data-days="fjern">Fjern dagene</button></div>` : ''}
       <span class="crumb">Klikk bilder og sider for å markere flere; Shift-klikk markerer alle bildene mellom. Ctrl/⌘-klikk (eller markeringsmodus) markerer bilder og sider rett i albumet. Esc fjerner markeringen.</span>`;
@@ -1483,6 +1511,7 @@ $('dock').addEventListener('click', e => {
   const ids = [...state.sel];
   if(a.dataset.act === 'fjern_markering'){ state.sel.clear(); refresh(); return; }
   if(a.dataset.act === 'stort'){ openLightbox(ids[0]); return; }
+  if(a.dataset.act === 'side'){ gatherOnPage(ids); return; }
   if(a.dataset.act === 'kandidat'){ ids.forEach(id => state.coverCands.add(id)); state.sel.clear(); toast(`${ids.length} ${ids.length === 1 ? 'bilde er' : 'bilder er'} kandidat til forsiden`); refresh(); return; }
   if(a.dataset.act === 'ta_bort') act('ta_bort', ids.filter(id => byId(id).selected));
   else if(a.dataset.act === 'ta_med') act('ta_med', ids.filter(id => !byId(id).selected));

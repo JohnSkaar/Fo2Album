@@ -79,6 +79,7 @@ Føringer fra eierens andre runde (4. oktober 2026):
 37. Revideringen må være rask: marker mange bilder, sider og dager samtidig, og utfør med ett trykk (fjern, nedprioriter, opprioriter, fjern sidene og bildene i dem osv.).
 
 38. Startsiden forblir kildesiden etter at en mappe er valgt: samme førstebilde, med «Lagt til» og «Lag utkast» under kortene, så flere kilder kan legges til først. Ingen årstall øverst; året velges i et felt («Album for»/«År», standard året med flest bilder). Albumutkastet viser bare gjennomgangen i sju punkter når den er startet, og deretter utkastet. Gjort i prototypen og appen.
+39. Når flere bilder er markert, kan de settes sammen på én side («Sett på én side»): bildene flyttes fra sidene de sto på, tas med om de ikke var med, og samles på en ny side i dagen til det første bildet (over 12 bilder fordeles på flere sider). Siden merkes «Fornøyd» så den beholdes i neste revisjon, og rammevalget åpnes. Kan angres. Gjort i prototypen; i appen kommer det sammen med markering og «Fornøyd» (krever lagring av låste sider).
 
 Status 36–37: gjort i prototypen. Kjernen: `DraftHints::merged_events`, `Draft::merge_suggestions`, `Decision::Opp`, `Action::Opp`/`SlaaSammen`. Appen viser ikke forslagene og markeringen ennå.
 
