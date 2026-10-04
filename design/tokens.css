@@ -1,0 +1,200 @@
+/* Pho2Album Design System v1 — generert fra Figma-filen "Pho2Album Design System" */
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Nunito+Sans:wght@400;600;700&display=swap');
+
+:root {
+  /* Primitives */
+  --terracotta-50: #FDF4F0;
+  --terracotta-100: #FAE3D8;
+  --terracotta-200: #F5C8B3;
+  --terracotta-300: #EFA98A;
+  --terracotta-400: #E58A63;
+  --terracotta-500: #D9714A;
+  --terracotta-600: #B8532F;
+  --terracotta-700: #9E4529;
+  --terracotta-800: #7A3520;
+  --terracotta-900: #5C2715;
+  --sand-0: #FFFDF9;
+  --sand-50: #FAF6F0;
+  --sand-100: #F2EBE1;
+  --sand-200: #E4D9CA;
+  --sand-300: #CDBFAB;
+  --sand-400: #B5A691;
+  --sand-500: #988A76;
+  --sand-600: #7A6C5B;
+  --sand-700: #5C5043;
+  --sand-800: #3D342A;
+  --sand-900: #241E18;
+  --sage-50: #F1F5F1;
+  --sage-100: #E3ECE3;
+  --sage-200: #C7D8C8;
+  --sage-300: #A5BFA7;
+  --sage-400: #88A68B;
+  --sage-500: #6E8F72;
+  --sage-600: #5A7A5E;
+  --sage-700: #4A6A4E;
+  --sage-800: #3A533D;
+  --sage-900: #2A3C2C;
+  --honey-50: #FDF7EA;
+  --honey-100: #FAEBC9;
+  --honey-200: #F5D894;
+  --honey-300: #EFC46A;
+  --honey-400: #E8B04B;
+  --honey-500: #D4952E;
+  --honey-600: #B07722;
+  --honey-700: #8A5B1C;
+  --honey-800: #654217;
+  --honey-900: #452D10;
+  --red-100: #FBE4E1;
+  --red-600: #B3382C;
+  --red-700: #8F2B22;
+  --base-white: #FFFFFF;
+  --base-black: #000000;
+
+  /* Semantiske farger (lys) */
+  --color-bg-canvas: var(--sand-50);
+  --color-bg-surface: var(--base-white);
+  --color-bg-subtle: var(--sand-100);
+  --color-bg-muted: var(--sand-200);
+  --color-bg-brand: var(--terracotta-600);
+  --color-bg-brand-hover: var(--terracotta-700);
+  --color-bg-brand-subtle: var(--terracotta-100);
+  --color-bg-secondary: var(--sage-100);
+  --color-bg-accent: var(--honey-100);
+  --color-bg-inverse: var(--sand-900);
+  --color-text-primary: var(--sand-900);
+  --color-text-secondary: var(--sand-700);
+  --color-text-tertiary: var(--sand-600);
+  --color-text-on-brand: var(--base-white);
+  --color-text-brand: var(--terracotta-700);
+  --color-text-secondary-brand: var(--sage-700);
+  --color-text-accent: var(--honey-700);
+  --color-text-inverse: var(--sand-0);
+  --color-text-disabled: var(--sand-400);
+  --color-border-default: var(--sand-200);
+  --color-border-strong: var(--sand-300);
+  --color-border-brand: var(--terracotta-600);
+  --color-border-focus: var(--terracotta-500);
+  --color-status-error: var(--red-600);
+  --color-status-error-subtle: var(--red-100);
+  --color-status-success: var(--sage-600);
+  --color-status-success-subtle: var(--sage-100);
+  --color-status-warning: var(--honey-600);
+  --color-status-warning-subtle: var(--honey-100);
+
+  /* Avstander */
+  --spacing-none: 0px;
+  --spacing-2xs: 2px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 48px;
+  --spacing-4xl: 64px;
+
+  /* Hjørner */
+  --radius-none: 0px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 999px;
+
+  /* Skygger */
+  --shadow-sm: 0 1px 2px rgba(36,30,24,.06), 0 1px 3px rgba(36,30,24,.08);
+  --shadow-md: 0 2px 4px rgba(36,30,24,.05), 0 6px 16px rgba(36,30,24,.10);
+  --shadow-lg: 0 4px 8px rgba(36,30,24,.06), 0 16px 40px rgba(36,30,24,.14);
+
+  /* Typografi */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Nunito Sans', system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    /* Mørk modus (forslag – ikke i Figma ennå pga. Starter-plan) */
+    --color-bg-canvas: var(--sand-900);
+    --color-bg-surface: var(--sand-800);
+    --color-bg-subtle: var(--sand-800);
+    --color-bg-muted: var(--sand-700);
+    --color-bg-brand: var(--terracotta-500);
+    --color-bg-brand-hover: var(--terracotta-400);
+    --color-bg-brand-subtle: var(--terracotta-900);
+    --color-bg-secondary: var(--sage-900);
+    --color-bg-accent: var(--honey-900);
+    --color-bg-inverse: var(--sand-50);
+    --color-text-primary: var(--sand-50);
+    --color-text-secondary: var(--sand-200);
+    --color-text-tertiary: var(--sand-400);
+    --color-text-on-brand: var(--sand-900);
+    --color-text-brand: var(--terracotta-300);
+    --color-text-secondary-brand: var(--sage-300);
+    --color-text-accent: var(--honey-300);
+    --color-text-inverse: var(--sand-900);
+    --color-text-disabled: var(--sand-600);
+    --color-border-default: var(--sand-700);
+    --color-border-strong: var(--sand-600);
+    --color-border-brand: var(--terracotta-500);
+    --color-border-focus: var(--terracotta-400);
+    --color-status-error: var(--red-100);
+    --color-status-error-subtle: var(--red-700);
+    --color-status-success: var(--sage-400);
+    --color-status-success-subtle: var(--sage-900);
+    --color-status-warning: var(--honey-400);
+    --color-status-warning-subtle: var(--honey-900);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+    --shadow-md: 0 6px 16px rgba(0,0,0,.45);
+    --shadow-lg: 0 16px 40px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"] {
+  /* Mørk modus (forslag – ikke i Figma ennå pga. Starter-plan) */
+  --color-bg-canvas: var(--sand-900);
+  --color-bg-surface: var(--sand-800);
+  --color-bg-subtle: var(--sand-800);
+  --color-bg-muted: var(--sand-700);
+  --color-bg-brand: var(--terracotta-500);
+  --color-bg-brand-hover: var(--terracotta-400);
+  --color-bg-brand-subtle: var(--terracotta-900);
+  --color-bg-secondary: var(--sage-900);
+  --color-bg-accent: var(--honey-900);
+  --color-bg-inverse: var(--sand-50);
+  --color-text-primary: var(--sand-50);
+  --color-text-secondary: var(--sand-200);
+  --color-text-tertiary: var(--sand-400);
+  --color-text-on-brand: var(--sand-900);
+  --color-text-brand: var(--terracotta-300);
+  --color-text-secondary-brand: var(--sage-300);
+  --color-text-accent: var(--honey-300);
+  --color-text-inverse: var(--sand-900);
+  --color-text-disabled: var(--sand-600);
+  --color-border-default: var(--sand-700);
+  --color-border-strong: var(--sand-600);
+  --color-border-brand: var(--terracotta-500);
+  --color-border-focus: var(--terracotta-400);
+  --color-status-error: var(--red-100);
+  --color-status-error-subtle: var(--red-700);
+  --color-status-success: var(--sage-400);
+  --color-status-success-subtle: var(--sage-900);
+  --color-status-warning: var(--honey-400);
+  --color-status-warning-subtle: var(--honey-900);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4);
+  --shadow-md: 0 6px 16px rgba(0,0,0,.45);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,.55);
+}
+
+/* Tekststiler */
+.text-display-large { font-family: var(--font-display); font-weight: 600; font-size: 56px; line-height: 64px; letter-spacing: -0.01em; }
+.text-display-medium { font-family: var(--font-display); font-weight: 600; font-size: 44px; line-height: 52px; letter-spacing: -0.01em; }
+.text-heading-h1 { font-family: var(--font-display); font-weight: 600; font-size: 36px; line-height: 44px; letter-spacing: -0.005em; }
+.text-heading-h2 { font-family: var(--font-display); font-weight: 600; font-size: 28px; line-height: 36px; letter-spacing: -0.005em; }
+.text-heading-h3 { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 30px; letter-spacing: 0em; }
+.text-heading-h4 { font-family: var(--font-body); font-weight: 700; font-size: 18px; line-height: 26px; letter-spacing: 0em; }
+.text-body-large { font-family: var(--font-body); font-weight: 400; font-size: 18px; line-height: 28px; letter-spacing: 0em; }
+.text-body-medium { font-family: var(--font-body); font-weight: 400; font-size: 16px; line-height: 24px; letter-spacing: 0em; }
+.text-body-small { font-family: var(--font-body); font-weight: 400; font-size: 14px; line-height: 20px; letter-spacing: 0em; }
+.text-label-large { font-family: var(--font-body); font-weight: 600; font-size: 16px; line-height: 24px; letter-spacing: 0em; }
+.text-label-medium { font-family: var(--font-body); font-weight: 600; font-size: 14px; line-height: 20px; letter-spacing: 0em; }
+.text-label-small { font-family: var(--font-body); font-weight: 700; font-size: 12px; line-height: 16px; letter-spacing: 0.02em; }
+.text-caption { font-family: var(--font-body); font-weight: 400; font-size: 12px; line-height: 16px; letter-spacing: 0em; }
