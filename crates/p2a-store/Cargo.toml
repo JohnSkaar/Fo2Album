@@ -1,5 +1,6 @@
 [package]
 name = "p2a-store"
+description = "Kryptert lokal lagring: katalog, familieprofil og miniatyrer."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,3 +12,23 @@ workspace = true
 
 [dependencies]
 p2a-core.workspace = true
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+sha2 = "0.10"
+getrandom = "0.3"
+zeroize = "1"
+thiserror = "2"
+serde.workspace = true
+serde_json.workspace = true
+
+# Hele databasen krypteres med SQLCipher. Mac bruker Apples CommonCrypto (ingen OpenSSL);
+# Windows trenger OpenSSL sitt kryptobibliotek (libcrypto), som bygges inn. Det brukes bare
+# til AES i SQLCipher, aldri til nettverk. Se docs/ARCHITECTURE.md.
+[target.'cfg(not(windows))'.dependencies]
+rusqlite = { version = "0.40", features = ["bundled-sqlcipher"] }
+
+[target.'cfg(windows)'.dependencies]
+rusqlite = { version = "0.40", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+[dev-dependencies]
+tempfile = "3"

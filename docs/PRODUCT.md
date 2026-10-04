@@ -30,7 +30,7 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 - **Oppskarping** tilbys for bilder brukeren vil fremheve; aldri automatisk, og originalen endres ikke.
 - **Kommentarer på utkastet** (bilde, side, person, hendelse, hele albumet). Strukturerte kommentarer justerer utvalget; fritekst lagres og vises igjen.
 - **Familieprofilen:** kryptert på brukerens maskin. Tar vare på personer, roller, fødselsdatoer, kommentarer og det appen har lært, så neste års album starter der dette slapp.
-- **Gjenoppretting:** en gjenopprettingsfrase og en kryptert sikkerhetskopi som familien selv oppbevarer, så familieprofilen ikke går tapt om maskinen gjør det.
+- **Gjenoppretting:** en gjenopprettingsnøkkel og en kryptert sikkerhetskopi som familien selv oppbevarer, så familieprofilen ikke går tapt om maskinen gjør det.
 - Eksport til trykkklar PDF og bestilling (kun PDF sendes).
 
 **Ikke med i v1:** kalendere, fotobøker for enkelthendelser, deling/samarbeid, mobilapp, nettbasert redigering, sky-lagring av prosjekter.

@@ -12,7 +12,7 @@
 | Apple Bilder | **PhotoKit-plugin (Swift) i v1**, som eget spor (M1b) rett etter M1 | iCloud Bilder på Mac er ikke en mappe; uten PhotoKit mister vi hovedkilden for Mac-familier med iPhone |
 | Minimum OS | macOS 12, Windows 10 22H2 / 11 (arbeidshypotese, ikke bekreftet) | |
 | Kryptering | **Fra M1**: familieprofil, ansiktsdata, kommentarer, poeng og miniatyrer krypteres på brukerens maskin | Personopplysninger skal ligge hos brukeren, og kryptering er mye vanskeligere å legge på i etterkant |
-| Gjenoppretting | **Gjenopprettingsfrase + kryptert sikkerhetskopi** som familien selv oppbevarer | Familieprofilen skal kunne brukes år etter år; uten gjenoppretting går den tapt med maskinen |
+| Gjenoppretting | **Gjenopprettingsnøkkel + kryptert sikkerhetskopi** som familien selv oppbevarer | Familieprofilen skal kunne brukes år etter år; uten gjenoppretting går den tapt med maskinen |
 | Kunde-ID | Nøkkelpar laget lokalt; den offentlige nøkkelen er kunde-ID. Ingen konto, e-post eller passord hos oss | Minimale opplysninger hos oss (se «Personvern og sikkerhet») |
 
 ## Personvern og sikkerhet
@@ -21,8 +21,12 @@
 
 - **Hva:** familieprofilen (personer, roller, fødselsdatoer, kommentarer, overstyringer, lærte vekter), ansiktsdata (embeddings, klynger), poeng og forklaringer, og miniatyrer (de er bilder av barna). Selve bildene ligger urørt der de var.
 - **Hovednøkkel:** tilfeldig 256-bits nøkkel laget ved første oppstart. Lagres i operativsystemets nøkkelring (Nøkkelring på Mac, Credential Manager/DPAPI på Windows), så brukeren slipper passord til daglig.
-- **Gjenoppretting:** ved første oppstart vises en gjenopprettingsfrase (norsk ordliste) som familien skriver ned. Hovednøkkelen pakkes også inn med en nøkkel avledet fra frasen (Argon2id). En kryptert sikkerhetskopi av familieprofilen kan lagres hvor familien vil, f.eks. i egen Dropbox; den kan bare åpnes med frasen.
-- **Kryptering:** autentisert kryptering (XChaCha20-Poly1305 eller AES-256-GCM). Valget mellom SQLCipher og kryptering på applikasjonsnivå (RustCrypto, MIT/Apache) tas i M1. Merk: SQLCipher trenger en kryptobackend, og `openssl` er forbudt i `deny.toml`.
+- **Gjenoppretting:** ved første oppstart vises en gjenopprettingsnøkkel som familien skriver ned: 28 tegn i grupper på fire (`ABCD-EFGH-…`, Crockford base32, 128 tilfeldige bit pluss kontrollsum som fanger skrivefeil). Valgt fremfor en ordliste fordi den er språknøytral, kort og ikke krever en kvalitetssikret norsk ordliste; formatet er versjonert og kan byttes. Hovednøkkelen pakkes inn med en nøkkel avledet fra gjenopprettingsnøkkelen (HKDF-SHA256; 128 tilfeldige bit trenger ingen treg passord-KDF) og lagres i `nokkel.json`. En kryptert sikkerhetskopi (databasen + `nokkel.json`) kan lagres hvor familien vil, f.eks. i egen Dropbox; den kan bare åpnes med gjenopprettingsnøkkelen.
+- **Kryptering (vedtatt i M1):**
+  - Databasen: **SQLCipher** (hele filen kryptert, AES-256) via `rusqlite`. Mac bruker Apples CommonCrypto. Windows bygger inn OpenSSL sitt kryptobibliotek (`openssl-sys`, vendored), som bare brukes til AES i SQLCipher. Høynivåpakken `openssl` er fortsatt forbudt.
+  - Miniatyrer og nøkkelfil: **XChaCha20-Poly1305** (RustCrypto), med innholdshashen som AAD så filer ikke kan byttes om.
+  - Undernøkler avledes fra hovednøkkelen med HKDF-SHA256, én per formål.
+  - Testet: ingen klartekst (navn, «SQLite format 3», miniatyrinnhold) finnes i filene på disken (`crates/p2a-store/tests/vault.rs`).
 - **«Slett alle data»** sletter databasen, miniatyrene og nøkkelen i nøkkelringen.
 
 ### Hos oss (minimalt)
@@ -71,6 +75,10 @@ Sjekkes automatisk av `cargo deny check licenses` (tillatte lisenser står i `de
 | Nunito Sans (`@fontsource/nunito-sans`) | Font, UI | SIL OFL 1.1 | Som over |
 | `cssparser`, `selectors`, `dtoa-short`, `option-ext` (via Tauri) | Transitive | MPL-2.0 | Svak copyleft på filnivå; greit så lenge vi ikke endrer filene |
 | ICU-pakker (via Tauri) | Transitive | Unicode-3.0 | |
+| SQLCipher Community Edition (via `rusqlite`/`libsqlite3-sys`, `bundled-sqlcipher`) | Kryptert database | BSD-3-Clause (SQLite selv: public domain) | Lisensteksten må følge med appen. cargo-deny ser ikke denne, fordi koden ligger inne i `libsqlite3-sys` |
+| OpenSSL 3 (bare Windows, via `openssl-sys`/`openssl-src`) | Kryptobackend for SQLCipher | Apache-2.0 | Lisensteksten må følge med appen |
+| `chacha20poly1305`, `hkdf`, `sha2`, `zeroize`, `getrandom` (RustCrypto) | Kryptering av miniatyrer og nøkkelfil | MIT OR Apache-2.0 | |
+| `keyring` | Nøkkelring på Mac og Windows (app-skallet) | MIT OR Apache-2.0 | |
 
 Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 

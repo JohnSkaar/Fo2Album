@@ -3,6 +3,10 @@
 //! Denne pakken er ren og deterministisk. Den gjør ingen I/O og har aldri
 //! nettverkstilgang (håndheves av `p2a-policy` og `deny.toml`).
 
+pub mod model;
+
+pub use model::{CommentKind, ContentHash, DateSource, Role, SourceKind, TakenAt};
+
 /// Versjonen av kjernen, vist i appen og logget i `eval/RESULTS.md`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
