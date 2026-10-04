@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! p2a bench [--antall 1000] [--bredde 2048] [--mappe STI]
-//! p2a demo --data STI [--antall 200]
+//! p2a demo --data STI [--antall 200] [--ansikter MAPPE]
 //! p2a les-inn --mappe STI [--kilde pc|dropbox|icloud|google_disk] [--data STI]
 //! p2a eval lag-gullsett --pdf ALBUM.pdf --aar 2010 --navn familie-2010 [--data STI]
 //! p2a eval liste [--data STI]
@@ -54,7 +54,7 @@ fn main() {
 
 const USAGE: &str = "Bruk:
   p2a bench [--antall N] [--bredde PX] [--mappe STI]
-  p2a demo --data STI [--antall N]
+  p2a demo --data STI [--antall N] [--ansikter MAPPE]
   p2a les-inn --mappe STI [--kilde pc|dropbox|icloud|google_disk] [--data STI]
   p2a eval lag-gullsett --pdf ALBUM.pdf --aar ÅR --navn NAVN [--data STI]
   p2a eval liste [--data STI]
@@ -359,6 +359,11 @@ fn generate(dir: &Path, count: u32, width: u32, height: u32) -> Result<u64, Stri
     Ok(sizes.iter().sum())
 }
 
+fn label_or(dir: &std::path::Path) -> String {
+    dir.file_name()
+        .map_or_else(|| "Bilder".into(), |n| n.to_string_lossy().into())
+}
+
 fn demo(args: &[String]) -> Result<(), String> {
     let data = PathBuf::from(flag(args, "--data").ok_or("mangler --data STI")?);
     let count: u32 = flag(args, "--antall")
@@ -459,6 +464,13 @@ fn demo(args: &[String]) -> Result<(), String> {
     store
         .add_source(SourceKind::Icloud, &icloud, "iCloud Photos")
         .map_err(|e| e.to_string())?;
+    // Ekte bilder med ansikter (for «Hvem er med?»), f.eks. egne bilder. Kopieres ikke.
+    if let Some(dir) = flag(args, "--ansikter") {
+        let dir = PathBuf::from(dir);
+        store
+            .add_source(SourceKind::Pc, &dir, &label_or(&dir))
+            .map_err(|e| e.to_string())?;
+    }
     println!("Demodata i {}", data.display());
     println!(
         "Gjenopprettingsnøkkel: {}",

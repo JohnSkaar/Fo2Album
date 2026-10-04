@@ -2,7 +2,7 @@
  * All tekst i grensesnittet, på norsk bokmål (CLAUDE.md, «Språk og tekst»).
  * Du-form, varm og konkret, setningsstor bokstav. Si aldri «last opp bildene».
  */
-import type { Analysefase, Begrunnelse, KildeType, Laerdom, Svar } from "./api";
+import type { Analysefase, Begrunnelse, KildeType, Laerdom, Rolle, Svar } from "./api";
 import { GRUNNPRIS, KR_PER_SIDE, SIDETRINN } from "./pris";
 
 const tall = new Intl.NumberFormat("nb-NO");
@@ -31,6 +31,7 @@ export const tekster = {
   nav: {
     album: "Album",
     alleBilder: "Alle bilder",
+    hvemErMed: "Hvem er med?",
     albumutkast: "Albumutkast",
     ikkeLaget: "Ikke laget ennå",
     sider: (n: number) => `Omtrent ${antall(n, "side", "sider")}`,
@@ -270,11 +271,51 @@ export const tekster = {
       liker_stemningsbilder: "Dere liker stemningsbilder uten personer.",
     } satisfies Record<Laerdom, string>,
   },
+  personer: {
+    tittel: "Hvem er med?",
+    ingress:
+      "Appen har funnet de samme ansiktene i mange bilder. Skriv hvem de er, så får de rett plass i albumet: barna får omtrent like mange bilder i hver historie, og turer uten barn kjennes igjen.",
+    trygt: "Ansiktene og navnene lagres kryptert på denne maskinen og sendes aldri noe sted.",
+    venter: (n: number) =>
+      `Appen leter fortsatt etter ansikter i ${antall(n, "bilde", "bilder")}. Flere personer kommer etter hvert.`,
+    ingen:
+      "Appen har ikke funnet noen personer i flere bilder ennå. Velg bildemapper først, så leter den etter ansikter mens bildene hentes inn.",
+    navngitt: "Personer dere har navngitt",
+    ukjent: "Hvem er dette?",
+    ukjentInfo: "Skriv navnet, eller velg en person dere allerede har navngitt.",
+    antall: (faces: number, photos: number) =>
+      `${antall(faces, "ansikt", "ansikter")} i ${antall(photos, "bilde", "bilder")}`,
+    navn: "Navn",
+    rolle: "Rolle",
+    finnes: "Eller samme person som",
+    velgPerson: "Velg person",
+    lagre: "Lagre",
+    ikkeViktig: "Ikke viktig",
+    ikkeViktigInfo: "Fremmede eller folk i bakgrunnen: telles ikke i albumet.",
+    ikkeSamme: (navn: string) => `Ikke ${navn}`,
+    ikkeSammeInfo: "Ta dette ansiktet ut av gruppen",
+    endre: "Endre",
+    lagret: (navn: string) => `Lagret. Appen kjenner nå igjen ${navn}.`,
+    ignorert: "Gruppen telles ikke lenger i albumet.",
+    flyttet: "Ansiktet er tatt ut av gruppen.",
+    mangler: "Skriv et navn først.",
+    roller: {
+      barn: "Barn i familien",
+      kjernefamilie: "Forelder",
+      besteforeldre: "Besteforelder",
+      naer_familie: "Nær familie",
+      venn: "Venn",
+      annen: "Annen",
+    } satisfies Record<Rolle, string>,
+  },
   innlesing: {
     skanner: "Går gjennom mappene …",
     leser: (done: number, total: number) =>
       `Leser bilder fra maskinen … ${fmt(done)} av ${fmt(total)}`,
     dubletter: "Leter etter samme bilde i flere kilder …",
+    ansikter: (done: number, total: number) =>
+      `Finner ansiktene i bildene … ${fmt(done)} av ${fmt(total)}`,
+    personer: "Kjenner igjen de samme personene på tvers av bildene …",
     avbryt: "Stopp",
     ferdig: (nye: number) =>
       nye === 0 ? "Alt er oppdatert" : `Fant ${antall(nye, "nytt bilde", "nye bilder")}`,

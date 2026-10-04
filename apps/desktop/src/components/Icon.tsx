@@ -17,6 +17,14 @@ const paths = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  people: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3 20a6 6 0 0 1 12 0" />
+      <circle cx="17" cy="9" r="2.4" />
+      <path d="M15.5 14.2A4.8 4.8 0 0 1 21 19" />
+    </>
+  ),
   folder: <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
   key: (

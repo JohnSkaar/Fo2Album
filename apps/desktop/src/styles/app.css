@@ -941,3 +941,114 @@ h3 {
     transition: none;
   }
 }
+
+/* ---------- Hvem er med? ---------- */
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  max-width: 1100px;
+}
+.people__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+.people__lead {
+  color: var(--color-text-secondary);
+  font-size: 16px;
+  line-height: 24px;
+  max-width: 70ch;
+}
+.people__hint {
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+.people__h {
+  font: 600 20px/28px var(--font-display);
+  margin-top: var(--spacing-md);
+}
+.pgroups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--spacing-md);
+}
+.pgroup {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+.pgroup__faces {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--spacing-xs);
+}
+.pgroup__face {
+  position: relative;
+}
+.face {
+  display: block;
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-muted);
+}
+.face img {
+  position: absolute;
+  max-width: none;
+  height: auto;
+}
+.pgroup__out {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  cursor: pointer;
+}
+.pgroup__face:hover .pgroup__out,
+.pgroup__out:focus-visible {
+  opacity: 1;
+}
+.pgroup__name {
+  font: 600 18px/24px var(--font-display);
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pgroup__role {
+  font: 600 12px/18px var(--font-body);
+  background: var(--color-bg-brand-subtle);
+  color: var(--color-text-brand);
+  border-radius: var(--radius-full);
+  padding: 1px 8px;
+}
+.pgroup__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+.pgroup__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}

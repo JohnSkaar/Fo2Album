@@ -3,6 +3,9 @@ import { tekster } from "../tekster";
 import { Icon } from "./Icon";
 import { Logo } from "./Logo";
 
+/** Hovedvisningene i menyen. */
+export type Visning = "utkast" | "alle" | "personer";
+
 export function Sidebar({
   sources,
   onAddFolder,
@@ -20,8 +23,8 @@ export function Sidebar({
   /** Før lagringen er åpnet vises bare logo og låsmerknad. */
   locked: boolean;
   /** Valgt visning; `null` før det finnes bildekilder. */
-  view: "utkast" | "alle" | null;
-  onView: (v: "utkast" | "alle") => void;
+  view: Visning | null;
+  onView: (v: Visning) => void;
   /** Sider i utkastet, eller `null` før det er laget. */
   draftPages: number | null;
 }) {
@@ -56,6 +59,16 @@ export function Sidebar({
             >
               <Icon name="image" />
               <span className="grow">{tekster.nav.alleBilder}</span>
+            </button>
+            <button
+              type="button"
+              className="item"
+              aria-current={view === "personer" ? "page" : undefined}
+              disabled={view === null}
+              onClick={() => onView("personer")}
+            >
+              <Icon name="people" />
+              <span className="grow">{tekster.nav.hvemErMed}</span>
             </button>
           </div>
           <div className="grp">

@@ -68,6 +68,8 @@ pub struct DraftConfig {
     pub blurry_sharp: f32,
     /// Andel hudtoner som regnes som «personer i bildet» (til M4).
     pub people_skin: f32,
+    /// Andel hudtoner som regnes som personer når ansiktene er gått gjennom uten funn.
+    pub people_skin_without_face: f32,
     /// Tillegg i poeng for bilder med personer.
     pub people_bonus: f32,
     /// Hendelser der færre enn denne andelen har personer, er turer i naturen.
@@ -102,6 +104,7 @@ impl Default for DraftConfig {
             blurry_rank: 0.2,
             blurry_sharp: 0.55,
             people_skin: 0.02,
+            people_skin_without_face: 0.08,
             people_bonus: 0.3,
             nature_people_share: 0.25,
             child_balance: 0.3,
@@ -327,8 +330,13 @@ pub fn make_draft(
                 .filter(|f| f.counts())
                 .filter_map(|f| Some((f.person.or(f.group)?, f.h * f.sharpness)))
                 .collect();
+            // Ansiktene avgjør. Mye hudtoner uten ansikt (profil, bakfra, små ansikter som
+            // ikke ble funnet) teller også som personer.
             let people = match faces {
-                Some(fs) => Some(fs.iter().any(FaceInfo::counts)),
+                Some(fs) => Some(
+                    fs.iter().any(FaceInfo::counts)
+                        || raw.is_some_and(|q| q.skin >= cfg.people_skin_without_face),
+                ),
                 None => raw.map(|q| q.skin >= cfg.people_skin),
             };
             let mut q = rel.map_or(0.5, |q| prefs.quality(&q));
@@ -1743,10 +1751,10 @@ mod tests {
 
     #[test]
     fn faces_decide_people_over_skin_tones() {
-        // Hudtoner, men ansiktene er gått gjennom og ingen ble funnet: ikke personer.
+        // Litt hudtoner, men ansiktene er gått gjennom og ingen ble funnet: ikke personer.
         let mut photos = day(0, 8, 2, 40);
         for p in &mut photos {
-            p.quality.as_mut().unwrap().skin = 0.2;
+            p.quality.as_mut().unwrap().skin = 0.05;
         }
         let none = DraftHints {
             faces: photos.iter().map(|p| (p.hash, vec![])).collect(),

@@ -116,6 +116,15 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
+    /// Endrer navn og rolle for en person.
+    pub fn update_person(&self, id: i64, name: &str, role: Role) -> Result<(), StoreError> {
+        self.conn.execute(
+            "UPDATE persons SET name = ?2, role = ?3 WHERE id = ?1",
+            params![id, name, role.as_str()],
+        )?;
+        Ok(())
+    }
+
     pub fn set_setting(&self, key: &str, value: &str) -> Result<(), StoreError> {
         self.conn.execute(
             "INSERT INTO settings (key, value) VALUES (?1, ?2)

@@ -11,16 +11,20 @@ import {
   type Kilde,
   type KildeType,
   type Handling,
+  type Ansiktsgruppe,
+  type Personer,
+  type Rolle,
   type Sammendrag,
   type Svar,
   type Utkast,
 } from "./api";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { DraftScreen } from "./components/DraftScreen";
+import { PeopleScreen } from "./components/PeopleScreen";
 import { PickScreen } from "./components/PickScreen";
 import { RecoverScreen } from "./components/RecoverScreen";
 import { RecoveryKeyScreen } from "./components/RecoveryKeyScreen";
-import { Sidebar } from "./components/Sidebar";
+import { Sidebar, type Visning } from "./components/Sidebar";
 import { StartScreen } from "./components/StartScreen";
 import { Toast } from "./components/Toast";
 import { Welcome } from "./components/Welcome";
@@ -63,7 +67,8 @@ export function App() {
   const [rapport, setRapport] = useState<Innlesingsrapport | null>(null);
   const [bekreftSlett, setBekreftSlett] = useState(false);
   // Albumutkastet er hovedvisningen; «Alle bilder» er for den som vil se alt.
-  const [visning, setVisning] = useState<"utkast" | "alle">("utkast");
+  const [visning, setVisning] = useState<Visning>("utkast");
+  const [personer, setPersoner] = useState<Personer | null>(null);
   const [utkast, setUtkast] = useState<Utkast | null>(null);
   const [analyse, setAnalyse] = useState<Analysefase | null>(null);
   // Valgt år leses av lastKatalog, som ikke skal lages på nytt hver gang året endres.
@@ -146,6 +151,7 @@ export function App() {
         else if (r.report) visMelding(tekster.innlesing.ferdig(r.report.new_photos));
         else visMelding(tekster.feil.ukjent ?? "");
         void lastKatalog();
+        void api.personer().then(setPersoner, () => undefined);
       }),
     ];
     (async () => {
@@ -286,6 +292,39 @@ export function App() {
     }
   };
 
+  // ---------- Hvem er med? ----------
+  useEffect(() => {
+    if (visning !== "personer" || fase.type !== "klar") return;
+    api.personer().then(setPersoner, (e) => visMelding(feiltekst(e)));
+  }, [visning, fase.type, visMelding]);
+
+  const navngi = async (g: Ansiktsgruppe, navn: string, rolle: Rolle, personId: number | null) => {
+    if (!navn.trim() && personId === null) return visMelding(tekster.personer.mangler);
+    try {
+      setPersoner(await api.navngiGruppe(g.group, navn, rolle, personId));
+      const kjent = personer?.persons.find((p) => p.id === personId)?.name;
+      visMelding(tekster.personer.lagret(navn.trim() || kjent || ""));
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+  const ignorer = async (g: Ansiktsgruppe) => {
+    try {
+      setPersoner(await api.ignorerGruppe(g.group));
+      visMelding(tekster.personer.ignorert);
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+  const flytt = async (faceId: number) => {
+    try {
+      setPersoner(await api.flyttAnsikt(faceId, null));
+      visMelding(tekster.personer.flyttet);
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
   // ---------- Visning ----------
   let innhold: React.ReactNode = null;
   switch (fase.type) {
@@ -321,6 +360,14 @@ export function App() {
             onYear={(y) => void velgAar(y)}
             ingest={fremdrift}
             onMake={() => void lagUtkast()}
+          />
+        ) : visning === "personer" ? (
+          <PeopleScreen
+            people={personer}
+            thumbUrl={api.miniatyrUrl}
+            onName={(g, n, r, p) => void navngi(g, n, r, p)}
+            onIgnore={(g) => void ignorer(g)}
+            onMove={(f) => void flytt(f)}
           />
         ) : visning === "utkast" ? (
           <DraftScreen

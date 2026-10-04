@@ -39,7 +39,7 @@ impl AppState {
         }
     }
 
-    fn store(&self) -> Result<MutexGuard<'_, Option<Store>>, CommandError> {
+    pub(crate) fn store(&self) -> Result<MutexGuard<'_, Option<Store>>, CommandError> {
         let guard = self.store.lock().unwrap_or_else(|e| e.into_inner());
         if guard.is_none() {
             return Err(CommandError::new("ikke_aapen", "lagringen er ikke åpnet"));
@@ -62,7 +62,7 @@ pub struct CommandError {
 }
 
 impl CommandError {
-    fn new(kode: &'static str, melding: impl Into<String>) -> Self {
+    pub(crate) fn new(kode: &'static str, melding: impl Into<String>) -> Self {
         CommandError {
             kode,
             melding: melding.into(),
@@ -83,7 +83,7 @@ impl From<StoreError> for CommandError {
     }
 }
 
-type CmdResult<T> = Result<T, CommandError>;
+pub(crate) type CmdResult<T> = Result<T, CommandError>;
 
 // ---------- Lagring og nøkler ----------
 

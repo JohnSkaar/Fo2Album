@@ -206,6 +206,7 @@ describe("albumutkast", () => {
         everyday: false,
         looksLikeTrip: false,
         adultTrip: false,
+        adultTripGuess: false,
         layout: [{ kind: "luft", photos: [h("a")] }],
       },
     ],

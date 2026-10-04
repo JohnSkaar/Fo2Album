@@ -52,7 +52,7 @@ export interface Bilde {
 }
 
 export interface Fremdrift {
-  phase: "skanner" | "leser" | "dubletter";
+  phase: "skanner" | "leser" | "dubletter" | "ansikter" | "personer";
   done: number;
   total: number;
 }
@@ -126,8 +126,10 @@ export interface UtkastHendelse {
   everyday: boolean;
   /** Ser ut som en tur over flere dager. */
   looksLikeTrip: boolean;
-  /** Brukeren har sagt at dette er en tur uten barn. */
+  /** Tur uten barn: brukeren har sagt det, eller ingen av barna er på bildene. */
   adultTrip: boolean;
+  /** Appen så selv at ingen av barna er med (brukeren har ikke svart ennå). */
+  adultTripGuess: boolean;
   /** Sidene historien får. */
   layout: Side[];
 }
@@ -192,6 +194,44 @@ export type Svar =
   | "uviktig_dag"
   | "stemning";
 
+/** Roller i familieprofilen. */
+export type Rolle = "barn" | "kjernefamilie" | "besteforeldre" | "naer_familie" | "venn" | "annen";
+
+/** Et ansikt i et bilde: boksen er andeler (0–1) av bildet. */
+export interface Ansikt {
+  faceId: number;
+  /** Bildet ansiktet er i. */
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** En gruppe ansikter appen mener er samme person. */
+export interface Ansiktsgruppe {
+  group: number;
+  personId: number | null;
+  name: string | null;
+  role: Rolle | null;
+  faces: number;
+  photos: number;
+  samples: Ansikt[];
+}
+
+export interface Person {
+  id: number;
+  name: string;
+  role: Rolle;
+}
+
+export interface Personer {
+  groups: Ansiktsgruppe[];
+  persons: Person[];
+  /** Bilder der ansiktene ikke er funnet ennå. */
+  pending: number;
+}
+
 /** Feil fra Rust-kjernen: en stabil kode og en teknisk melding. */
 export interface Kommandofeil {
   kode: string;
@@ -240,4 +280,13 @@ export const api = {
     invoke<number>("choose_photo", { year, action, id, other: other ?? null }),
   svarHvorfor: (feedbackId: number, reason: Svar | null) =>
     invoke<Laert>("answer_why", { feedbackId, reason }),
+
+  personer: () => invoke<Personer>("face_groups"),
+  /** Gir gruppen navn og rolle; med `personId` slås den inn i en person som finnes. */
+  navngiGruppe: (group: number, name: string, role: Rolle, personId: number | null = null) =>
+    invoke<Personer>("name_face_group", { group, name, role, personId }),
+  ignorerGruppe: (group: number) => invoke<Personer>("ignore_face_group", { group }),
+  /** Tar ett ansikt ut av gruppen (`personId` null) eller flytter det til en person. */
+  flyttAnsikt: (faceId: number, personId: number | null) =>
+    invoke<Personer>("move_face", { faceId, personId }),
 };
