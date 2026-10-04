@@ -3,6 +3,7 @@
  * Du-form, varm og konkret, setningsstor bokstav. Si aldri «last opp bildene».
  */
 import type { Analysefase, Begrunnelse, KildeType, Laerdom, Svar } from "./api";
+import { GRUNNPRIS, KR_PER_SIDE, SIDETRINN } from "./pris";
 
 const tall = new Intl.NumberFormat("nb-NO");
 /** 8412 → «8 412» */
@@ -162,10 +163,14 @@ export const tekster = {
   pris: {
     naa: (sider: number, kr: number) =>
       `Albumet er nå på ${antall(sider, "side", "sider")} og koster ${fmt(kr)} kr.`,
-    trinn:
-      "Prisen går i trinn på 50 sider. Vil du ha et mindre album, krymper appen alle historiene litt, men hver hendelse beholder minst én side.",
-    hele: (sider: number, kr: number) => `Hele historien: ${fmt(sider)} sider · ${fmt(kr)} kr`,
-    valg: (sider: number, kr: number) => `${fmt(sider)} sider · ${fmt(kr)} kr`,
+    juster:
+      "Juster antall sider etter ønske. Færre sider: alle historiene krymper litt, men hver dag beholder minst én side. Flere sider: flere bilder og mer plass til historiene.",
+    ned: (sider: number, kr: number) => `↓ ${fmt(sider)} sider · ${fmt(kr)} kr`,
+    opp: (sider: number, kr: number) => `↑ ${fmt(sider)} sider · ${fmt(kr)} kr`,
+    forslag: (sider: number, kr: number) => `Appens forslag: ${fmt(sider)} sider · ${fmt(kr)} kr`,
+    eget: "Eget antall",
+    lagPaaNytt: "Lag på nytt",
+    modell: `Prisen (foreløpig): perm ${fmt(GRUNNPRIS)} kr + ${KR_PER_SIDE} kr per side, regnet i trinn på ${SIDETRINN} sider.`,
     etikett: "Velg størrelse på albumet",
   },
   sider: {

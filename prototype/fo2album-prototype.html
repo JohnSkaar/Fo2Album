@@ -228,6 +228,9 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
 .ask-inline span{flex:1 1 320px}
 .kindrow .chip{font-size:12px;padding:4px 10px}
 .dock .xn{min-width:24px;text-align:center}
+.sizes{align-items:center}
+.ownsize{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:600}
+.ownsize input{width:80px;font:600 14px var(--body);padding:6px 8px;border:1.5px solid var(--border-strong);border-radius:10px}
 .added{display:flex;flex-direction:column;gap:10px;width:100%;background:var(--bg-surface);border:1.5px solid var(--border-default);border-radius:16px;padding:16px 18px}
 .added ul{margin:0;padding-left:18px}
 .covers2{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:14px;padding:12px 16px}
@@ -607,7 +610,9 @@ const CFG = { burst: 20e3, simMs: 600e3, gap: 3*3600e3, evMin: 3, ppsq: 0.6, max
    blir albumet større, foreslår appen å redusere etter at forslaget er sett. */
 const MAX_SIDER = 500;
 const PREF0 = { ws: 0.5, we: 0.3, wc: 0.2, imp: 0.75, dens: 1, ham: 10, mood: 0.9 };
-const KR_PER_SIDE = 4, SIDETRINN = 50;
+/* Prismodell (foreløpig, plassholdere til prisene er avklart med trykkeriet): grunnpris for
+   permen pluss en pris per side, regnet i trinn. Endres bare her. */
+const GRUNNPRIS = 300, KR_PER_SIDE = 4, SIDETRINN = 50;
 const LOG_KEY = 'fo2album-laering';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function loadLog(){ try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch(e){ return []; } }
@@ -652,7 +657,7 @@ function lessons(p){
   return out;
 }
 const prisTrinn = s => Math.max(SIDETRINN, Math.ceil(s / SIDETRINN) * SIDETRINN);
-const pris = s => prisTrinn(s) * KR_PER_SIDE;
+const pris = s => GRUNNPRIS + prisTrinn(s) * KR_PER_SIDE;
 const kr = n => n.toLocaleString('nb-NO') + ' kr';
 const aspect = p => p && p.w && p.h ? p.w / p.h : 4/3;
 const hasPeople = p => p.q && p.q.skin >= CFG.skin;
@@ -920,6 +925,7 @@ function reasonsFor(ana, g){
     d.reason.set(id, r); if(rel != null) d.related.set(id, items[rel].p.id); else d.related.delete(id);
   });
 }
+function scaledPages(g, sc){ const n = naturalPages(g) * sc; return Math.max(1, sc > 1 ? Math.round(n) : Math.floor(n)); }
 /* Lager en ny revisjon. Sider brukeren er fornøyd med, beholdes som de er. */
 function makeDraft(cap){
   const ana = prepare(); if(!ana) return null;
@@ -927,7 +933,9 @@ function makeDraft(cap){
   const lockedPages = [...state.locked.values()];
   const fixed = new Set(lockedPages.flatMap(lp => lp.ids));
   let scale = 1;
-  if(cap) for(let k = 0; k <= 19; k++){ scale = 1 - k*.05; if(groups.reduce((a, g) => a + Math.max(1, Math.floor(naturalPages(g)*scale)), 0) <= cap) break; }
+  // Ønsket antall sider (ned eller opp): skalaen som gir sidetallet nærmest ønsket.
+  const pagesAt = sc => groups.reduce((a, g) => a + scaledPages(g, sc), 0);
+  if(cap){ let best = Infinity; for(let k = 4; k <= 60; k++){ const sc = k*.05, diff = Math.abs(pagesAt(sc) - cap); if(diff < best){ best = diff; scale = sc; } } }
   const kept = [...(state.draft?.reason ?? new Map())].filter(([, r]) => r === 'dag_fjernet');
   const draft = { reason: new Map(kept), related: new Map(), cap: cap || null, events: [], revision: (state.draft?.revision ?? 0) + 1 };
   state.draft = draft;
@@ -937,10 +945,12 @@ function makeDraft(cap){
     const mine = lockedPages.filter(lp => lp.ids.some(id => g.ids.has(id)));
     const keep = mine.map(lp => ({ id: lp.id, kind: lp.kind, tpl: lp.tpl, ids: lp.ids.filter(id => g.ids.has(id)), locked: true }));
     keep.forEach(pg => pg.ids.forEach(id => byId(id).selected = true));
-    const target = Math.max(1, Math.floor(naturalPages(g) * scale));
+    const target = scaledPages(g, scale);
     const left = Math.max(mine.length ? 0 : 1, target - keep.length);
     const pool = g.m.filter(i => !fixed.has(items[i].p.id));
-    const quota = left ? Math.max(1, Math.round(Math.min(left*CFG.ppp*ana.prefs.dens, Math.ceil(pool.length*CFG.maxShare)))) : 0;
+    // Flere sider gir plass til en større andel av bildene.
+    const share = Math.min(.9, CFG.maxShare * Math.max(1, scale));
+    const quota = left ? Math.max(1, Math.round(Math.min(left*CFG.ppp*ana.prefs.dens, Math.ceil(pool.length*share)))) : 0;
     const chosen = quota ? selectFor(ana, g, pool, quota) : [];
     chosen.forEach(i => items[i].p.selected = true);
     const fresh = chosen.length ? layoutFor(ana, g, chosen, left) : [];
@@ -1178,14 +1188,22 @@ function renderDraft(){
     return;
   }
   const pages = draftPages(), included = visible().filter(p => p.selected).length;
-  const tiers = [{ cap: null, s: d.fullPages }]; for(let t = prisTrinn(d.fullPages) - SIDETRINN; t >= SIDETRINN && tiers.length < 4; t -= SIDETRINN) tiers.push({ cap: t, s: t });
+  // Justering av sidetall etter gjennomkjøringen, både ned og opp, i trinn.
+  // Trinnene rundt dagens sidetall: to under og to over (grensene der prisen endres).
+  const below = Math.ceil(pages / SIDETRINN) * SIDETRINN - SIDETRINN, above = Math.floor(pages / SIDETRINN) * SIDETRINN + SIDETRINN;
+  const steps = [below - SIDETRINN, below, above, above + SIDETRINN].filter(t => t >= SIDETRINN && t !== pages);
   const les = lessons(learn(loadLog())), log = loadLog();
   const nLocked = draftPagesFlat().filter(pg => pg.locked).length;
   const over = pages > MAX_SIDER ? [MAX_SIDER, MAX_SIDER - SIDETRINN, MAX_SIDER - 2*SIDETRINN] : [];
   let html = `<div class="sum"><p><b>${included} bilder på ${pages} sider</b>, fra ${d.events.filter(e => e.pages.length).length} dager og hendelser. <span class="crumb">Revisjon ${d.revision}${nLocked ? ` · ${nLocked} ${nLocked === 1 ? 'side' : 'sider'} du er fornøyd med` : ''}</span></p><button class="btn btn--p" data-fs="0">Vis albumet i helskjerm</button></div>
   ${over.length ? `<div class="price over"><b>Albumet er på ${pages} sider. Trykkeriet tar foreløpig maks ${MAX_SIDER} sider i ett album.</b><span class="crumb">Se gjerne gjennom forslaget først. Velg så hvor mange sider albumet skal ha; alle historiene krymper litt, og sidene du er fornøyd med, beholdes.</span><div class="chips">${over.map(t => `<button class="chip" data-cap="${t}">${t} sider · ${kr(pris(t))}</button>`).join('')}</div></div>` : ''}
-  <div class="price"><b>Albumet er nå på ${pages} sider og koster ${kr(pris(pages))}.</b><span class="crumb">Prisen går i trinn på ${SIDETRINN} sider (${KR_PER_SIDE} kr per side). Vil du ha et mindre album, krymper appen alle historiene litt, men hver dag beholder minst én side.</span>
-  <div class="chips">${tiers.map(t => `<button class="chip" data-cap="${t.cap ?? ''}" aria-pressed="${t.cap === d.cap}">${t.cap === null ? `Hele historien: ${t.s} sider · ${kr(pris(t.s))}` : `${t.s} sider · ${kr(pris(t.s))}`}</button>`).join('')}</div></div>
+  <div class="price"><b>Albumet er nå på ${pages} sider og koster ${kr(pris(pages))}.</b>
+  <span class="crumb">Juster antall sider etter ønske. Færre sider: alle historiene krymper litt, men hver dag beholder minst én side. Flere sider: flere bilder og mer plass til historiene. Sider du er fornøyd med, beholdes.</span>
+  <div class="chips sizes">${steps.filter(t => t < pages).map(t => `<button class="chip" data-cap="${t}">↓ ${t} sider · ${kr(pris(t))}</button>`).join('')}
+    <label class="ownsize">Eget antall <input type="number" id="ownPages" min="1" step="1" value="${pages}" aria-label="Antall sider"></label><button class="btn btn--s" data-ownsize>Lag på nytt</button>
+    ${steps.filter(t => t > pages).map(t => `<button class="chip" data-cap="${t}">↑ ${t} sider · ${kr(pris(t))}</button>`).join('')}
+    ${d.cap ? `<button class="chip" data-cap="">Appens forslag: ${d.fullPages} sider · ${kr(pris(d.fullPages))}</button>` : ''}</div>
+  <span class="crumb">Prisen (foreløpig): perm ${kr(GRUNNPRIS)} + ${KR_PER_SIDE} kr per side, regnet i trinn på ${SIDETRINN} sider.</span></div>
   ${coverSection()}
   <details class="learned"><summary>Dette har appen lært om dere</summary>${les.length ? `<ul>${les.map(l => `<li>${l}</li>`).join('')}</ul>` : '<p>Ingenting ennå. Når du tar med, tar bort eller bytter bilder, lærer appen litt etter litt hva dere liker.</p>'}${log.length ? `<p class="crumb">Basert på ${log.length} valg og ${log.filter(f => f.r).length} svar. Lagres bare i denne nettleseren.</p>` : ''}</details>
   <p class="crumb">Øverst i hver dag er <b>albumsidene</b>, slik albumet blir. Klikk et bilde på en side for å ta det bort, fremheve det, dempe det eller endre utsnitt. Klikk i margen på en side for å velge rammer. Under ligger alle bildene fra dagen: klikk for å markere mange, og bruk knappene nederst.</p>`;
@@ -1331,7 +1349,8 @@ document.addEventListener('click', e => { if(!$('pmenuFloat').classList.contains
 let lastClicked = null;
 $('draftWrap').addEventListener('click', e => {
   if(e.target.closest('#startDraft')){ runAnalysis(null); return; }
-  const c = e.target.closest('[data-cap]'); if(c){ revise(c.dataset.cap ? +c.dataset.cap : null, c.dataset.cap ? `Albumet er redusert til omtrent ${c.dataset.cap} sider.` : 'Hele historien er med igjen.'); return; }
+  const c = e.target.closest('[data-cap]'); if(c){ resize(c.dataset.cap ? +c.dataset.cap : null); return; }
+  if(e.target.closest('[data-ownsize]')){ const n = Math.round(+$('ownPages').value); if(n >= 1) resize(n); return; }
   const kd = e.target.closest('[data-kind]');
   if(kd){ const k = +kd.closest('[data-ev]').dataset.ev, g = state.ana.groups[state.draft.events[k].gi];
     g.ids.forEach(id => state.kinds.set(id, kd.dataset.kind)); g.ids.forEach(id => state.targets.delete(id));
@@ -1450,6 +1469,17 @@ function renderMini(){
 $('spread').addEventListener('click', e => { if(onPageClick(e)) return; });
 $('makeDraft').onclick = () => state.draft ? revise(state.draft.cap) : runAnalysis(null);
 $('redraft').onclick = () => revise(state.draft?.cap ?? null);
+/* Nytt sidetall etter gjennomkjøringen: appen lager utkastet på nytt med omtrent så mange sider. */
+function resize(n){
+  const before = draftPages();
+  revise(n);
+  const after = draftPages();
+  const days = state.draft.events.filter(e => e.pages.length).length;
+  const why = after > n && n < before ? ` Hver dag beholder minst én side, og albumet har ${days} dager. Vil du ned til ${n} sider, kan du fjerne dager du ikke trenger, eller markere sider og presentere dem på færre sider.`
+    : after < n && n > before ? ' Det finnes ikke flere gode bilder å fylle med.' : '';
+  state.note = { text: n == null ? `Tilbake til appens forslag: ${after} sider.` : Math.abs(after - n) <= 2 ? `Albumet har nå ${after} sider.` : `Albumet har nå ${after} sider (du ba om ${n}).${why}` };
+  renderDock();
+}
 /* Ny revisjon: bruker det appen har lært, brukerens valg og sidene hun er fornøyd med. */
 function revise(cap, msg){
   if(!state.draft || state.analysing) return runAnalysis(cap);

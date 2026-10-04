@@ -272,11 +272,13 @@ describe("albumutkast", () => {
     expect(screen.getByText("Beste bilde i en serie på 4")).toBeInTheDocument();
     expect(screen.getByText("Et bedre bilde fra samme øyeblikk er med")).toBeInTheDocument();
     expect(screen.getAllByText(tekster.utkast.uskarpt)).toHaveLength(2);
-    expect(screen.getByText(/Albumet er nå på 312 sider og koster 1\s400 kr/)).toBeInTheDocument();
+    expect(screen.getByText(/Albumet er nå på 312 sider og koster 1\s700 kr/)).toBeInTheDocument();
 
-    // Mindre album: utkastet lages på nytt med sidetak.
-    await userEvent.click(screen.getByRole("button", { name: tekster.pris.valg(300, 1200) }));
+    // Færre eller flere sider etter gjennomkjøringen: utkastet lages på nytt.
+    await userEvent.click(screen.getByRole("button", { name: tekster.pris.ned(300, 1500) }));
     expect(mock.lagUtkast).toHaveBeenLastCalledWith(2011, 300);
+    await userEvent.click(screen.getByRole("button", { name: tekster.pris.opp(400, 1900) }));
+    expect(mock.lagUtkast).toHaveBeenLastCalledWith(2011, 400);
   });
 
   it("bytter bilder og spør forsiktig hvorfor", async () => {

@@ -709,6 +709,19 @@ h3 {
   margin: 0;
   font-weight: 700;
 }
+.price__sizes {
+  align-items: center;
+}
+.price__own {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: 600;
+  font-size: 14px;
+}
+.price__own .input {
+  width: 90px;
+}
 .price__help {
   margin: 0;
   font-size: 13px;

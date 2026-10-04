@@ -554,7 +554,7 @@ fn draft_for(
         &prefs,
         &DraftConfig::default(),
         &DraftHints {
-            page_cap,
+            album_pages: page_cap,
             ..DraftHints::default()
         },
         &mut |phase| {

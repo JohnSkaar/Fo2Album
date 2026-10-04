@@ -208,8 +208,9 @@ pub struct LockedPage {
 /// hendelsen, så valgene overlever at utkastet lages på nytt.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct DraftHints {
-    /// Brukerens valg av et mindre album, etter at forslaget er sett.
-    pub page_cap: Option<usize>,
+    /// Antall sider brukeren ønsker etter å ha sett forslaget, ned eller opp. Appen
+    /// velger den skalaen for alle historiene som gir nærmest dette sidetallet.
+    pub album_pages: Option<usize>,
     /// Hendelser som er turer uten barn (gutte- og jenteturer, jobbturer).
     pub adult_trips: HashSet<ContentHash>,
     /// «Presenter denne hendelsen på x sider.»
@@ -371,7 +372,7 @@ pub fn make_draft(
     let mut included = vec![false; items.len()];
     let mut first_pick: Vec<Option<usize>> = vec![None; groups.len()];
     let mut out_of_order = vec![false; items.len()];
-    let scale = page_scale(&groups, cfg, hints.page_cap);
+    let scale = page_scale(&groups, cfg, hints.album_pages);
     let targets: Vec<usize> = groups.iter().map(|g| target_pages(g, cfg, scale)).collect();
     let mut left_pages = vec![0; groups.len()];
     for (g, group) in groups.iter().enumerate() {
@@ -394,7 +395,7 @@ pub fn make_draft(
         if pool.is_empty() {
             continue;
         }
-        let quota = quota(pool.len(), left_pages[g], prefs, cfg);
+        let quota = quota(pool.len(), left_pages[g], scale, prefs, cfg);
         // Personer først: stemningsbilder er drypp. Høyst ett per hendelse (tre på turer uten
         // barn), og i naturen høyst fire, så ingen side blir fylt av bare ting.
         let mood_max = if nature[g] {
@@ -782,28 +783,28 @@ fn story_pages(
 }
 
 fn target_pages(group: &Group, cfg: &DraftConfig, scale: f32) -> usize {
-    ((natural_pages(group, cfg) * scale).floor() as usize).max(1)
+    let n = natural_pages(group, cfg) * scale;
+    (if scale > 1.0 { n.round() } else { n.floor() } as usize).max(1)
 }
 
-/// Største skala (i steg på 5 %) som holder albumet innenfor brukerens sidetak.
-fn page_scale(groups: &[Group], cfg: &DraftConfig, cap: Option<usize>) -> f32 {
-    let Some(cap) = cap else { return 1.0 };
-    (0..=19)
-        .map(|k| 1.0 - k as f32 * 0.05)
-        .find(|&s| {
-            groups
-                .iter()
-                .map(|g| target_pages(g, cfg, s))
-                .sum::<usize>()
-                <= cap
+/// Skalaen (0,2–3,0 i steg på 5 %) som gir nærmest ønsket antall sider, ned eller opp.
+fn page_scale(groups: &[Group], cfg: &DraftConfig, wanted: Option<usize>) -> f32 {
+    let Some(wanted) = wanted else { return 1.0 };
+    (4..=60)
+        .map(|k| k as f32 * 0.05)
+        .min_by_key(|&s| {
+            let pages: usize = groups.iter().map(|g| target_pages(g, cfg, s)).sum();
+            pages.abs_diff(wanted)
         })
-        .unwrap_or(0.05)
+        .unwrap_or(1.0)
 }
 
 /// Hvor mange bilder en gruppe med `n` mulige bilder skal ha.
-fn quota(n: usize, pages: usize, prefs: &Preferences, cfg: &DraftConfig) -> usize {
+/// Flere sider enn forslaget (`scale` > 1) gir plass til en større andel av bildene.
+fn quota(n: usize, pages: usize, scale: f32, prefs: &Preferences, cfg: &DraftConfig) -> usize {
     let want = pages as f32 * cfg.photos_per_page * prefs.event_density;
-    let most = (n as f32 * cfg.max_share).ceil().max(1.0);
+    let share = (cfg.max_share * scale.max(1.0)).min(0.9);
+    let most = (n as f32 * share).ceil().max(1.0);
     (want.min(most).round() as usize).max(1)
 }
 
@@ -1206,7 +1207,7 @@ mod tests {
             &Preferences::default(),
             &DraftConfig::default(),
             &DraftHints {
-                page_cap: Some(cap),
+                album_pages: Some(cap),
                 ..DraftHints::default()
             },
             &mut |_| {},
@@ -1494,5 +1495,25 @@ mod tests {
         assert!(alone(idx(weak)));
         assert!(get(&d, &photos[idx(best)]).included);
         assert!(!alone(idx(best)));
+    }
+
+    #[test]
+    fn more_pages_than_suggested_gives_more_photos() {
+        let photos = day(0, 6, 6, 200);
+        let auto = draft(&photos, &HashMap::new());
+        let bigger = with(
+            &photos,
+            &DraftHints {
+                album_pages: Some(auto.pages() * 2),
+                ..DraftHints::default()
+            },
+        );
+        assert!(
+            bigger.pages() > auto.pages(),
+            "{} > {}",
+            bigger.pages(),
+            auto.pages()
+        );
+        assert!(bigger.included().count() > auto.included().count());
     }
 }

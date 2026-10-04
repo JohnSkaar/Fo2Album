@@ -1,21 +1,21 @@
 import { pris, prisTrinn, prisvalg } from "./pris";
 
 describe("pris i trinn", () => {
-  it("regner fra neste trinn på 50 sider", () => {
-    expect(prisTrinn(350)).toBe(350);
+  it("er grunnpris pluss pris per side, regnet fra neste trinn", () => {
     expect(prisTrinn(312)).toBe(350);
-    expect(pris(350)).toBe(1400);
-    expect(pris(300)).toBe(1200);
-    expect(pris(10)).toBe(200);
+    expect(pris(350)).toBe(300 + 1400);
+    expect(pris(300)).toBe(300 + 1200);
   });
 
-  it("viser hele historien og trinnene under", () => {
-    expect(prisvalg(350)).toEqual([
-      { sidetak: null, sider: 350, pris: 1400 },
-      { sidetak: 300, sider: 300, pris: 1200 },
-      { sidetak: 250, sider: 250, pris: 1000 },
-      { sidetak: 200, sider: 200, pris: 800 },
-    ]);
-    expect(prisvalg(60).map((v) => v.sider)).toEqual([60, 50]);
+  it("gir valg både ned og opp rundt dagens sidetall", () => {
+    expect(prisvalg(76)).toEqual({
+      ned: [{ sider: 50, pris: 500 }],
+      opp: [
+        { sider: 100, pris: 700 },
+        { sider: 150, pris: 900 },
+      ],
+    });
+    expect(prisvalg(300).ned.map((v) => v.sider)).toEqual([200, 250]);
+    expect(prisvalg(300).opp.map((v) => v.sider)).toEqual([350, 400]);
   });
 });

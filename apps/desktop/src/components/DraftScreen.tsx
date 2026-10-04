@@ -252,27 +252,48 @@ function Hendelse({
   );
 }
 
-function Pris({ draft, onSize }: { draft: Utkast; onSize: (sidetak: number | null) => void }) {
-  const valg = prisvalg(draft.fullPages);
+function Pris({ draft, onSize }: { draft: Utkast; onSize: (sider: number | null) => void }) {
+  const { ned, opp } = prisvalg(draft.pages);
+  const [eget, setEget] = useState(String(draft.pages));
   return (
     <div className="price">
       <p className="price__now">{tekster.pris.naa(draft.pages, pris(draft.pages))}</p>
-      <p className="price__help">{tekster.pris.trinn}</p>
-      <div className="chips" role="group" aria-label={tekster.pris.etikett}>
-        {valg.map((v) => (
-          <button
-            key={v.sidetak ?? "hele"}
-            type="button"
-            className="chip"
-            aria-pressed={v.sidetak === draft.pageCap}
-            onClick={() => onSize(v.sidetak)}
-          >
-            {v.sidetak === null
-              ? tekster.pris.hele(v.sider, v.pris)
-              : tekster.pris.valg(v.sider, v.pris)}
+      <p className="price__help">{tekster.pris.juster}</p>
+      <div className="chips price__sizes" role="group" aria-label={tekster.pris.etikett}>
+        {ned.map((v) => (
+          <button key={v.sider} type="button" className="chip" onClick={() => onSize(v.sider)}>
+            {tekster.pris.ned(v.sider, v.pris)}
           </button>
         ))}
+        <label className="price__own">
+          {tekster.pris.eget}
+          <input
+            type="number"
+            min={1}
+            className="input"
+            value={eget}
+            onChange={(e) => setEget(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          className="btn btn--secondary btn--sm"
+          onClick={() => Number(eget) >= 1 && onSize(Math.round(Number(eget)))}
+        >
+          {tekster.pris.lagPaaNytt}
+        </button>
+        {opp.map((v) => (
+          <button key={v.sider} type="button" className="chip" onClick={() => onSize(v.sider)}>
+            {tekster.pris.opp(v.sider, v.pris)}
+          </button>
+        ))}
+        {draft.pageCap !== null && (
+          <button type="button" className="chip" onClick={() => onSize(null)}>
+            {tekster.pris.forslag(draft.fullPages, pris(draft.fullPages))}
+          </button>
+        )}
       </div>
+      <p className="price__help">{tekster.pris.modell}</p>
     </div>
   );
 }
