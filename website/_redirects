@@ -1,0 +1,5 @@
+# fo2album.no og www sendes til pho2album.no
+https://fo2album.no/*      https://pho2album.no/:splat  301!
+https://www.fo2album.no/*  https://pho2album.no/:splat  301!
+http://fo2album.no/*       https://pho2album.no/:splat  301!
+http://www.fo2album.no/*   https://pho2album.no/:splat  301!
