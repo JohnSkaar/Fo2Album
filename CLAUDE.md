@@ -2,7 +2,7 @@
 
 Desktop-app for Mac og Windows som lager **årets familiealbum** av bildene familien allerede har, spredt over PC, Dropbox, iCloud og Google Disk. Appen finner de beste og mest meningsfulle bildene, lager et ferdig utkast og sender kun den ferdige trykkfilen til trykk.
 
-Les dette først, deretter `docs/PRODUCT.md` og `docs/SCORING.md`.
+Les dette først, deretter **`docs/OVERLEVERING.md`** (status, eierens føringer, åpne spørsmål og neste steg), `docs/PRODUCT.md` og `docs/SCORING.md`.
 
 ## Ufravikelige prinsipper
 
