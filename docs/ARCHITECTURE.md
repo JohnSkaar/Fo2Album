@@ -116,7 +116,7 @@ Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 | Bildedekoding | Rust `image` + **libheif** for HEIC | HEIC er avgjørende (iPhone) | Plattformens egne API-er (ImageIO på Mac, WIC på Windows) |
 | EXIF | Rust EXIF-bibliotek (f.eks. kamadak-exif) | | exiftool som sidekar (tyngre) |
 | Hashing | BLAKE3 (eksakt), pHash/dHash (perceptuell) | | |
-| ML-kjøring | **ONNX Runtime** lokalt (CPU; CoreML på Mac, DirectML på Windows når tilgjengelig) | Én motor for alle modeller | |
+| ML-kjøring | **tract** (ONNX i ren Rust, CPU) for ansiktsmodellene. ONNX Runtime kan vurderes senere for tyngre modeller (CLIP) | Ingen eksterne biblioteker å pakke med, ingen nettverk, bygges likt på Mac og Windows | ONNX Runtime (CoreML/DirectML) |
 | Geokoding | Offline GeoNames-utdrag for Norden + resten av verden (by-nivå) | Ingen nettverkskall | |
 | PDF | Generer trykkfil lokalt (Rust PDF-bibliotek, eller rendre layout i webview og skrive ut til PDF) | Krav fra trykkeri avgjør (se under) | |
 
@@ -130,7 +130,16 @@ Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 | Estetikk | Lineært hode på CLIP-embeddings (f.eks. LAION-aesthetic-tilnærming) | Kan kalibreres på egne data |
 | Øyne åpne / smil | Små klassifikatorer på ansiktsutsnitt, eller landemerker | |
 
-Noter valgt modell, versjon, lisens og kilde i en tabell her når det er bestemt.
+### Valgte modeller
+
+| Behov | Modell | Versjon og sjekksum (SHA-256) | Lisens | Kilde |
+|---|---|---|---|---|
+| Ansiktsdeteksjon (boks + 5 landemerker) | YuNet | `face_detection_yunet_2023mar.onnx`, `8f2383e4…2552fa4` (232 kB) | MIT (Shiqi Yu) | OpenCV Zoo, `models/face_detection_yunet` |
+| Ansiktskjennetegn (128 tall) | SFace (MobileFaceNet) | `face_recognition_sface_2021dec.onnx`, `0ba9fbfa…087c34e79` (38 MB) | Apache-2.0 | OpenCV Zoo, `models/face_recognition_sface` |
+
+Modellene ligger i `crates/p2a-faces/models/` med lisensfilene, og bygges inn i programmet. Kontrollert mot OpenCVs egen implementasjon (oktober 2026): samme ansikter i samme oppløsning; samme kjennetegn for samme opprettede ansikt (likhet 1,000). Samme person i to bilder gir likhet 0,86–0,99, ulike personer under 0,2; terskelen er 0,363 (OpenCVs anbefaling). Tid: ca. 0,2 s per bilde for deteksjon og 0,06 s per ansikt, på én kjerne.
+
+**Åpent spørsmål (juridisk):** vektene har tillatende lisenser, men SFace er trent på offentlige ansiktsdatasett (bl.a. avledet av MS-Celeb-1M/CASIA-WebFace) med egne vilkår. Bør vurderes før lansering; alternativet er å trene eller finjustere en egen modell på lisensierte data. Små ansikter (under ca. 1/60 av bildets lengste side) finnes ikke ennå; det kan løses med deteksjon i ruter for gruppebilder.
 
 ## Kilder
 
