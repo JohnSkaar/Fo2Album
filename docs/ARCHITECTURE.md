@@ -134,6 +134,7 @@ Noter valgt modell, versjon, lisens og kilde i en tabell her når det er bestemt
 - Alt cachet på innholdshash; avbryt og gjenoppta.
 - Kjør analyse i bakgrunnstråder; UI skal aldri fryse.
 - **Målt (M1, 4. oktober 2026):** innlesing (hash, EXIF, dekoding, miniatyr, pHash, dubletter) av syntetiske 12 MP JPEG-er: **20 ms per bilde med 4 tråder**, dvs. ca. 3,3 min for 10 000 bilder. 2048 × 1536: ca. 9 ms per bilde. JPEG dekodes direkte i 1/4 størrelse (`jpeg-decoder`), som kuttet tiden fra 48 ms. Merk: filene lå i diskbufferen; ekte bibliotek på SSD legger til lesetid (ca. 30 GB for 10 000 bilder à 3 MB). Kjør selv med `cargo run --release -p p2a-cli -- bench --antall 1000 --bredde 4032`.
+- **Full kjøring, 10 000 bilder** (1600 × 1200, 4,5 GB, 10 % eksakte kopier): innlesing på **108 s** med 4 tråder, alle 1 000 kopier funnet. Kriteriet for M1 («10 000 bilder skannet») er oppfylt.
 
 ## Personvern i koden
 
