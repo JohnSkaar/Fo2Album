@@ -275,6 +275,26 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
   .fs,.lb,.pmfloat{display:none!important}
   .pg .ph.sel{outline:none}
 }
+.panelacts{display:flex;flex-direction:column;gap:8px}
+.texts{background:var(--bg-surface);border:1px solid var(--border-default);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.texts h2{font:600 20px/1.2 var(--display);margin:0}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}.tgrid .wide{grid-column:1/-1}
+.tgrid textarea{font:inherit;padding:10px 12px;border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-surface);color:var(--text-primary);resize:vertical}
+.spine{width:min(3vw,30px);align-self:stretch;background:#E6DCCD;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-lg);cursor:pointer;border:0;padding:0}
+.spine span{writing-mode:vertical-rl;transform:rotate(180deg);font:600 13px/1 var(--display);color:#241E18;white-space:nowrap;overflow:hidden;max-height:95%}
+.pg.intro .in{align-content:center;justify-items:start;padding:8%;gap:3cqw}
+.pg.intro h3{font:600 7cqw/1.1 var(--display);color:#241E18;margin:0}
+.pg.intro p{font:400 3.3cqw/1.5 var(--body);color:#3D342B;margin:0;white-space:pre-wrap}
+.pg.intro p.ph-text{color:#A39482;font-style:italic}
+.cover.back .ct .bt{font:400 3.2cqw/1.4 var(--body);color:#3D342B;white-space:pre-wrap}
+.pg.clickable{cursor:pointer}
+.cvnow{display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap}.cvnow .pg{width:150px;box-shadow:var(--shadow-lg)}.cvnow figure{margin:0;display:flex;flex-direction:column;gap:6px;align-items:center}
+.order{display:grid;grid-template-columns:220px 1fr;gap:24px;background:var(--bg-surface);border:1px solid var(--border-default);border-radius:16px;padding:20px}
+.order .pg{box-shadow:var(--shadow-lg)}
+.order ul.check{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.order ul.check li::before{content:'✓ ';color:var(--text-success, var(--text-brand));font-weight:700}
+.order ul.check li.todo::before{content:'○ ';color:var(--text-secondary)}
+@media (max-width: 700px){.order,.tgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -350,15 +370,30 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
       <div class="pager"><button class="btn btn--s" id="prev" aria-label="Forrige oppslag">‹ Forrige</button><span id="pageLabel"></span><button class="btn btn--s" id="next" aria-label="Neste oppslag">Neste ›</button></div>
       <p class="helptext">Klikk et bilde for å ta det bort, fremheve det, dempe det, endre utsnitt eller bruke det som forside.</p>
       <div class="strip" id="strip" aria-label="Alle sider"></div>
+      <section class="texts" id="texts" aria-label="Tekst i albumet">
+        <h2>Tekst i albumet</h2>
+        <p class="crumb">Klikk på forsiden, ryggen, første side eller baksiden over for å gå rett til teksten.</p>
+        <div class="tgrid">
+          <div class="field"><label for="albumName">Forsiden: tittel</label><input id="albumName" value="Øyeblikk fra 2025"></div>
+          <div class="field"><label for="albumSub">Forsiden: undertittel</label><input id="albumSub" value="" placeholder="For eksempel navnene i familien"></div>
+          <div class="field"><label for="famNames">Hvem er familien?</label><input id="famNames" placeholder="For eksempel: Kari, Ola, Emma og Jonas"><span class="crumb">Navnene kommer med som undertittel på forsiden, hvis du vil.</span></div>
+          <div class="field"><label for="spineText">Ryggen</label><input id="spineText" value="" placeholder="Øyeblikk fra 2025"></div>
+          <div class="field wide"><label for="introText">Første side inne i albumet</label><textarea id="introText" rows="5" placeholder=""></textarea><div class="toolbar"><button class="btn btn--s" id="introSuggest">Foreslå en start</button><span class="crumb">Skriv litt om året: hva som skjedde, hvem som kom til, hva dere husker best.</span></div></div>
+          <div class="field wide"><label for="backText">Baksiden</label><textarea id="backText" rows="3" placeholder="En hilsen, et sitat eller et minne fra året"></textarea></div>
+        </div>
+      </section>
       <div id="covers"></div>
+    </section>
+    <!-- BESTILLING -->
+    <section id="viewOrder" class="hidden" style="display:flex;flex-direction:column;gap:18px">
+      <div class="head"><div><div class="crumb">Bestilling</div><h1>Bestill albumet</h1></div><div class="toolbar"><button class="btn btn--g" id="orderBack">Tilbake til albumet</button></div></div>
+      <div id="orderWrap"></div>
     </section>
   </main>
 
   <aside class="panel">
     <h2>Albumutkast</h2>
     <div class="field"><label for="albumYear">År</label><select id="albumYear" disabled><option>–</option></select></div>
-    <div class="field"><label for="albumName">Navn på albumet</label><input id="albumName" value="Familiealbum 2025"></div>
-    <div class="field"><label for="albumSub">Undertittel</label><input id="albumSub" value="Året vårt"></div>
     <div class="mini" id="miniCover"><span class="crumb">Forsiden vises her</span></div>
     <dl class="facts">
       <dt>Bilder med</dt><dd id="fSel">0</dd>
@@ -368,6 +403,7 @@ h1,h2,h3{font-family:var(--display);font-weight:600;margin:0}
       <dt>Kilder</dt><dd id="fFolder">–</dd>
     </dl>
     <div class="spacer"></div>
+    <div class="panelacts hidden" id="panelActs"><button class="btn btn--s" id="saveDraft">Lagre utkast</button><button class="btn btn--p" id="goOrder">Gå til bestilling</button></div>
     <button class="btn btn--p btn--lg" id="makeDraft" disabled>Lag utkast</button>
     <button class="btn btn--s btn--lg hidden" id="exportPdf">Lagre som PDF</button>
     <p class="hint" id="panelHint">Utkastet lages lokalt på maskinen</p>
@@ -389,7 +425,7 @@ const IMG_EXT = /\.(jpe?g|png|webp|gif|bmp|avif)$/i;
 const SKIP_EXT = /\.(heic|heif|dng|cr2|cr3|nef|arw|raf|orf)$/i;
 const MAX_PHOTOS = 3000;
 
-const state = { photos: [], folders: [], year: null, pages: [], spread: 0, sel: null, coverId: null, coverType: 'mood', view: 'start', pendingSource: 'PC', draft: null, decisions: new Map(), pick: null, ask: null, thanks: false, actions: 0, skips: 0, ingesting: 0, analysing: false, openEvents: new Set(), sel: new Set(), menu: null, pageSel: null, fs: { open: false, spread: 0 }, lb: null, byId: null, kinds: new Map(), targets: new Map(), locked: new Map(), pgMarked: new Set(), note: null, undo: null, ana: null, fullPages: null, coverCands: new Set(), backId: null, coversOpen: true, merges: [], mergeNo: new Set(), dayMarked: new Set(), markMode: false };
+const state = { photos: [], folders: [], year: null, pages: [], spread: 0, sel: null, coverId: null, coverType: 'mood', view: 'start', pendingSource: 'PC', draft: null, decisions: new Map(), pick: null, ask: null, thanks: false, actions: 0, skips: 0, ingesting: 0, analysing: false, openEvents: new Set(), sel: new Set(), menu: null, pageSel: null, fs: { open: false, spread: 0 }, lb: null, byId: null, kinds: new Map(), targets: new Map(), locked: new Map(), pgMarked: new Set(), note: null, undo: null, ana: null, fullPages: null, coverCands: new Set(), backId: null, coversOpen: true, merges: [], mergeNo: new Set(), dayMarked: new Set(), markMode: false, stories: [], texts: { family: '', spine: '', intro: '', back: '' }, touched: {} };
 let uid = 0;
 
 function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'),2600); }
@@ -542,7 +578,7 @@ function markDuplicates(){
   const seen = new Map();
   state.photos.forEach(p => p.dup = false);
   [...state.photos].sort((a,b) => a.id - b.id).forEach(p => {
-    const keys = [`n:${p.name.toLowerCase()}|${p.size}`]; if(p.exif) keys.push(`t:${p.date.getTime()}|${p.size}`, `t2:${p.date.getTime()}|${p.name.replace(/\.[^.]+$/,'').toLowerCase()}`);
+    const keys = [`n:${p.name.toLowerCase()}|${p.big}`]; if(p.exif) keys.push(`t:${p.date.getTime()}|${p.big}`, `t2:${p.date.getTime()}|${p.name.replace(/\.[^.]+$/,'').toLowerCase()}`);
     if(keys.some(k => seen.has(k))){ p.dup = true; p.selected = false; } else keys.forEach(k => seen.set(k, p.id));
   });
 }
@@ -581,7 +617,7 @@ $('yearChips').addEventListener('click', e => { const b = e.target.closest('.chi
 function renderGrid(){
   const vis = visible();
   $('pickTitle').textContent = state.year ? `Familiealbum ${state.year}` : 'Velg bilder';
-  if(state.year && (!$('albumName').dataset.touched)) $('albumName').value = `Familiealbum ${state.year}`;
+  if(state.year) setYearName();
   if(!vis.length){ $('gridWrap').innerHTML = '<p class="empty">Ingen bilder her. Velg et annet år eller en annen mappe.</p>'; updateCounts(); return; }
   const groups = new Map();
   vis.forEach(p => { const k = p.date.getFullYear()+'-'+p.date.getMonth(); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(p); });
@@ -668,7 +704,17 @@ function lessons(p){
 const prisTrinn = s => Math.max(SIDETRINN, Math.ceil(s / SIDETRINN) * SIDETRINN);
 const pris = s => GRUNNPRIS + prisTrinn(s) * KR_PER_SIDE;
 const kr = n => n.toLocaleString('nb-NO') + ' kr';
-const aspect = p => p && p.w && p.h ? p.w / p.h : 4/3;
+const rot = p => ((p?.rot || 0) % 360 + 360) % 360, sideways = p => rot(p) === 90 || rot(p) === 270;
+const aspect = p => p && p.w && p.h ? (sideways(p) ? p.h / p.w : p.w / p.h) : 4/3;
+/* Et rotert bilde i en ramme: bildet roteres rundt midten og fyller rammen som før. */
+function imgStyle(p, fit, r){
+  const [fx, fy] = p.focus || [.5, .5], d = rot(p);
+  if(!d) return `object-fit:${fit};object-position:${fx*100}% ${fy*100}%`;
+  if(d === 180) return `object-fit:${fit};transform:rotate(180deg)`;
+  const k = r ? r.h / r.w : 1;
+  return `position:absolute;left:50%;top:50%;width:${(k*100).toFixed(2)}%;height:${(100/k).toFixed(2)}%;object-fit:${fit};transform:translate(-50%,-50%) rotate(${d}deg)`;
+}
+const rotCss = p => rot(p) ? `transform:rotate(${rot(p)}deg)${sideways(p) ? ' scale(.75)' : ''}` : '';
 const hasPeople = p => p.q && p.q.skin >= CFG.skin;
 
 /* Nesten like bilder: dHash (9 × 8) fra miniatyren. */
@@ -750,16 +796,27 @@ function pageRects(page){
     if(page.kind === 'full'){ if(a <= .9) return [{ x: 0, y: 0, w: PW, h: PH, fill: true }]; const h = PW / a; return [{ x: 0, y: (PH - h)/2, w: PW, h, fill: false }]; }
     return [{ ...fitIn({ x: .14, y: .16, w: PW - .28, h: PH - .32 }, a), fill: false }];
   }
-  return justify(ps.map(aspect), BOX).map(r => ({ ...r, fill: false }));
+  // Et opprioritert bilde blir større enn de andre (trinn 1 og 2); nedprioriterte blir mindre.
+  const size = ps.map(p => p.big || 0), top = Math.max(...size);
+  let out;
+  if(top > 0){
+    const h = size.indexOf(top), a = aspect(ps[h]), frac = top >= 2 ? .7 : .52, others = ps.filter((_, i) => i !== h).map(aspect);
+    let hero, rest;
+    if(a < 1){ const w = BOX.w*frac; hero = fitIn({ x: BOX.x, y: BOX.y, w, h: BOX.h }, a); rest = { x: BOX.x + w + GAP, y: BOX.y, w: BOX.w - w - GAP, h: BOX.h }; }
+    else { const hh = BOX.h*frac; hero = fitIn({ x: BOX.x, y: BOX.y, w: BOX.w, h: hh }, a); rest = { x: BOX.x, y: BOX.y + hh + GAP, w: BOX.w, h: BOX.h - hh - GAP }; }
+    const rr = justify(others, rest); out = []; let j = 0;
+    ps.forEach((_, i) => out.push(i === h ? hero : rr[j++]));
+  } else out = justify(ps.map(aspect), BOX);
+  return out.map((r, i) => { if(size[i] >= 0 || top > 0 && size[i] === top) return { ...r, fill: false }; const k = .72; return { x: r.x + r.w*(1-k)/2, y: r.y + r.h*(1-k)/2, w: r.w*k, h: r.h*k, fill: false }; });
 }
 function renderPage(page, mode){
   const rects = pageRects(page), pct = (v, d) => (v / d * 100).toFixed(3) + '%';
   const frames = page.ids.map((id, i) => {
     const p = byId(id), r = rects[i]; if(!r) return '';
     const src = mode === 'print' ? URL.createObjectURL(p.file) : (p.thumb || '');
-    const [fx, fy] = p.focus || [.5, .5], fit = r.fill ? 'cover' : 'contain';
+    const fit = r.fill ? 'cover' : 'contain';
     const tag = mode === 'print' ? 'div' : 'button';
-    return `<${tag} class="fr${state.menu?.id === id ? ' sel' : ''}${state.sel.has(id) ? ' marked' : ''}" data-pid="${id}" data-pgid="${page.id}" style="left:${pct(r.x, PW)};top:${pct(r.y, PH)};width:${pct(r.w, PW)};height:${pct(r.h, PH)}" ${tag === 'button' ? `aria-label="Bilde på siden: ${esc(p.name)}"` : ''}><img src="${src}" alt="" style="object-fit:${fit};object-position:${fx*100}% ${fy*100}%"></${tag}>`;
+    return `<${tag} class="fr${state.menu?.id === id ? ' sel' : ''}${state.sel.has(id) ? ' marked' : ''}" data-pid="${id}" data-pgid="${page.id}" style="left:${pct(r.x, PW)};top:${pct(r.y, PH)};width:${pct(r.w, PW)};height:${pct(r.h, PH)}" ${tag === 'button' ? `aria-label="Bilde på siden: ${esc(p.name)}"` : ''}><img src="${src}" alt="" style="${imgStyle(p, fit, r)}"></${tag}>`;
   }).join('');
   return `<div class="pg2${state.pageSel === page.id ? ' on' : ''}${page.locked && mode !== 'print' ? ' locked' : ''}" data-pgid="${page.id}">${frames}</div>`;
 }
@@ -829,6 +886,15 @@ function prepare(){
     const into = hit[0]; into.m = hit.flatMap(g => g.m).sort((a, b) => a - b); into.everyday = false; into.merged = ms;
     hit.slice(1).forEach(g => groups.splice(groups.indexOf(g), 1));
   }
+  // Bilder brukeren har gjort til en egen historie, tas ut av dagene sine og blir én historie.
+  for(const st of state.stories){
+    const m = items.map((it, i) => st.has(it.p.id) ? i : -1).filter(i => i >= 0); if(!m.length) continue;
+    const set = new Set(m);
+    groups.forEach(g => g.m = g.m.filter(i => !set.has(i)));
+    groups.push({ m, everyday: false, own: st });
+  }
+  for(let i = groups.length - 1; i >= 0; i--) if(!groups[i].m.length) groups.splice(i, 1);
+  groups.sort((a, b) => a.m[0] - b.m[0]);
   groups.forEach(g => {
     g.ids = new Set(g.m.map(i => items[i].p.id));
     g.days = Math.round((items[g.m[g.m.length-1]].t - items[g.m[0]].t) / 864e5) + 1;
@@ -972,7 +1038,7 @@ function makeDraft(cap){
     const fresh = chosen.length ? layoutFor(ana, g, chosen, left) : [];
     const pages = [...keep, ...fresh].sort((a, b) => byId(a.ids[0]).date - byId(b.ids[0]).date);
     const removed = g.m.every(i => state.decisions.get(items[i].p.id) === 'ikke') && g.m.some(i => draft.reason.get(items[i].p.id) === 'dag_fjernet');
-    draft.events.push({ gi: k, merged: g.merged || null, everyday: g.everyday, start: items[g.m[0]].p.date, end: items[g.m[g.m.length-1]].p.date, removed, ids: g.m.map(i => items[i].p.id), pages, trip: looksLikeTrip(g) });
+    draft.events.push({ gi: k, merged: g.merged || null, own: g.own || null, everyday: g.everyday, start: items[g.m[0]].p.date, end: items[g.m[g.m.length-1]].p.date, removed, ids: g.m.map(i => items[i].p.id), pages, trip: looksLikeTrip(g) });
   });
   draft.eventOf = new Map(draft.events.flatMap((e, k) => e.ids.map(id => [id, k])));
   state.ana = ana;
@@ -1019,13 +1085,13 @@ function snapshot(){
   const d = state.draft;
   return { events: d.events.map(e => ({ removed: e.removed, pages: e.pages.map(pg => ({ ...pg, ids: [...pg.ids] })) })), reason: new Map(d.reason), related: new Map(d.related),
     selected: state.photos.filter(p => p.selected).map(p => p.id), decisions: new Map(state.decisions), locked: new Map(state.locked),
-    emph: new Map(state.photos.filter(p => p.emph).map(p => [p.id, p.emph])) };
+    emph: new Map(state.photos.filter(p => p.emph).map(p => [p.id, p.emph])), look: new Map(state.photos.filter(p => p.big || p.rot).map(p => [p.id, [p.big, p.rot]])) };
 }
 function undo(){
   const s = state.undo, d = state.draft; if(!s || !d) return;
   s.events.forEach((e, k) => { d.events[k].pages = e.pages; d.events[k].removed = e.removed; });
   d.reason = s.reason; d.related = s.related; state.decisions = s.decisions; state.locked = s.locked;
-  const sel = new Set(s.selected); state.photos.forEach(p => { p.selected = sel.has(p.id); p.emph = s.emph.get(p.id); });
+  const sel = new Set(s.selected); state.photos.forEach(p => { p.selected = sel.has(p.id); p.emph = s.emph.get(p.id); [p.big, p.rot] = s.look.get(p.id) || [0, 0]; });
   state.undo = null; state.note = { text: 'Endringen er angret.' }; refresh();
 }
 /* «Fornøyd»: siden beholdes i neste revisjon, helt til den endres. */
@@ -1057,7 +1123,7 @@ const ASK = {
 };
 const PHASES = ['Henter miniatyrbilder og måler kvalitet', 'Sammenligner bildene for å finne nesten like', 'Finner hendelsene i året, dag for dag', 'Finner serier tatt i samme øyeblikk', 'Velger de beste bildene fra hver dag', 'Lager sidene, med helsider og luft', 'Skriver en kort begrunnelse for hvert bilde'];
 
-async function runAnalysis(cap){
+async function runAnalysis(cap, keepLocked){
   if(state.analysing) return;
   state.analysing = true; closeOverlays(); state.sel.clear(); showView('draft');
   const show = (k, extra) => { $('draftWrap').innerHTML = `<div class="analyse"><h2>Lager utkastet …</h2><div class="progress"><i style="width:${Math.round(k/PHASES.length*100)}%"></i></div><ol>${PHASES.map((t, i) => `<li class="${i < k ? 'done' : i === k ? 'now' : ''}">${t}${i === k && extra ? ` <span class="count">${extra}</span>` : ''}</li>`).join('')}</ol><p class="crumb">Det tar litt tid, og alt skjer på denne maskinen.</p></div>`; };
@@ -1067,13 +1133,15 @@ async function runAnalysis(cap){
     show(1, `0 av ${vis.length}`);
     await pool(vis, 6, async p => { await dhash(p); if(++done % 40 === 0) show(1, `${done} av ${vis.length}`); });
     for(const k of [2, 3, 4]){ show(k); await sleep(450); }
-    state.draft = null; state.locked.clear();
+    state.draft = null; if(!keepLocked) state.locked.clear();
     makeDraft(cap);
+    // Et lagret utkast: sidene kommer tilbake som de var, men bare de som var «Fornøyd», er merket slik.
+    if(state.restoring){ draftPagesFlat().filter(pg => state.restoring.has(pg.id)).forEach(pg => setLocked(pg, false)); state.restoring = null; }
     for(const k of [5, 6]){ show(k); await sleep(400); }
     state.pages = [];
   } finally { state.analysing = false; }
   renderDraftView();
-  if(state.draft) toast(`Utkastet er klart: ${draftPages()} sider`);
+  if(state.draft){ $('panelActs').classList.toggle('hidden', state.view !== 'draft' && state.view !== 'album'); toast(keepLocked ? 'Det lagrede utkastet er hentet fram' : `Utkastet er klart: ${draftPages()} sider`); }
 }
 
 /* ---------- Endringer i utkastet ---------- */
@@ -1091,6 +1159,42 @@ function setIn(id, replaces){
   touch(pg);
   if(pg.ids.length === 1 && pg.kind === 'full'){ e.pages.splice(e.pages.indexOf(pg) + 1, 0, { id: ++pageUid, kind: 'grid', tpl: 'auto', ids: [id] }); return; }
   pg.ids.push(id); pg.ids.sort((a, b) => byId(a).date - byId(b).date); if(pg.tpl !== 'auto') pg.tpl = 'auto';
+}
+/* Opprioriter: bildet blir større for hvert trykk (større på siden, større igjen, egen side,
+   til slutt hele siden). Nedprioriter går motsatt vei, til samme størrelse som de andre og
+   så litt mindre. Valget huskes også til neste revisjon. */
+function grow(id){
+  const p = byId(id); if(!p.selected) setIn(id);
+  const at = pageOf(id); if(!at) return;
+  touch(at.pg);
+  if(at.pg.ids.length === 1){ if(at.pg.kind !== 'full'){ at.pg.kind = 'full'; at.pg.tpl = 'auto'; } p.big = 4; p.emph = 'fremhev'; return; }
+  p.big = Math.max(0, p.big || 0) + 1; at.pg.tpl = 'auto';
+  if(p.big >= 3){ p.big = 3; p.emph = 'fremhev'; at.pg.ids = at.pg.ids.filter(x => x !== id); at.e.pages.splice(at.e.pages.indexOf(at.pg), 0, { id: ++pageUid, kind: 'air', tpl: 'auto', ids: [id] }); return; }
+  at.pg.ids.forEach(x => { if(x !== id && (byId(x).big || 0) >= p.big) byId(x).big = p.big - 1; });
+  p.emph = 'opp';
+}
+function shrink(id){
+  const p = byId(id); if(!p.selected) setIn(id);
+  const at = pageOf(id); if(!at) return;
+  touch(at.pg);
+  if(at.pg.ids.length === 1){ if(at.pg.kind === 'full'){ at.pg.kind = 'air'; p.big = 3; } else { p.big = 0; dampen(id); } p.emph = 'demp'; return; }
+  p.big = Math.max(-1, (p.big || 0) - 1); at.pg.tpl = 'auto';
+  if(p.big <= 0) p.emph = 'demp';
+}
+function rotate(id){ const p = byId(id); p.rot = (rot(p) + 90) % 360; const at = state.draft && pageOf(id); if(at) touch(at.pg); }
+/* «Egen historie»: de markerte bildene blir en egen historie med egne sider, i tidsrekkefølge
+   blant de andre. Huskes til neste revisjon, og kan legges tilbake. */
+function ownStory(ids){
+  if(!ids.length) return;
+  const set = new Set(ids);
+  state.stories = state.stories.map(st => new Set([...st].filter(id => !set.has(id)))).filter(st => st.size);
+  state.stories.push(set);
+  ids.forEach(id => { state.decisions.set(id, 'med'); byId(id).selected = true; });
+  state.merges = state.merges.map(ms => new Set([...ms].filter(id => !set.has(id)))).filter(ms => ms.size > 1);
+  logAct('egen_historie', false);
+  revise(state.draft.cap, `${ids.length} ${ids.length === 1 ? 'bilde er' : 'bilder er'} nå en egen historie med egne sider.`);
+  const k = state.draft.events.findIndex(e => e.own === set);
+  setTimeout(() => document.querySelector(`.ev[data-ev="${k}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 50);
 }
 function emphasize(id){
   const p = byId(id); p.emph = 'fremhev'; if(!p.selected) setIn(id);
@@ -1141,20 +1245,23 @@ function gatherOnPage(ids){
 }
 function clearMarks(){ state.sel.clear(); state.pgMarked.clear(); state.dayMarked.clear(); state.presentN = null; }
 /* Opprioriter: med, og høyere prioritet når sidene lages (ikke nødvendigvis egen side). */
+function sizeText(id){ const p = byId(id), at = state.draft && pageOf(id); if(!at) return 'Bildet er endret';
+  if(at.pg.ids.length === 1) return at.pg.kind === 'full' ? 'Bildet tar hele siden' : 'Bildet har en egen side, med luft rundt';
+  return (p.big || 0) > 0 ? `Bildet er større på siden (trinn ${p.big} av 4)` : (p.big || 0) < 0 ? 'Bildet er mindre enn de andre på siden' : 'Bildet er like stort som de andre på siden'; }
 function boost(id){ const p = byId(id); p.emph = 'opp'; if(!p.selected) setIn(id); else state.decisions.set(id, 'med'); }
 function act(a, ids, other){
   ids = [...ids];
   if(ids.length > 1) state.undo = snapshot();
-  if(a === 'opp') ids.forEach(boost);
+  if(a === 'opp' || a === 'fremhev') ids.forEach(grow);
+  if(a === 'demp') ids.forEach(shrink);
+  if(a === 'roter') ids.forEach(rotate);
   if(a === 'ta_bort') ids.forEach(id => setOut(id));
   if(a === 'ta_med') ids.forEach(id => setIn(id));
   if(a === 'bytt'){ setIn(ids[0], other); setOut(other); }
-  if(a === 'fremhev') ids.forEach(emphasize);
-  if(a === 'demp') ids.forEach(dampen);
   logAct(a);
   const n = ids.length;
-  toast({ ta_bort: n > 1 ? `${n} bilder er tatt bort` : 'Bildet er tatt bort', ta_med: n > 1 ? `${n} bilder er med` : 'Bildet er med', bytt: 'Bildene er byttet', fremhev: 'Bildet får mer plass', demp: n > 1 ? `${n} bilder er nedprioritert` : 'Bildet er med, men mindre', opp: n > 1 ? `${n} bilder er opprioritert` : 'Bildet er opprioritert' }[a]);
-  if(n > 1 && a !== 'bytt') state.note = { text: { ta_bort: `${n} bilder er tatt bort.`, ta_med: `${n} bilder er med.`, demp: `${n} bilder er nedprioritert.`, opp: `${n} bilder er opprioritert, og får mer plass i neste revisjon.`, fremhev: `${n} bilder får egen side.` }[a], undo: true };
+  toast({ ta_bort: n > 1 ? `${n} bilder er tatt bort` : 'Bildet er tatt bort', ta_med: n > 1 ? `${n} bilder er med` : 'Bildet er med', bytt: 'Bildene er byttet', fremhev: sizeText(ids[0]), demp: n > 1 ? `${n} bilder er gjort mindre` : sizeText(ids[0]), opp: n > 1 ? `${n} bilder er gjort større` : sizeText(ids[0]), roter: 'Bildet er rotert' }[a]);
+  if(n > 1 && a !== 'bytt') state.note = { text: { ta_bort: `${n} bilder er tatt bort.`, ta_med: `${n} bilder er med.`, demp: `${n} bilder er gjort mindre på sidene sine.`, opp: `${n} bilder er gjort større. Trykk igjen for enda større, til slutt hele siden.`, fremhev: `${n} bilder er gjort større.`, roter: `${n} bilder er rotert.` }[a], undo: true };
   state.sel.clear(); state.menu = null; refresh();
 }
 function removeDay(k){
@@ -1210,14 +1317,16 @@ function coverSection(){
   const c = coverSuggest();
   const tile = id => { const p = byId(id); return `<div class="cv"><button class="cv__img" data-zoom="${id}" aria-label="Vis stort"><img src="${p.thumb}" alt="">${state.coverId === id ? '<span class="cvtag">Forside</span>' : state.backId === id ? '<span class="cvtag">Bakside</span>' : ''}</button><div class="cv__btn"><button class="pgb${state.coverId === id ? ' ok' : ''}" data-cover="${id}">Forside</button><button class="pgb${state.backId === id ? ' ok' : ''}" data-back="${id}">Bakside</button></div></div>`; };
   const group = (title, ids, empty) => `<div class="cvg"><b>${title}</b>${ids.length ? `<div class="cvrow">${ids.map(tile).join('')}</div>` : `<p class="crumb">${empty}</p>`}</div>`;
+  const now = state.coverId != null ? `<div class="cvg"><b>Valgt nå</b><div class="cvnow"><figure>${pageHtml({ type: 'cover', ids: [state.coverId] }, 0, false)}<figcaption class="crumb">Forsiden</figcaption></figure><figure>${pageHtml({ type: 'end', ids: [] }, 0, false)}<figcaption class="crumb">Baksiden</figcaption></figure><span class="crumb">Teksten på forsiden, ryggen og baksiden skriver du under «Tekst i albumet» når du ser albumet side for side.</span></div></div>` : '';
   return `<details class="covers2" ${state.coversOpen ? 'open' : ''}><summary>Forside og bakside <span class="crumb">Forslag fra de beste bildene gjennom året. Merk bilder med ☆ hvor som helst, så kommer de med her.</span></summary>
+    ${now}
     ${group('Dine kandidater ☆', c.marked, 'Ingen ennå. Trykk ☆ på et bilde for å merke det som kandidat til forside eller bakside.')}
     ${group('Med personer', c.people, 'Fant ingen gode bilder med personer.')}
     ${group('Oversiktsbilder', c.overview, 'Fant ingen gode oversiktsbilder.')}</details>`;
 }
 function card(id){
   const p = byId(id), on = state.sel.has(id), why = reasonText(state.draft.reason.get(id));
-  return `<div class="dc${on ? ' on' : ''}"><button class="dc__img" data-dc="${id}" aria-pressed="${on}" aria-label="${p.selected ? 'Med' : 'Ikke med'}: ${esc(why)}. Klikk for å markere."><img src="${p.thumb || ''}" alt="" loading="lazy"><span class="ck">✓</span>${p.blurry ? '<span class="blur" title="Kan være uskarpt">◔ Uskarpt?</span>' : ''}${p.emph === 'fremhev' ? '<span class="emph">Fremhevet</span>' : p.emph === 'demp' ? '<span class="emph">Nedprioritert</span>' : p.emph === 'opp' ? '<span class="emph">Opprioritert</span>' : ''}</button><button class="zoom" data-zoom="${id}" aria-label="Vis stort" title="Vis stort">⤢</button><button class="star${state.coverCands.has(id) ? ' on' : ''}" data-star="${id}" aria-pressed="${state.coverCands.has(id)}" title="Kandidat til forside eller bakside">${state.coverCands.has(id) ? '★' : '☆'}</button><span class="why">${esc(why)}</span></div>`;
+  return `<div class="dc${on ? ' on' : ''}"><button class="dc__img" data-dc="${id}" aria-pressed="${on}" aria-label="${p.selected ? 'Med' : 'Ikke med'}: ${esc(why)}. Klikk for å markere."><img src="${p.thumb || ''}" alt="" loading="lazy" style="${rotCss(p)}"><span class="ck">✓</span>${p.blurry ? '<span class="blur" title="Kan være uskarpt">◔ Uskarpt?</span>' : ''}${p.emph === 'fremhev' ? '<span class="emph">Fremhevet</span>' : (p.big || 0) > 0 ? '<span class="emph">Større</span>' : (p.big || 0) < 0 ? '<span class="emph">Mindre</span>' : p.emph === 'demp' ? '<span class="emph">Nedprioritert</span>' : p.emph === 'opp' ? '<span class="emph">Opprioritert</span>' : ''}</button><button class="zoom" data-zoom="${id}" aria-label="Vis stort" title="Vis stort">⤢</button><button class="star${state.coverCands.has(id) ? ' on' : ''}" data-star="${id}" aria-pressed="${state.coverCands.has(id)}" title="Kandidat til forside eller bakside">${state.coverCands.has(id) ? '★' : '☆'}</button><span class="why">${esc(why)}</span></div>`;
 }
 /* ---------- Slå sammen dager ---------- */
 const dayKey = e => e.ids[0];
@@ -1307,8 +1416,8 @@ function renderDraft(){
     const sug = suggestions.find(r => r[0] === k);
     if(sug) html += mergeSuggestionHtml(sug);
     const dk = dayKey(e), dm = state.dayMarked.has(dk);
-    html += `<section class="ev${e.removed ? ' ev--off' : ''}${dm ? ' ev--marked' : ''}" data-ev="${k}"><div class="ev-h"><div><h3><button class="daymark" data-daymark="${dk}" aria-pressed="${dm}" title="Marker dagen">${dm ? '☑' : '☐'}</button> ${eventTitle(e)}${e.merged ? ' <span class="tag">Slått sammen</span>' : ''}</h3><span class="count">${e.ids.length} bilder · ${e.pages.length ? `side ${first}–${first + e.pages.length - 1}` : 'ingen sider'}</span></div>
-      <div class="toolbar">${e.removed ? `<button class="btn btn--s" data-day="tilbake">Ta med dagen igjen</button>` : `<button class="btn btn--g" data-day="fs">Helskjerm</button><button class="btn btn--g" data-day="sider">Marker sidene</button><button class="btn btn--g" data-day="velg">Marker bildene</button><button class="btn btn--g" data-day="fornoyd">Fornøyd med dagen</button><button class="btn btn--s" data-day="fjern">Fjern dagen</button>${e.merged ? '<button class="btn btn--g" data-day="del">Del opp igjen</button>' : ''}`}</div></div>
+    html += `<section class="ev${e.removed ? ' ev--off' : ''}${dm ? ' ev--marked' : ''}" data-ev="${k}"><div class="ev-h"><div><h3><button class="daymark" data-daymark="${dk}" aria-pressed="${dm}" title="Marker dagen">${dm ? '☑' : '☐'}</button> ${eventTitle(e)}${e.merged ? ' <span class="tag">Slått sammen</span>' : ''}${e.own ? ' <span class="tag">Egen historie</span>' : ''}</h3><span class="count">${e.ids.length} bilder · ${e.pages.length ? `side ${first}–${first + e.pages.length - 1}` : 'ingen sider'}</span></div>
+      <div class="toolbar">${e.removed ? `<button class="btn btn--s" data-day="tilbake">Ta med dagen igjen</button>` : `<button class="btn btn--g" data-day="fs">Helskjerm</button><button class="btn btn--g" data-day="sider">Marker sidene</button><button class="btn btn--g" data-day="velg">Marker bildene</button><button class="btn btn--g" data-day="fornoyd">Fornøyd med dagen</button><button class="btn btn--s" data-day="fjern">Fjern dagen</button>${e.merged ? '<button class="btn btn--g" data-day="del">Del opp igjen</button>' : ''}${e.own ? '<button class="btn btn--g" data-day="tilbakefor">Legg bildene tilbake i dagene sine</button>' : ''}`}</div></div>
       ${dayKindHtml(e)}
       ${e.pages.length ? `<div class="albumrow"><span class="albumlabel">Albumsidene</span><div class="spreads">${spreadsOf(e.pages).map(sp => `<div class="spr">${sp.map(pageCard).join('')}</div>`).join('')}</div></div>` : ''}
       ${selPage ? templateBar(selPage) : ''}
@@ -1329,7 +1438,7 @@ function renderDock(){
     const parts = [n && `${n} ${n === 1 ? 'bilde' : 'bilder'}`, m && `${m} ${m === 1 ? 'side' : 'sider'}`, dd && `${dd} ${dd === 1 ? 'dag' : 'dager'}`].filter(Boolean).join(' · ');
     const x = state.presentN ?? m;
     dk.innerHTML = `<div class="dockhead"><b>Markert: ${parts}</b><button class="btn btn--g" data-all="av">Fjern all markering</button></div>
-      ${n ? `<div class="dockrow"><span class="docklbl">Bildene</span>${inn.length ? `<button class="btn btn--s" data-act="ta_bort">Ta bort (${inn.length})</button>` : ''}${ut.length ? `<button class="btn btn--s" data-act="ta_med">Ta med (${ut.length})</button>` : ''}<button class="btn btn--s" data-act="side">Sett på én side (${n})</button><button class="btn btn--s" data-act="opp">Opprioriter (${n})</button>${inn.length ? `<button class="btn btn--s" data-act="demp">Nedprioriter (${inn.length})</button>` : ''}<button class="btn btn--s" data-act="kandidat">☆ Forsidekandidat</button>${swap ? '<button class="btn btn--s" data-act="bytt">Bytt dem</button>' : ''}${n === 1 ? '<button class="btn btn--g" data-act="stort">Vis stort</button>' : ''}</div>` : ''}
+      ${n ? `<div class="dockrow"><span class="docklbl">Bildene</span>${inn.length ? `<button class="btn btn--s" data-act="ta_bort">Ta bort (${inn.length})</button>` : ''}${ut.length ? `<button class="btn btn--s" data-act="ta_med">Ta med (${ut.length})</button>` : ''}<button class="btn btn--s" data-act="side">Sett på én side (${n})</button><button class="btn btn--s" data-act="historie">Egen historie (${n})</button><button class="btn btn--s" data-act="roter" title="Roter en kvart omdreining med klokka">↻ Roter</button><button class="btn btn--s" data-act="opp" title="Gjør bildet større på siden, til slutt en hel side">Opprioriter, større (${n})</button>${inn.length ? `<button class="btn btn--s" data-act="demp" title="Gjør bildet mindre, som de andre på siden">Nedprioriter, mindre (${inn.length})</button>` : ''}<button class="btn btn--s" data-act="kandidat">☆ Forsidekandidat</button>${swap ? '<button class="btn btn--s" data-act="bytt">Bytt dem</button>' : ''}${n === 1 ? '<button class="btn btn--g" data-act="stort">Vis stort</button>' : ''}</div>` : ''}
       ${m ? `<div class="dockrow"><span class="docklbl">Sidene</span><button class="btn btn--s" data-pg="fjern">Fjern sidene og bildene i dem</button><span>Presenter på</span><button class="btn btn--s" data-pg="minus" aria-label="Færre sider">−</button><b class="xn">${x}</b><button class="btn btn--s" data-pg="pluss" aria-label="Flere sider">+</button><span>${x === 1 ? 'side' : 'sider'}</span><button class="btn btn--s" data-pg="lag">Lag forslag</button><button class="btn btn--s" data-pg="fornoyd">Fornøyd</button></div>` : ''}
       ${dd ? `<div class="dockrow"><span class="docklbl">Dagene</span>${dd >= 2 ? '<button class="btn btn--s" data-days="slaa">Slå sammen til én historie</button>' : ''}<button class="btn btn--s" data-days="fornoyd">Fornøyd med dagene</button><button class="btn btn--s" data-days="fjern">Fjern dagene</button></div>` : ''}
       <span class="crumb">Klikk bilder og sider for å markere flere; Shift-klikk markerer alle bildene mellom. Ctrl/⌘-klikk (eller markeringsmodus) markerer bilder og sider rett i albumet. Esc fjerner markeringen.</span>`;
@@ -1343,9 +1452,10 @@ function renderDock(){
 function photoMenu(id, inFs){
   const p = byId(id);
   return `<div class="pmenu" role="menu"><b>${esc(reasonText(state.draft.reason.get(id)))}</b>${p.blurry ? '<span class="crumb">◔ Kan være uskarpt</span>' : ''}
-    <button data-m="stort">Vis stort</button><button data-m="ta_bort">1. Ta bort</button><button data-m="fremhev">2. Fremhev mer (egen side)</button><button data-m="demp">3. Ta med, men demp</button><button data-m="utsnitt">4. Endre utsnitt</button>${inFs ? '' : ''}<button data-m="kandidat">${state.coverCands.has(id) ? '★ Kandidat til forsiden' : '☆ Merk som kandidat til forsiden'}</button><button data-m="forside">Bruk som forside</button><button data-m="bakside">Bruk som bakside</button><button data-m="lukk" class="g">Lukk</button></div>`;
+    <button data-m="stort">Vis stort</button><button data-m="ta_bort">1. Ta bort</button><button data-m="fremhev">2. Fremhev mer (større)</button><button data-m="demp">3. Ta med, men demp (mindre)</button><button data-m="utsnitt">4. Endre utsnitt</button><button data-m="roter">↻ Roter</button>${inFs ? '' : ''}<button data-m="kandidat">${state.coverCands.has(id) ? '★ Kandidat til forsiden' : '☆ Merk som kandidat til forsiden'}</button><button data-m="forside">Bruk som forside</button><button data-m="bakside">Bruk som bakside</button><button data-m="lukk" class="g">Lukk</button></div>`;
 }
 function refresh(){
+  renderMini();
   if(state.view === 'draft') renderDraft();
   if(state.view === 'album') renderAlbum();
   renderDock(); updateCounts();
@@ -1384,12 +1494,12 @@ function renderLightbox(){
   let frame = '';
   if(crop && at){ const r = pageRects(at.pg)[at.pg.ids.indexOf(id)]; const [fx, fy] = p.focus || [.5, .5];
     frame = `<div class="cropbox" style="aspect-ratio:${(r.w / r.h).toFixed(4)}"><img src="${state.lb.url}" alt="" data-focus style="object-fit:${p.fit === 'hele' ? 'contain' : 'cover'};object-position:${fx*100}% ${fy*100}%"></div>`; }
-  $('lb').innerHTML = `<div class="lb-in"><div class="lb-img">${crop ? frame : `<img src="${state.lb.url}" alt="">`}</div>
+  $('lb').innerHTML = `<div class="lb-in"><div class="lb-img">${crop ? frame : `<img src="${state.lb.url}" alt="" style="${rotCss(p)}">`}</div>
     <div class="lb-side"><b>${esc(p.name)}</b><span class="crumb">${p.date.toLocaleString('nb-NO', { dateStyle: 'long', timeStyle: 'short' })}</span>
     <p>${esc(reasonText(state.draft?.reason.get(id) || ''))}</p>
     <div class="qual"><span>Skarphet ${p.sharpRel != null ? Math.round(p.sharpRel*100) : '–'} / 100${p.blurry ? ' · ◔ kan være uskarpt' : ''}</span><span>Lys ${Math.round(p.q.expo*100)} / 100</span><span>${hasPeople(p) ? 'Personer i bildet' : 'Ingen personer funnet'}</span></div>
     ${crop ? `<p class="crumb">Klikk i bildet for å velge hva som skal være i midten av rammen.</p><div class="toolbar"><button class="btn btn--s" data-lb="fyll" aria-pressed="${p.fit !== 'hele'}">Fyll rammen</button><button class="btn btn--s" data-lb="hele" aria-pressed="${p.fit === 'hele'}">Vis hele bildet</button><button class="btn btn--g" data-lb="ferdig">Ferdig</button></div>`
-      : `<div class="lb-acts">${inAlbum ? '<button class="btn btn--s" data-lb="ta_bort">Ta bort</button><button class="btn btn--s" data-lb="fremhev">Fremhev mer</button><button class="btn btn--s" data-lb="demp">Ta med, men demp</button>' + (at || pageOf(id) ? '<button class="btn btn--s" data-lb="utsnitt">Endre utsnitt</button>' : '') : '<button class="btn btn--s" data-lb="ta_med">Ta med</button><button class="btn btn--s" data-lb="fremhev">Ta med og fremhev</button>'}</div>`}
+      : `<div class="lb-acts">${inAlbum ? '<button class="btn btn--s" data-lb="ta_bort">Ta bort</button><button class="btn btn--s" data-lb="fremhev">Fremhev mer</button><button class="btn btn--s" data-lb="demp">Ta med, men demp</button>' + (at || pageOf(id) ? '<button class="btn btn--s" data-lb="utsnitt">Endre utsnitt</button>' : '') + '<button class="btn btn--s" data-lb="roter">↻ Roter</button>' : '<button class="btn btn--s" data-lb="ta_med">Ta med</button><button class="btn btn--s" data-lb="fremhev">Ta med og fremhev</button>'}</div>`}
     <div class="lb-acts"><button class="btn btn--s" data-lb="kandidat">${state.coverCands.has(id) ? '★ Kandidat til forsiden' : '☆ Kandidat til forsiden'}</button></div>
     <p class="lb-note">Dette er en forhåndsvisning på skjermen. Trykket bruker originalfilen i full oppløsning.</p>
     <button class="btn btn--p" data-lb="lukk">Lukk</button></div></div>`;
@@ -1439,8 +1549,8 @@ function menuAction(m){
   if(m === 'lukk'){ state.menu = null; refresh(); return; }
   if(m === 'stort'){ state.menu = null; openLightbox(id); return; }
   if(m === 'utsnitt'){ state.menu = null; openLightbox(id, true); return; }
-  if(m === 'forside'){ state.coverId = id; state.menu = null; toast('Forsiden er valgt'); refresh(); return; }
-  if(m === 'bakside'){ state.backId = id; state.menu = null; toast('Baksiden er valgt'); refresh(); return; }
+  if(m === 'forside'){ state.coverId = id; if(state.backId === id) state.backId = null; state.menu = null; toast('Forsiden er valgt. Den vises under «Forside og bakside».'); refresh(); renderMini(); return; }
+  if(m === 'bakside'){ state.backId = id; if(state.coverId === id) state.coverId = null; state.menu = null; toast('Baksiden er valgt. Den vises under «Forside og bakside».'); refresh(); return; }
   if(m === 'kandidat'){ toggleCand(id); state.menu = null; refresh(); return; }
   act(m, [id]);
 }
@@ -1465,6 +1575,7 @@ $('draftWrap').addEventListener('click', e => {
   const day = e.target.closest('[data-day]');
   if(day){ const k = +day.closest('[data-ev]').dataset.ev, ev = state.draft.events[k];
     if(day.dataset.day === 'fjern') removeDay(k); else if(day.dataset.day === 'tilbake') restoreDay(k); else if(day.dataset.day === 'del') splitDay(k);
+    else if(day.dataset.day === 'tilbakefor'){ state.stories = state.stories.filter(st => st !== ev.own); revise(state.draft.cap, 'Bildene er lagt tilbake i dagene sine.'); }
     else if(day.dataset.day === 'velg'){ ev.ids.filter(id => byId(id).selected).forEach(id => state.sel.add(id)); refresh(); }
     else if(day.dataset.day === 'sider'){ ev.pages.forEach(pg => state.pgMarked.add(pg.id)); refresh(); }
     else if(day.dataset.day === 'fornoyd'){ const all = ev.pages.every(pg => pg.locked); ev.pages.forEach(pg => setLocked(pg, !all)); state.note = { text: all ? 'Dagen er ikke lenger merket «Fornøyd».' : 'Dagen er merket «Fornøyd» og beholdes i neste revisjon.' }; refresh(); }
@@ -1512,6 +1623,8 @@ $('dock').addEventListener('click', e => {
   if(a.dataset.act === 'fjern_markering'){ state.sel.clear(); refresh(); return; }
   if(a.dataset.act === 'stort'){ openLightbox(ids[0]); return; }
   if(a.dataset.act === 'side'){ gatherOnPage(ids); return; }
+  if(a.dataset.act === 'historie'){ ownStory(ids); return; }
+  if(a.dataset.act === 'roter'){ state.undo = snapshot(); ids.forEach(rotate); state.note = { text: `${ids.length} ${ids.length === 1 ? 'bilde er' : 'bilder er'} rotert. Trykk igjen for å rotere mer.`, undo: true }; refresh(); return; }
   if(a.dataset.act === 'kandidat'){ ids.forEach(id => state.coverCands.add(id)); state.sel.clear(); toast(`${ids.length} ${ids.length === 1 ? 'bilde er' : 'bilder er'} kandidat til forsiden`); refresh(); return; }
   if(a.dataset.act === 'ta_bort') act('ta_bort', ids.filter(id => byId(id).selected));
   else if(a.dataset.act === 'ta_med') act('ta_med', ids.filter(id => !byId(id).selected));
@@ -1528,6 +1641,7 @@ $('lb').addEventListener('click', e => {
   if(k === 'lukk' || k === 'ferdig'){ closeLightbox(); refresh(); return; }
   if(k === 'utsnitt'){ state.lb.crop = true; renderLightbox(); return; }
   if(k === 'kandidat'){ toggleCand(id); renderLightbox(); refresh(); return; }
+  if(k === 'roter'){ rotate(id); renderLightbox(); refresh(); return; }
   if(k === 'fyll' || k === 'hele'){ byId(id).fit = k === 'hele' ? 'hele' : undefined; refresh(); return; }
   closeLightbox(); act(k, [id]);
 });
@@ -1548,20 +1662,26 @@ function buildPages(){
   ensureCovers();
   if(state.coverId == null) state.coverId = sel[Math.floor(sel.length/2)].id;
   // Teksten er av som standard: bare bilder.
-  const pages = [{ type: 'cover', ids: [state.coverId] }, ...draftPagesFlat().map(pg => ({ type: 'photos', page: pg }))];
+  // Første side inne i albumet er tekst om året.
+  const pages = [{ type: 'cover', ids: [state.coverId] }, { type: 'intro', ids: [] }, ...draftPagesFlat().map(pg => ({ type: 'photos', page: pg }))];
   pages.push({ type: 'end', ids: [] });
   if(pages.length % 2 === 1) pages.splice(pages.length-1, 0, { type: 'blank', ids: [] });
   state.pages = pages; state.spread = Math.min(state.spread, Math.ceil(pages.length/2));
 }
 function renderCovers(){ $('covers').innerHTML = coverSection().replace('<details class="covers2"', '<details class="covers2" open'); }
-$('covers').addEventListener('click', e => { if(e.target.closest('[data-zoom]')){ openLightbox(+e.target.closest('[data-zoom]').dataset.zoom); return; } if(coverClick(e)) renderAlbum(); });
+$('covers').addEventListener('click', e => { if(e.target.closest('[data-zoom]')){ openLightbox(+e.target.closest('[data-zoom]').dataset.zoom); return; }
+  const front = e.target.closest('[data-cover]'), back = e.target.closest('[data-back]');
+  if(coverClick(e)){ state.spread = front ? 0 : back ? spreads().length - 1 : state.spread; renderAlbum(); if(front || back) $('spread').scrollIntoView({ block: 'center', behavior: 'smooth' }); } });
 function pageHtml(pg, idx, full){
   const mode = full ? 'print' : 'view';
   if(pg.type === 'photos') return renderPage(pg.page, mode).replace('class="pg2', 'class="pg2 pgp');
   const src = p => full ? URL.createObjectURL(p.file) : (p.thumb || '');
-  if(pg.type === 'cover'){ const p = byId(pg.ids[0]); return `<div class="pg cover"><div class="in"><span class="ph"><img src="${src(p)}" alt=""></span><div class="ct"><h2>${esc($('albumName').value || 'Familiealbum')}</h2><p>${esc($('albumSub').value || '')}</p></div></div></div>`; }
+  if(pg.type === 'intro'){ const t = $('introText').value.trim();
+    return `<div class="pg intro${full ? '' : ' clickable'}" data-text="introText"><div class="in"><h3>${esc(String(state.year ?? ''))}</h3>${t ? `<p>${esc(t)}</p>` : full ? '' : `<p class="ph-text">${esc($('introText').placeholder)}</p>`}</div></div>`; }
+  if(pg.type === 'cover'){ const p = byId(pg.ids[0]); return `<div class="pg cover${full ? '' : ' clickable'}" data-text="albumName"><div class="in"><span class="ph"><img src="${src(p)}" alt="" style="${rotCss(p)}"></span><div class="ct"><h2>${esc($('albumName').value || 'Familiealbum')}</h2><p>${esc($('albumSub').value || '')}</p></div></div></div>`; }
   if(pg.type === 'end'){ const b = state.backId != null && byId(state.backId);
-    return b ? `<div class="pg cover back"><div class="in"><span class="ph"><img src="${src(b)}" alt=""></span><div class="ct"><p>Laget med Fo2Album</p></div></div></div>` : `<div class="pg endp"><div class="in"><div class="logo-e">Fo2Album</div><div class="capsm">Laget på vår egen maskin, trykket for å bli bladd i.</div></div></div>`; }
+    const bt = $('backText').value.trim(), btHtml = bt ? `<div class="bt">${esc(bt)}</div>` : '';
+    return b ? `<div class="pg cover back${full ? '' : ' clickable'}" data-text="backText"><div class="in"><span class="ph"><img src="${src(b)}" alt="" style="${rotCss(b)}"></span><div class="ct">${btHtml}<p>Laget med Fo2Album</p></div></div></div>` : `<div class="pg endp${full ? '' : ' clickable'}" data-text="backText"><div class="in">${btHtml}<div class="logo-e">Fo2Album</div><div class="capsm">Laget på vår egen maskin, trykket for å bli bladd i.</div></div></div>`; }
   return `<div class="pg blank"></div>`;
 }
 function spreads(){ const s = [[0]]; for(let i=1;i<state.pages.length;i+=2) s.push(state.pages[i+1] ? [i, i+1] : [i]); return s; }
@@ -1569,7 +1689,7 @@ function renderAlbum(){
   buildPages();
   const sp = spreads(); state.spread = Math.max(0, Math.min(state.spread, sp.length-1));
   const cur = sp[state.spread];
-  $('spread').innerHTML = cur.map(i => pageHtml(state.pages[i], i, false)).join('') + (state.menu ? '' : '');
+  $('spread').innerHTML = (state.spread === 0 ? `<button class="spine" data-text="spineText" title="Ryggen" aria-label="Ryggen: ${esc(spineText())}"><span>${esc(spineText())}</span></button>` : '') + cur.map(i => pageHtml(state.pages[i], i, false)).join('');
   $('pageLabel').textContent = state.spread === 0 ? 'Forside' : `Side ${cur[0]}${cur[1] ? '–'+cur[1] : ''} av ${state.pages.length-1}`;
   $('prev').disabled = state.spread === 0; $('next').disabled = state.spread === sp.length-1;
   $('strip').innerHTML = sp.map((s, k) => `<button aria-current="${k===state.spread}" data-sp="${k}" aria-label="Oppslag ${k+1}">${s.map(i => pageHtml(state.pages[i], i, false).replace(/<button class="fr/g,'<span class="fr').replace(/<\/button>/g,'</span>')).join('')}</button>`).join('');
@@ -1577,10 +1697,12 @@ function renderAlbum(){
   renderMini(); updateCounts(); renderCovers();
 }
 function renderMini(){
-  if(!state.pages.length){ $('miniCover').innerHTML = '<span class="crumb">Forsiden vises her</span>'; return; }
-  $('miniCover').innerHTML = `<div style="width:120px;box-shadow:var(--shadow-lg)">${pageHtml(state.pages[0], 0, false)}</div>`;
+  if(state.draft) ensureCovers();
+  if(!state.draft || state.coverId == null || !byId(state.coverId)){ $('miniCover').innerHTML = '<span class="crumb">Forsiden vises her</span>'; return; }
+  $('miniCover').innerHTML = `<div style="width:120px;box-shadow:var(--shadow-lg)">${pageHtml({ type: 'cover', ids: [state.coverId] }, 0, false)}</div>`;
 }
-$('spread').addEventListener('click', e => { if(onPageClick(e)) return; });
+$('spread').addEventListener('click', e => { if(onPageClick(e)) return; const t = e.target.closest('[data-text]'); if(t) goText(t.dataset.text); });
+function goText(id){ const el = $(id); el.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => el.focus(), 250); }
 $('makeDraft').onclick = () => state.draft ? revise(state.draft.cap) : runAnalysis(null);
 $('redraft').onclick = () => revise(state.draft?.cap ?? null);
 /* Nytt sidetall etter gjennomkjøringen: appen lager utkastet på nytt med omtrent så mange sider. */
@@ -1608,7 +1730,12 @@ $('backPick').onclick = () => showView('draft');
 $('prev').onclick = () => { state.spread--; renderAlbum(); };
 $('next').onclick = () => { state.spread++; renderAlbum(); };
 $('strip').addEventListener('click', e => { const b = e.target.closest('[data-sp]'); if(b){ state.spread = +b.dataset.sp; renderAlbum(); } });
-['albumName','albumSub'].forEach(id => $(id).addEventListener('input', () => { if(state.view==='album') renderAlbum(); else renderMini(); }));
+['albumName','albumSub','spineText','introText','backText','famNames'].forEach(id => $(id).addEventListener('input', () => {
+  if(id === 'albumName' || id === 'albumSub') $(id).dataset.touched = $(id).value ? '1' : '';
+  if(id === 'famNames' || id === 'albumName') setYearName();
+  if(state.view === 'album') renderAlbum(); else renderMini();
+}));
+$('introSuggest').onclick = () => { $('introText').value = introSuggestion(); renderAlbum(); goText('introText'); };
 $('exportPdf').onclick = async () => {
   buildPages(); if(!state.pages.length) return;
   const pr = $('print'); pr.innerHTML = state.pages.map((pg, i) => pageHtml(pg, i, true)).join('');
@@ -1628,7 +1755,27 @@ function updateCounts(){
   $('makeDraft').textContent = state.draft ? 'Lag ny revisjon' : 'Lag utkast';
   $('navDraftSub').textContent = state.draft ? `${sider} sider` : 'Ikke laget ennå';
 }
-function setYearName(){ if(state.year != null && !$('albumName').dataset.touched) $('albumName').value = `Familiealbum ${state.year}`; renderYearSelect(); }
+/* Forslag til tekst: «Øyeblikk fra 2011» på forsiden og ryggen, og navnene i familien som
+   undertittel. Det brukeren har skrevet selv, blir stående. */
+function setYearName(){
+  if(state.year != null){
+    const t = `Øyeblikk fra ${state.year}`;
+    if(!$('albumName').dataset.touched) $('albumName').value = t;
+    $('spineText').placeholder = $('albumName').value || t;
+    $('introText').placeholder = `Skriv litt om ${state.year}. Hva skjedde, hvem kom til, hva husker dere best? Trykk «Foreslå en start» for et utgangspunkt.`;
+  }
+  if(!$('albumSub').dataset.touched) $('albumSub').value = famLine();
+  renderYearSelect();
+}
+function famLine(){ const n = $('famNames').value.split(/,| og /).map(x => x.trim()).filter(Boolean); return n.length > 1 ? n.slice(0, -1).join(', ') + ' og ' + n[n.length - 1] : n[0] || ''; }
+const spineText = () => $('spineText').value.trim() || $('albumName').value || '';
+/* Et utgangspunkt for teksten på første side, ut fra de største historiene i utkastet. */
+function introSuggestion(){
+  const evs = (state.draft?.events || []).filter(e => e.pages.length && !e.everyday).sort((a, b) => b.pages.length - a.pages.length).slice(0, 3).sort((a, b) => a.start - b.start);
+  const fam = famLine();
+  const when = evs.map(e => e.start.toDateString() === e.end.toDateString() ? fmtDay(e.start) : eventTitle(e));
+  return `${state.year} var året da …\n\n${fam ? `Vi er ${fam}. ` : ''}${when.length ? `Noen av dagene vi husker best: ${when.join(', ').replace(/, ([^,]*)$/, ' og $1')}. ` : ''}Skriv om det som betydde mest for dere i år.`;
+}
 /* Året for albumet velges i panelet (standard: året med flest bilder), ikke øverst på sidene. */
 function renderYearSelect(){
   const counts = {}; state.photos.filter(p => !p.dup).forEach(p => { const y = p.date.getFullYear(); counts[y] = (counts[y] || 0) + 1; });
@@ -1645,11 +1792,68 @@ function renderDraftView(){
   const years = [...new Set(state.photos.filter(p => !p.dup).map(p => p.date.getFullYear()))].sort();
   if(state.year == null && years.length) state.year = years[years.length-1];
   setYearName();
-  $('draftTitle').textContent = state.draft ? `Utkast til ${$('albumName').value}` : $('albumName').value;
+  $('draftTitle').textContent = state.draft ? `Utkast: ${$('albumName').value}` : $('albumName').value;
   $('redraft').classList.toggle('hidden', !state.draft); $('seeAlbum').classList.toggle('hidden', !state.draft);
   if(!state.analysing) renderDraft();
   renderDock(); updateCounts();
 }
+
+/* ---------- Lagre utkastet ----------
+   Lagres bare på denne maskinen (her: i nettleseren). Bildene kjennes igjen på filnavn og
+   tidspunkt, så utkastet kan hentes fram igjen når de samme mappene er valgt. */
+const SAVE_KEY = 'fo2album-utkast';
+const keyOf = p => `${p.name}|${+p.date}`;
+function savedDraft(){ try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch(e){ return null; } }
+function saveDraft(){
+  if(!state.draft) return toast('Lag utkastet først');
+  const k = id => { const p = byId(id); return p ? keyOf(p) : null; }, ks = ids => [...ids].map(k).filter(Boolean);
+  // Sidene slik de er nå beholdes som «Fornøyd» når utkastet hentes fram igjen.
+  const pages = draftPagesFlat().map(pg => ({ kind: pg.kind, tpl: pg.tpl, ids: ks(pg.ids), locked: !!pg.locked }));
+  const data = { year: state.year, at: Date.now(), pages, decisions: [...state.decisions].map(([id, d]) => [k(id), d]).filter(x => x[0]),
+    look: state.photos.filter(p => p.big || p.rot || p.emph || p.focus || p.fit).map(p => [keyOf(p), { big: p.big, rot: p.rot, emph: p.emph, focus: p.focus, fit: p.fit }]),
+    merges: state.merges.map(ks), stories: state.stories.map(ks), kinds: [...state.kinds].map(([id, v]) => [k(id), v]).filter(x => x[0]),
+    cands: ks(state.coverCands), cover: k(state.coverId), back: k(state.backId),
+    texts: { name: $('albumName').value, nameT: !!$('albumName').dataset.touched, sub: $('albumSub').value, subT: !!$('albumSub').dataset.touched, fam: $('famNames').value, spine: $('spineText').value, intro: $('introText').value, back: $('backText').value } };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch(e){ return toast('Fikk ikke lagret utkastet'); }
+  toast('Utkastet er lagret på denne maskinen');
+  state.note = { text: 'Utkastet er lagret på denne maskinen. Neste gang du velger de samme bildemappene, kan du fortsette der du slapp.' }; renderDock(); renderStart();
+}
+function restoreDraft(){
+  const sv = savedDraft(); if(!sv) return;
+  const byKey = new Map(state.photos.map(p => [keyOf(p), p.id])), id = k => byKey.get(k), ids = ks => ks.map(id).filter(x => x != null);
+  state.year = sv.year; state.decisions = new Map(sv.decisions.map(([k, d]) => [id(k), d]).filter(x => x[0] != null));
+  sv.look.forEach(([k, v]) => { const p = byId(id(k)); if(p) Object.assign(p, v); });
+  state.merges = sv.merges.map(ks => new Set(ids(ks))).filter(m => m.size > 1); state.stories = sv.stories.map(ks => new Set(ids(ks))).filter(m => m.size);
+  state.kinds = new Map(sv.kinds.map(([k, v]) => [id(k), v]).filter(x => x[0] != null)); state.coverCands = new Set(ids(sv.cands));
+  state.coverId = id(sv.cover) ?? null; state.backId = id(sv.back) ?? null;
+  const t = sv.texts; $('albumName').value = t.name; $('albumName').dataset.touched = t.nameT ? '1' : ''; $('albumSub').value = t.sub; $('albumSub').dataset.touched = t.subT ? '1' : '';
+  $('famNames').value = t.fam; $('spineText').value = t.spine; $('introText').value = t.intro; $('backText').value = t.back;
+  state.locked = new Map(); state.restoring = new Set(); sv.pages.forEach(pg => { const pid = ++pageUid, list = ids(pg.ids); if(list.length){ state.locked.set(pid, { id: pid, kind: pg.kind, tpl: pg.tpl, ids: list }); if(!pg.locked) state.restoring.add(pid); } });
+  renderChips(); setYearName();
+  runAnalysis(null, true);
+}
+/* Bestilling: oppsummering, sjekkliste og hva som sendes. Bare det ferdige albumet sendes. */
+function renderOrder(){
+  buildPages();
+  const sider = draftPages(), cover = state.coverId != null && byId(state.coverId);
+  const check = [[!!cover, 'Forsiden har et bilde'], [!!$('albumName').value.trim(), `Tittel på forsiden: «${esc($('albumName').value.trim() || '–')}»`], [!!spineText(), `Ryggen: «${esc(spineText() || '–')}»`],
+    [!!$('introText').value.trim(), 'Tekst om året på første side'], [!!$('backText').value.trim(), 'Tekst på baksiden (valgfritt)'], [draftPagesFlat().some(pg => pg.locked), 'Du har gått gjennom sidene og merket noen «Fornøyd»']];
+  $('orderWrap').innerHTML = `<div class="order"><div>${cover ? pageHtml({ type: 'cover', ids: [state.coverId] }, 0, false) : ''}</div>
+    <div style="display:flex;flex-direction:column;gap:12px"><h2 style="margin:0;font:600 22px/1.2 var(--display)">${esc($('albumName').value || 'Albumet')}</h2>
+    <dl class="facts"><dt>Sider</dt><dd>${sider}</dd><dt>Bilder</dt><dd>${visible().filter(p => p.selected).length}</dd><dt>Format</dt><dd>Innbundet, 21 × 28 cm</dd><dt>Pris</dt><dd>${kr(pris(sider))}</dd></dl>
+    <ul class="check">${check.map(([ok, t]) => `<li class="${ok ? '' : 'todo'}">${t}</li>`).join('')}</ul>
+    <p><b>Bare det ferdige albumet sendes til trykkeriet.</b> Bildene, ansiktene og det appen har lært om dere, blir på denne maskinen.</p>
+    <p class="crumb">Minnene blir sterkere når dere blar i dem sammen. Albumet trykkes og sendes hjem til dere.</p>
+    <div class="toolbar"><button class="btn btn--s" id="orderTexts">Rett tekstene</button><button class="btn btn--p btn--lg" id="orderPdf">Lag trykkfilen</button></div>
+    <p class="crumb">I prototypen lagres trykkfilen som PDF på maskinen din. I appen sendes den til trykkeriet når du bekrefter bestillingen.</p></div></div>`;
+}
+$('orderWrap').addEventListener('click', e => {
+  if(e.target.closest('#orderPdf')) $('exportPdf').click();
+  if(e.target.closest('#orderTexts')){ showView('album'); renderAlbum(); goText('albumName'); }
+});
+$('orderBack').onclick = () => { showView('album'); renderAlbum(); };
+$('saveDraft').onclick = saveDraft;
+$('goOrder').onclick = () => { if(!state.draft) return toast('Lag utkastet først'); showView('order'); renderOrder(); };
 
 /* ---------- Visninger ---------- */
 function showView(v){
@@ -1659,14 +1863,17 @@ function showView(v){
   $('viewDraft').classList.toggle('hidden', v !== 'draft');
   $('navDraft').setAttribute('aria-current', v === 'draft');
   $('viewAlbum').classList.toggle('hidden', v !== 'album');
+  $('viewOrder').classList.toggle('hidden', v !== 'order');
+  $('panelActs').classList.toggle('hidden', !state.draft || v === 'start' || v === 'order');
   $('navPick').setAttribute('aria-current', v === 'pick');
   $('navAlbum').setAttribute('aria-current', v === 'album');
-  $('makeDraft').classList.toggle('hidden', v === 'album');
+  $('makeDraft').classList.toggle('hidden', v === 'album' || v === 'order');
   // Én hovedknapp per skjerm: på startsiden er «Lag utkast» i selve siden.
   $('makeDraft').classList.toggle('btn--p', v !== 'start'); $('makeDraft').classList.toggle('btn--s', v === 'start');
-  $('exportPdf').classList.toggle('hidden', v !== 'album');
+  // Trykkfilen lages fra bestillingen; knappen i panelet brukes ikke lenger direkte.
+  $('exportPdf').classList.add('hidden');
   $('exportPdf').classList.toggle('btn--p', v === 'album'); $('exportPdf').classList.toggle('btn--s', v !== 'album');
-  $('panelHint').textContent = v === 'album' ? 'Velg «Lagre som PDF» i utskriftsvinduet. Filen lagres bare på din maskin.' : 'Utkastet lages lokalt på maskinen';
+  $('panelHint').textContent = v === 'album' || v === 'order' ? 'Bare det ferdige albumet sendes til trykk, og bare når du bestiller.' : 'Utkastet lages lokalt på maskinen';
   if(v === 'pick') renderGrid();
   if(v === 'draft') renderDraftView(); else $('dock').classList.add('hidden');
 }
@@ -1674,6 +1881,12 @@ $('navPick').onclick = () => showView(state.photos.length ? 'pick' : 'start');
 $('navDraft').onclick = () => showView(state.draft || state.analysing ? 'draft' : 'start');
 /* Startsiden forblir kildesiden: når en mappe er lagt til, vises bare listen over kildene og
    «Lag utkast» under kortene, så flere kilder kan legges til før utkastet lages. */
+/* Et lagret utkast passer når de fleste bildene i det finnes blant bildene som er valgt nå. */
+function savedMatch(){
+  const sv = savedDraft(); if(!sv || state.ingesting) return false;
+  const keys = new Set(state.photos.map(keyOf)), want = sv.pages.flatMap(pg => pg.ids);
+  return want.length > 0 && want.filter(k => keys.has(k)).length >= .8*want.length;
+}
 function renderStart(){
   const box = $('startAdded'); if(!box) return;
   const has = state.folders.length > 0;
@@ -1683,15 +1896,15 @@ function renderStart(){
   box.innerHTML = `<b>Lagt til</b><ul>${state.folders.map(f => `<li>${esc(f.name)} <span class="crumb">${f.source} · ${f.count} bilder</span></li>`).join('')}</ul>
     ${state.ingesting ? `<p class="crumb">${esc($('loadText').textContent)}</p>` : ''}
     <p class="crumb">Har dere bilder flere steder? Legg dem til med kortene over før du lager utkastet.</p>
-    <div class="toolbar"><button class="btn btn--p btn--lg" id="startDraft2" ${n ? '' : 'disabled'}>Lag utkast</button></div>`;
+    <div class="toolbar"><button class="btn btn--p btn--lg" id="startDraft2" ${n ? '' : 'disabled'}>Lag utkast</button>${savedMatch() ? `<button class="btn btn--s btn--lg" id="resume">Fortsett på lagret utkast (${new Date(savedDraft().at).toLocaleDateString('nb-NO')})</button>` : ''}</div>`;
 }
 $('startAdded').addEventListener('click', e => {
   if(e.target.closest('#startDraft2')){ runAnalysis(null); return; }
+  if(e.target.closest('#resume')){ restoreDraft(); return; }
 });
 $('navAlbum').onclick = () => { if(state.pages.length){ showView('album'); renderAlbum(); } else if(state.draft){ buildPages(); showView('album'); renderAlbum(); } else toast('Trykk «Lag utkast» først'); };
 $('sources').addEventListener('click', e => { const b = e.target.closest('[data-src]'); if(b) pickFolder(b.dataset.src); });
 $('addFolder').onclick = () => { if(state.view === 'start') toast('Velg en kilde under'); else pickFolder('PC'); };
-$('albumName').addEventListener('input', () => $('albumName').dataset.touched = '1');
 })();
 </script>
 </body>

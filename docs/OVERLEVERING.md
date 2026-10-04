@@ -80,6 +80,12 @@ Føringer fra eierens andre runde (4. oktober 2026):
 
 38. Startsiden forblir kildesiden etter at en mappe er valgt: samme førstebilde, med «Lagt til» og «Lag utkast» under kortene, så flere kilder kan legges til først. Ingen årstall øverst; året velges i et felt («Album for»/«År», standard året med flest bilder). Albumutkastet viser bare gjennomgangen i sju punkter når den er startet, og deretter utkastet. Gjort i prototypen og appen.
 39. Når flere bilder er markert, kan de settes sammen på én side («Sett på én side»): bildene flyttes fra sidene de sto på, tas med om de ikke var med, og samles på en ny side i dagen til det første bildet (over 12 bilder fordeles på flere sider). Siden merkes «Fornøyd» så den beholdes i neste revisjon, og rammevalget åpnes. Kan angres. Gjort i prototypen; i appen kommer det sammen med markering og «Fornøyd» (krever lagring av låste sider).
+40. «Egen historie» for markerte bilder: bildene tas ut av dagene sine og blir en egen historie med egne sider, i tidsrekkefølge. Huskes i neste revisjon og kan legges tilbake. Gjort i prototypen.
+41. Bilder kan roteres (meny, stor visning og markering). Gjort i prototypen; rotasjonen følger med til trykkfilen.
+42. Opprioriter gjør bildet større trinn for trinn: større på siden, større igjen, egen side, til slutt hele siden. «Ta med, men demp» går motsatt vei, til samme størrelse som de andre på siden og så litt mindre. Gjort i prototypen.
+43. Høyre panel har «Lagre utkast» og «Gå til bestilling». Lagret utkast hentes fram fra startsiden når de samme bildemappene er valgt («Fortsett på lagret utkast»). Bestillingen viser sider, pris, en sjekkliste og at bare det ferdige albumet sendes. Gjort i prototypen (lagret i nettleseren; i appen i den krypterte databasen).
+44. Valgt forside vises tydelig («Valgt nå» under «Forside og bakside» og i panelet), også når den velges fra bildemenyen.
+45. Tekst i albumet: forsiden (forslag «Øyeblikk fra <år>», undertittel med navnene i familien), ryggen, første side inne i albumet (tekst om året, med «Foreslå en start») og baksiden. Klikk på forsiden, ryggen, første side eller baksiden går rett til teksten. Gjort i prototypen.
 
 Status 36–37: gjort i prototypen. Kjernen: `DraftHints::merged_events`, `Draft::merge_suggestions`, `Decision::Opp`, `Action::Opp`/`SlaaSammen`. Appen viser ikke forslagene og markeringen ennå.
 
