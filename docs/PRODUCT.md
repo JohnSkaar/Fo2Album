@@ -26,6 +26,11 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 - Utkast: forside, månedsvise kapitler, variert layout (helside, 2, 3, 4 bilder, serie-oppslag), bildetekster med måned/dato og stedsnavn.
 - Forsidehjelp (se under).
 - Redigering: bytte, flytte, fjerne, legge til, bytte layout per side, beskjære.
+- **Helhetsvurdering:** uskarpe bilder utelukkes ikke før appen har vurdert hvor mye personen og situasjonen betyr (se `SCORING.md` §3.6 og §6.1). Uskarpe, men viktige bilder får litt mindre plass.
+- **Oppskarping** tilbys for bilder brukeren vil fremheve; aldri automatisk, og originalen endres ikke.
+- **Kommentarer på utkastet** (bilde, side, person, hendelse, hele albumet). Strukturerte kommentarer justerer utvalget; fritekst lagres og vises igjen.
+- **Familieprofilen:** kryptert på brukerens maskin. Tar vare på personer, roller, fødselsdatoer, kommentarer og det appen har lært, så neste års album starter der dette slapp.
+- **Gjenoppretting:** en gjenopprettingsfrase og en kryptert sikkerhetskopi som familien selv oppbevarer, så familieprofilen ikke går tapt om maskinen gjør det.
 - Eksport til trykkklar PDF og bestilling (kun PDF sendes).
 
 **Ikke med i v1:** kalendere, fotobøker for enkelthendelser, deling/samarbeid, mobilapp, nettbasert redigering, sky-lagring av prosjekter.
@@ -38,7 +43,18 @@ Familier og foreldre (særlig den i familien som «har ansvaret for bildene»), 
 4. **Hvem er med?** Vis de 6–12 største ansiktsgruppene. Brukeren navngir og markerer roller. Spør særskilt: «Er det noen som er spesielt viktige å få med, som besteforeldre eller oldeforeldre?»
 5. **Forslag**: rutenett per måned med forslaget forhåndsvalgt, poeng og begrunnelse ved hover («Skarp, alle smiler, oldemor er med – 1 av 4 bilder av henne i år»).
 6. **Forside** (se under).
-7. **Utkast** → redigering → **Lagre PDF / Bestill**.
+7. **Utkast** → redigering og **kommentarer** → **Lagre PDF / Bestill**.
+8. **Neste år:** appen åpner med familieprofilen: kjente personer, fjorårets kommentarer og det den har lært. Brukeren bekrefter eller justerer før analysen starter.
+
+## Personvern: hva vi vet om kunden
+
+Så lite som mulig. Alt som kan være personopplysninger ligger helst på brukerens maskin (kryptert), og bare unntaksvis hos oss.
+
+| Hos brukeren (kryptert) | Hos oss | Hos betalings- og trykkpartner |
+|---|---|---|
+| Bilder (urørt), miniatyrer, ansiktsdata, personer og roller, kommentarer, poeng, familieprofil | Kunde-ID (offentlig nøkkel, ingen konto, e-post eller passord), ordre, navn og leveringsadresse, trykk-PDF til albumet er levert og reklamasjonsfristen er ute | Stripe/Vipps: betalingsopplysninger (vi får bare en referanse). Trykkeri: PDF og leveringsadresse, under databehandleravtale med krav om sletting |
+
+Ansiktsgjenkjenning skjer bare på familiens egen maskin; vi behandler aldri biometriske data. Detaljer i `ARCHITECTURE.md`, «Personvern og sikkerhet».
 
 ## Forsidehjelp
 

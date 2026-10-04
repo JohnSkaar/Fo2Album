@@ -10,8 +10,10 @@ All analyse skjer lokalt. Alle tall under er **startverdier** som skal kalibrere
 
 ```
 Kilder → Innlesing → Dubletter → Funksjoner per bilde → Hendelser → Personer
-      → Bildepoeng → Utvalg (optimering) → Sidefordeling/layout → Forside → Forklaringer
+      → Betydning → Bildepoeng → Utvalg (optimering) → Sidefordeling/layout → Forside → Forklaringer
 ```
+
+**Helhetsvurdering først.** Ingen bilder utelukkes på teknisk kvalitet alene før betydningen er regnet ut (§3.6). Et uskarpt bilde av noe som betyr mye (det eneste bildet av oldemor, de første dagene med en nyfødt) skal kunne komme med. Appen sletter aldri bilder; den lar bare være å foreslå dem, og forklarer hvorfor.
 
 Alle steg er inkrementelle og cachet (SQLite) med filens innholdshash som nøkkel, så ny analyse etter at en mappe er lagt til går raskt.
 
@@ -27,6 +29,8 @@ Alle steg er inkrementelle og cachet (SQLite) med filens innholdshash som nøkke
 3. **Nesten-dubletter (serier):** ulike bilder av samme øyeblikk. Håndteres i §5, ikke slettes.
 
 **Støy som filtreres før poengsetting** (ikke slettes, bare utelates fra forslag): skjermbilder (oppløsning = skjerm, ingen EXIF-kamera, filnavn `Screenshot`), dokumenter/kvitteringer/whiteboard (tekst-tetthet høy, scene-tag «document»), memes/videresendte bilder (WhatsApp/Messenger uten kamera-EXIF og lav oppløsning), helt svarte/utbrente bilder, bilder tatt i lomma.
+
+**Ubrukelig** (`Q_tech < 0.15`: helt svart/utbrent, lommebilde, motivet ikke til å kjenne igjen) holdes utenfor forslaget **bare hvis betydningen også er lav** (`B_i < 0.8`, §3.6). Er det eneste bildet av en viktig person eller et spesielt øyeblikk, blir det med som kandidat og merkes for brukeren.
 
 ---
 
@@ -70,6 +74,25 @@ Avledet **bildetype** (brukes til variasjon i §6 og §7): `portrett`, `par`, `g
 - **Sted:** GPS → omvendt geokoding **lokalt** (offline database, f.eks. GeoNames) til stedsnavn for bildetekster. Avstand fra «hjem» (det hyppigste overnattingsstedet) indikerer reise.
 - **Kalender:** norske høytider og merkedager (nyttår, vinterferie, påske, 17. mai, sankthans, fellesferie, høstferie, advent, jul). Fødselsdager når brukeren har oppgitt dem.
 
+### 3.6 Betydning `B` (regnes ut før kvaliteten vektes)
+
+Betydningen avgjør hvor mye teknisk kvalitet får lov å trekke ned (§6.1). Den har to deler:
+
+- **Personens betydning `P_i`** (§6.1): rolle × sjeldenhet. Den synker når det finnes mange gode bilder av personen.
+- **Situasjonens betydning `M_i`** = maks av hendelsens viktighet `E_e(i)` (§4.2) og **spesielle øyeblikk** `Ø_i`:
+
+| Spesielt øyeblikk | Signal | Startverdi `Ø` |
+|---|---|---|
+| Ny i familien | De første ukene etter at en ny person (spedbarn) dukker opp i bildene, eller etter fødselsdato registrert i familieprofilen | 0.9 de første 14 dagene, deretter avtagende til 0 etter 90 dager |
+| Merkedag for en person i bildet | Bursdag (fra familieprofilen), dåp, konfirmasjon, bryllup (scene-tagger og kalender) | 0.8 |
+| Uvanlig mye fotografert | Mange bilder på kort tid sammenlignet med familiens vanlige rytme | 0.4–0.7 (skalert) |
+| Brukeren har markert det | Favoritt/hjerte, kommentar «viktig» (§6.3), hendelse markert som viktig | 1.0 |
+
+```
+M_i = max(E_e(i), Ø_i)
+B_i = 1 − (1 − P_i) · (1 − M_i)       // høy hvis enten personen eller situasjonen betyr mye
+```
+
 ---
 
 ## 4. Personer og hendelser
@@ -100,7 +123,7 @@ rar_p = 1 + α · exp(−n_p / τ)        α = 1.2, τ = 8
 ```
 En person med 3 gode bilder får ≈ ×1.83, en med 40 får ≈ ×1.01.
 
-**Dekning:** hver navngitt person med rolle ≠ annen skal være med i albumet minst `min_p` ganger (barn/kjernefamilie: 6, besteforeldre: 2, nær familie/venn: 1), hvis det finnes et akseptabelt bilde (Q_tech ≥ 0.4). Kjernefamilien skal være rimelig jevnt fordelt (ikke 40 bilder av det ene barnet og 8 av det andre); balanse inngår i målfunksjonen (§6).
+**Dekning:** hver navngitt person med rolle ≠ annen skal være med i albumet minst `min_p` ganger (barn/kjernefamilie: 6, besteforeldre: 2, nær familie/venn: 1), hvis det finnes et akseptabelt bilde. **Akseptabelt** = `Q_tech ≥ 0.4`, eller for personer med `n_p ≤ 5`: det beste bildet som ikke er ubrukelig (§2). Kjernefamilien skal være rimelig jevnt fordelt (ikke 40 bilder av det ene barnet og 8 av det andre); balanse inngår i målfunksjonen (§6).
 
 ### 4.2 Hendelser
 1. Sorter bilder på tid. Del i hendelser når tidsgapet > `max(3 t, 2 × median-gap i nabolaget)` **eller** stedet endres > 30 km.
@@ -136,13 +159,18 @@ Serie-oppslag er sjeldne og skal føles som en gave, ikke som at algoritmen ikke
 ## 6. Samlet bildepoeng og utvalg
 
 ### 6.1 Bildepoeng (grunnverdi)
+
+Person og situasjon får mest vekt. Teknisk kvalitet trekker ned, men mindre jo viktigere bildet er.
+
 ```
-S_i = Q_tech_i^0.7 · ( 0.30·Q_aes_i + 0.30·P_i + 0.20·Q_moment_i + 0.20·E_e(i) )
+S_i = Q_tech_i^γ_i · ( 0.35·P_i + 0.30·M_i + 0.20·Q_aes_i + 0.15·Q_moment_i )
+γ_i = γ_max − (γ_max − γ_min) · B_i          γ_max = 0.7, γ_min = 0.15
 P_i = min(1, Σ_p∈i  w_p · rar_p · ansiktskvalitet_pi) / P_norm
 ```
-- `Q_tech` virker som en port (multiplikativt): et uskarpt bilde blir ikke reddet av at oldemor er med, men et litt uskarpt bilde av oldemor kan slå et knivskarpt bilde av en vase.
-- Bilder uten personer får `P_i = 0` og `Q_moment` erstattes av `Q_aes` (stemningsbilder konkurrerer på estetikk og hendelse).
-- **Unntak for sjeldne:** hvis person p har `n_p ≤ 3`, tillates `Q_tech` ned til 0.3 for p sitt beste bilde (det kan være det eneste bildet av oldemor i år).
+- **Kvalitet straffer mindre når betydningen er høy.** Med `Q_tech = 0.3` beholder et vanlig bilde (`B = 0`) 43 % av poengene, mens det eneste bildet av oldemor (`B ≈ 1`) beholder 83 %. Et knivskarpt bilde av en vase slår fortsatt ikke et litt uskarpt bilde av oldemor.
+- Bilder uten personer: `P_i = 0`, og vektene for `P` og `Q_moment` flyttes til `Q_aes` (stemningsbilder konkurrerer på estetikk og situasjon): `S_i = Q_tech_i^γ_i · (0.30·M_i + 0.70·Q_aes_i)`.
+- Det gamle unntaket for sjeldne personer (`n_p ≤ 3` tillater `Q_tech` ned til 0.3) erstattes av `γ_i`, som gir samme effekt jevnt i stedet for med en terskel.
+- Forklaringen skal si det når betydningen har reddet et uskarpt bilde: «Litt uskarpt, men det eneste bildet av oldemor i år».
 
 ### 6.2 Utvalg som optimering
 Antall bilder `K` bestemmes av antall sider (standard 40 sider ≈ 110–150 bilder, avhengig av layoutmiks). Velg mengden `A` (|A| = K) som maksimerer:
@@ -166,6 +194,8 @@ Kvadratrot-leddene gjør funksjonen submodulær (avtagende utbytte), så **gråd
 - Bilder brukeren har redigert/beskåret → +0.05.
 - Bilder delt til familien (f.eks. eksportert til WhatsApp-mappe) → svakt signal.
 - **Overstyringer i appen:** når brukeren fjerner/legger til bilder, juster vekter lokalt (f.eks. lavere vekt på en bildetype som stadig fjernes). Lagres per bruker, aldri sendt.
+- **Kommentarer på utkastet:** brukeren kan kommentere bilder, sider, personer, hendelser og hele albumet. Strukturerte kommentarer («mer av», «mindre av», «viktig», «ikke ta med») justerer vektene direkte. Fritekst lagres og vises igjen, men tolkes ikke i v1.
+- **Familieprofilen** (kryptert, lokalt; se `ARCHITECTURE.md`) tar vare på personer, roller, fødselsdatoer, kommentarer, overstyringer og lærte vekter fra år til år. Neste års utvalg starter fra den: fjorårets kommentarer vises, og vektene er allerede justert.
 
 ---
 
@@ -179,6 +209,8 @@ Hvert valgt bilde får en **sidevekt** som avgjør plassen det får:
 | **Halv side** (2-bildesmal, stort felt) | S i topp 20 % |
 | **Rutenett** (3–4 per side) | Resten, gruppert etter hendelse |
 | **Serie-oppslag** | Se §5 |
+
+**Uskarpe, men viktige bilder** får mindre plass, der uskarpheten synes mindre: `Q_tech < 0.5` gir aldri helside, og `Q_tech < 0.35` gir et felt i rutenett. Brukeren kan alltid gjøre bildet større. Senere: regn ut hvor stor uskarpheten blir på trykk (i mm) for feltstørrelsen, i stedet for faste terskler.
 
 **Rytme og variasjon i layout:**
 - Maks 1 helside per 4 sider i snitt, aldri to helsider ved siden av hverandre unntatt bevisst «oppslag-par» (to helsider som hører sammen, f.eks. landskap + portrett fra samme sted).
@@ -217,9 +249,19 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
 
 ---
 
+## 9b. Oppskarping (tilbud, aldri automatisk)
+
+- Tilbys for bilder i albumet med `Q_tech < 0.5`, når brukeren vil fremheve dem.
+- Kjøres lokalt. Brukeren ser før og etter og velger selv. Originalen endres aldri; oppskarpingen lagres som en redigering i familieprofilen og brukes bare i trykkfilen.
+- v1: klassiske metoder (uskarp maske, dekonvolusjon). En ML-modell for oppskarping kan vurderes senere (lisenssjekk, se `ARCHITECTURE.md`).
+- Vær ærlig i grensesnittet: litt uskarphet kan bedres, kraftig bevegelsesuskarphet kan ikke reddes.
+
+---
+
 ## 10. Evaluering (må bygges tidlig)
 
 1. **Gullsett:** 3–5 ekte familiebibliotek (med samtykke, kun lokalt hos utvikler) der familien selv har valgt «sitt» album for et år. Pluss syntetiske testsett for enhetstester.
+   - **Eierens eget bibliotek:** fasit (ferdige album) for 2006–2010, som brukes som første gullsett og til kalibrering når hovedstrukturen er på plass. **2011** brukes som eierens eget testår uten fasit (bl.a. nyfødtbilder i dårlig lys), for å prøve helhetsvurderingen i §3.6 og §6.1 i praksis.
 2. **Metrikker:**
    - Presisjon/recall mot familiens eget utvalg (på hendelsesnivå og bildenivå; tillat «nesten samme bilde» som treff).
    - Dekning: andel navngitte personer over `min_p`; måneder representert.
@@ -244,5 +286,9 @@ Forkastede bilder kan også forklares («Nesten likt et bedre bilde», «Uskarpt
 | full_page_percentile | 0.05 | Topp-andel som kan få helside |
 | series_spread_max | 1 per 20 sider | Kunstneriske serier |
 | ppi_min / ppi_ok | 150 / 200 | Oppløsningskrav |
+| γ_max / γ_min | 0.7 / 0.15 | Hvor hardt teknisk kvalitet straffer, ved lav og høy betydning (§6.1) |
+| unusable_q_tech / unusable_b_max | 0.15 / 0.8 | Ubrukelig holdes ute bare når betydningen er under grensen (§2) |
+| newborn_days_full / newborn_days_end | 14 / 90 | «Ny i familien»: full verdi, deretter avtagende (§3.6) |
+| blur_no_fullpage / blur_grid_only | 0.5 / 0.35 | Uskarpe bilder får mindre plass (§7) |
 
 Prototypen (`prototype/pho2album-prototype.html`) bruker en svært forenklet versjon (skarphet, eksponering, farge, hudtoner som stedfortreder for personer). Den er bare en referanse for flyten.

@@ -11,6 +11,33 @@
 | Bildedekoding | Plattformens API-er først (ImageIO på Mac, WIC på Windows), Rust `image` for JPEG/PNG/WebP, `libheif` bare som reserve | Unngår HEVC-patent- og LGPL-spørsmål der det går. `libheif` krever juridisk vurdering før bruk |
 | Apple Bilder | **PhotoKit-plugin (Swift) i v1**, som eget spor (M1b) rett etter M1 | iCloud Bilder på Mac er ikke en mappe; uten PhotoKit mister vi hovedkilden for Mac-familier med iPhone |
 | Minimum OS | macOS 12, Windows 10 22H2 / 11 (arbeidshypotese, ikke bekreftet) | |
+| Kryptering | **Fra M1**: familieprofil, ansiktsdata, kommentarer, poeng og miniatyrer krypteres på brukerens maskin | Personopplysninger skal ligge hos brukeren, og kryptering er mye vanskeligere å legge på i etterkant |
+| Gjenoppretting | **Gjenopprettingsfrase + kryptert sikkerhetskopi** som familien selv oppbevarer | Familieprofilen skal kunne brukes år etter år; uten gjenoppretting går den tapt med maskinen |
+| Kunde-ID | Nøkkelpar laget lokalt; den offentlige nøkkelen er kunde-ID. Ingen konto, e-post eller passord hos oss | Minimale opplysninger hos oss (se «Personvern og sikkerhet») |
+
+## Personvern og sikkerhet
+
+### Hos brukeren (kryptert)
+
+- **Hva:** familieprofilen (personer, roller, fødselsdatoer, kommentarer, overstyringer, lærte vekter), ansiktsdata (embeddings, klynger), poeng og forklaringer, og miniatyrer (de er bilder av barna). Selve bildene ligger urørt der de var.
+- **Hovednøkkel:** tilfeldig 256-bits nøkkel laget ved første oppstart. Lagres i operativsystemets nøkkelring (Nøkkelring på Mac, Credential Manager/DPAPI på Windows), så brukeren slipper passord til daglig.
+- **Gjenoppretting:** ved første oppstart vises en gjenopprettingsfrase (norsk ordliste) som familien skriver ned. Hovednøkkelen pakkes også inn med en nøkkel avledet fra frasen (Argon2id). En kryptert sikkerhetskopi av familieprofilen kan lagres hvor familien vil, f.eks. i egen Dropbox; den kan bare åpnes med frasen.
+- **Kryptering:** autentisert kryptering (XChaCha20-Poly1305 eller AES-256-GCM). Valget mellom SQLCipher og kryptering på applikasjonsnivå (RustCrypto, MIT/Apache) tas i M1. Merk: SQLCipher trenger en kryptobackend, og `openssl` er forbudt i `deny.toml`.
+- **«Slett alle data»** sletter databasen, miniatyrene og nøkkelen i nøkkelringen.
+
+### Hos oss (minimalt)
+
+| Opplysning | Hvorfor | Hvor lenge |
+|---|---|---|
+| Kunde-ID (offentlig nøkkel) | Kjenne igjen en kunde ved ny bestilling eller support uten konto | Så lenge kunden har ordrer hos oss |
+| Navn og leveringsadresse | Posten/trykkeriet må vite hvor albumet skal | Til levering og reklamasjonsfrist; ordredata deretter så lenge bokføringsreglene krever |
+| Ordre (produkt, pris, betalingsreferanse) | Regnskap og reklamasjon | Etter bokføringsreglene (avklares med regnskapsfører) |
+| Trykk-PDF | Trykking. Det mest følsomme vi har: inneholder ansiktene til barna | Slettes når albumet er levert og reklamasjonsfristen er ute. Kryptert under overføring og lagring |
+
+- **Betaling:** Stripe Checkout eller Vipps. Kort og telefonnummer håndteres av dem; vi lagrer bare en referanse og ber ikke om profildata fra Vipps ut over det leveringen krever.
+- **Trykkeri:** databehandleravtale med krav om sletting av PDF og adresse.
+- **Ansiktsgjenkjenning** skjer bare på familiens maskin (GDPR-unntaket for privat bruk). Vi behandler aldri biometriske data.
+- **E-post for leveringsvarsel** er valgfritt og kan gå direkte til transportøren.
 
 ### Struktur
 
