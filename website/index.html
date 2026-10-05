@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="nb">
+<html lang="nb" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,14 +16,13 @@
 <meta property="og:url" content="https://fo2album.no/">
 <meta property="og:image" content="https://fo2album.no/img/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/tokens.css">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <a class="skip" href="#innhold">Hopp til innhold</a>
 <header class="wrap top">
-<a class="logo" href="/"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="9" fill="#B8532F" transform="rotate(-6 16 16)"/><g fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 9h9a3 3 0 0 1 3 3v11H13a3 3 0 0 1-3-3z"/><path d="M10 20a3 3 0 0 1 3-3h9"/></g></svg>Fo2Album</a>
+<a class="logo" href="/" aria-label="Fo2Album.no, til forsiden"><img src="/logo-symbol.svg" alt="" width="58" height="50"><span aria-hidden="true"><span class="fo2">Fo2</span>Album<span class="no">.no</span></span></a>
 <nav class="nav" aria-label="Hovedmeny"><a href="/#slik">Slik fungerer det</a><a href="/#personvern">Personvern</a><a href="/#eksempler">Eksempler</a></nav>
 <a class="btn btn--primary btn--sm" href="/#venteliste">Få beskjed ved lansering</a>
 </header>
@@ -38,7 +37,7 @@
 </div>
 <div class="hero__media">
 <picture><source srcset="/img/hero.webp" type="image/webp"><img src="/img/hero.jpg" alt="Tre generasjoner samlet rundt et trykt fotoalbum. Bestemor peker på et bilde, og barna ler." width="1024" height="1024" fetchpriority="high"></picture>
-<div class="hero__card" aria-hidden="true"><div class="card"><picture><source srcset="/img/hylle.webp" type="image/webp"><img src="/img/hylle.jpg" alt="" width="800" height="538" loading="lazy"></picture><div class="card__body"><h3>Familiealbum 2025</h3><p class="card__meta">24 sider, 96 bilder</p></div></div></div>
+<div class="hero__card" aria-hidden="true"><div class="card"><picture><img src="/img/hylle.jpg" alt="" width="800" height="538" loading="lazy"></picture><div class="card__body"><h3>Familiealbum 2025</h3><p class="card__meta">24 sider, 96 bilder</p></div></div></div>
 </div>
 </section>
 
@@ -61,16 +60,16 @@
 <li><span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11"/><path d="M9 8h6"/></svg></span><div><strong>Bare albumet sendes</strong><span>Kun det ferdige albumet går til trykk når du bestiller.</span></div></li>
 </ul>
 </div>
-<picture><source srcset="/img/pc.webp" type="image/webp"><img src="/img/pc.jpg" alt="En mor med barnet på fanget ser på bilder på PC-en, med et trykt album på bordet ved siden av." width="1000" height="672" loading="lazy"></picture>
+<div class="privacy__art"><img src="/logo-symbol.svg" alt="En familie ser i et trykt fotoalbum sammen." width="400" height="344" loading="lazy"></div>
 </div>
 </section>
 
 <section id="eksempler" class="wrap section" style="padding-top: 0">
 <h2>Album som blir tatt fram igjen og igjen</h2>
 <div class="albums">
-<article class="card"><picture><source srcset="/img/sommer.webp" type="image/webp"><img src="/img/sommer.jpg" alt="To barn hopper fra brygga ved en rød hytte i solnedgang." width="900" height="678" loading="lazy"></picture><div class="card__body"><h3>Sommer på hytta</h3><p class="card__meta">48 bilder fra juli</p></div></article>
+<article class="card"><div class="ph"><img src="/logo-symbol.svg" alt="" width="96" height="83"><span>Eksempelbilde kommer</span></div><div class="card__body"><h3>Sommer på hytta</h3><p class="card__meta">48 bilder fra juli</p></div></article>
 <article class="card"><picture><source srcset="/img/emma.webp" type="image/webp"><img src="/img/emma.jpg" alt="En baby på et linteppe strekker seg mot en hånd." width="900" height="678" loading="lazy"></picture><div class="card__body"><h3>Emmas første år</h3><p class="card__meta">112 bilder fra 2025</p></div></article>
-<article class="card"><picture><source srcset="/img/jul.webp" type="image/webp"><img src="/img/jul.jpg" alt="Besteforeldre og barnebarn ler rundt julebordet i levende lys." width="900" height="678" loading="lazy"></picture><div class="card__body"><h3>Jul hos besteforeldre</h3><p class="card__meta">36 bilder fra desember</p></div></article>
+<article class="card"><div class="ph"><img src="/logo-symbol.svg" alt="" width="96" height="83"><span>Eksempelbilde kommer</span></div><div class="card__body"><h3>Jul hos besteforeldre</h3><p class="card__meta">36 bilder fra desember</p></div></article>
 </div>
 </section>
 
@@ -92,6 +91,6 @@
 </div>
 </section>
 </main>
-<footer class="foot"><div class="wrap"><span>© 2026 Fo2Album</span><nav aria-label="Bunnmeny"><a href="/personvern.html">Personvern</a><a href="mailto:[KONTAKT-EPOST]">Kontakt oss</a></nav></div></footer>
+<footer class="foot"><div class="wrap"><span>© 2026 Fo2Album.no</span><nav aria-label="Bunnmeny"><a href="/personvern.html">Personvern</a><a href="mailto:[KONTAKT-EPOST]">Kontakt oss</a></nav></div></footer>
 </body>
 </html>

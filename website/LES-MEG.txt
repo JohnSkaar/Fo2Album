@@ -1,5 +1,11 @@
 FO2ALBUM – NETTSIDE
 
+Innhold: index.html, personvern.html, takk.html (etter påmelding), style.css, tokens.css
+(kopi av design/tokens.css uten Google Fonts), fonts/ (Fraunces og Nunito Sans, SIL OFL),
+logo-symbol.svg, logo.svg og favicon.svg (fra design/logo/), img/ (og.jpg er delingsbildet).
+Mangler fortsatt: eksempelbildene «Sommer på hytta» og «Jul hos besteforeldre» (vises som
+plassholder med logoen), og bildet i personvern-delen (viser logosymbolet i stedet).
+
 Publiser (Netlify, gratis):
 1. Gå til app.netlify.com/drop og logg inn (eller opprett konto).
 2. Pakk ut zip-filen og dra mappen "fo2album-nettside" inn i nettleservinduet.
