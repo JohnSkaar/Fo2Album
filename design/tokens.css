@@ -81,6 +81,20 @@
   --color-status-warning: var(--honey-600);
   --color-status-warning-subtle: var(--honey-100);
 
+  /* Logoen (en tegning av et trykt album: samme farger i lys og mørk modus) */
+  --color-logo-cover: var(--terracotta-700);
+  --color-logo-page: var(--sand-0);
+  --color-logo-page-alt: var(--sand-50);
+  --color-logo-line: var(--sand-300);
+  --color-logo-frame: var(--sand-200);
+  --color-logo-sky: var(--terracotta-200);
+  --color-logo-sun: var(--terracotta-600);
+  --color-logo-hill: var(--sage-500);
+  --color-logo-heart: var(--sage-400);
+  --color-logo-adult: var(--terracotta-600);
+  --color-logo-child: var(--terracotta-500);
+  --color-logo-ink: var(--sand-700);
+
   /* Avstander */
   --spacing-none: 0px;
   --spacing-2xs: 2px;

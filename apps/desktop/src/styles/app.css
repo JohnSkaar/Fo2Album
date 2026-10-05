@@ -77,24 +77,68 @@ h3 {
 }
 .logo {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--spacing-xs);
   padding: 0 var(--spacing-sm);
-  font: 600 20px/28px var(--font-display);
 }
-.logo svg {
-  width: 30px;
-  height: 30px;
+.logo__symbol {
+  width: 112px;
+  height: auto;
 }
-.logo__bg {
-  fill: var(--color-bg-brand);
+.logo__word {
+  font: 600 22px/28px var(--font-display);
+  color: var(--color-text-primary);
 }
-.logo__mark {
+.logo__fo2 {
+  color: var(--color-text-brand);
+}
+.logo__no {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+.logo__heart {
+  fill: var(--color-logo-heart);
+}
+.logo__cover {
+  fill: var(--color-logo-cover);
+}
+.logo__page {
+  fill: var(--color-logo-page);
+}
+.logo__page-alt {
+  fill: var(--color-logo-page-alt);
+}
+.logo__line {
   fill: none;
-  stroke: var(--color-text-on-brand);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: var(--color-logo-line);
+}
+.logo__frame {
+  fill: var(--color-bg-surface);
+  stroke: var(--color-logo-frame);
+  stroke-width: 1.2;
+}
+.logo__sky {
+  fill: var(--color-logo-sky);
+}
+.logo__sun {
+  fill: var(--color-logo-sun);
+}
+.logo__hill {
+  fill: var(--color-logo-hill);
+}
+.logo__ink {
+  fill: var(--color-logo-ink);
+}
+/* Strek i bakgrunnsfargen skiller personene fra boka og fra hverandre. */
+.logo__people {
+  stroke: var(--color-bg-subtle);
+}
+.logo__adult {
+  fill: var(--color-logo-adult);
+}
+.logo__child {
+  fill: var(--color-logo-child);
 }
 .grp {
   display: flex;
