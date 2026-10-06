@@ -136,8 +136,16 @@ Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 |---|---|---|---|---|
 | Ansiktsdeteksjon (boks + 5 landemerker) | YuNet | `face_detection_yunet_2023mar.onnx`, `8f2383e4…2552fa4` (232 kB) | MIT (Shiqi Yu) | OpenCV Zoo, `models/face_detection_yunet` |
 | Ansiktskjennetegn (128 tall) | SFace (MobileFaceNet) | `face_recognition_sface_2021dec.onnx`, `0ba9fbfa…087c34e79` (38 MB) | Apache-2.0 | OpenCV Zoo, `models/face_recognition_sface` |
+| *Mulig senere:* deteksjon og gjenkjenning | Luxand FaceSDK | – | Kommersiell: 12 950 USD (Windows + macOS), 2 500 USD/år for oppdateringer | Vurderes bare når kundebasen bærer det og evalueringen viser behov; krav: helt frakoblet lisensaktivering |
 
 Modellene ligger i `crates/p2a-faces/models/` med lisensfilene, og bygges inn i programmet. Kontrollert mot OpenCVs egen implementasjon (oktober 2026): samme ansikter i samme oppløsning; samme kjennetegn for samme opprettede ansikt (likhet 1,000). Samme person i to bilder gir likhet 0,86–0,99, ulike personer under 0,2; terskelen er 0,363 (OpenCVs anbefaling). Tid: ca. 0,2 s per bilde for deteksjon og 0,06 s per ansikt, på én kjerne.
+
+**Beslutning (6. oktober 2026, eieren):** M4 bruker YuNet (deteksjon) og SFace (kjennetegn) via ONNX Runtime, bak et byttbart grensesnitt. Luxand FaceSDK (tilbud: 12 950 USD for Windows og macOS, deretter 2 500 USD/år for oppdateringer) vurderes først når kundebasen kan bære kostnaden, og bare hvis evalueringen viser at det trengs. Krav ved et eventuelt kjøp: helt frakoblet lisensaktivering. Personer (navn, roller) lagres uavhengig av kjennetegnene, så ansiktene kan analyseres på nytt ved modellbytte.
+
+Status mot beslutningen (6. oktober 2026):
+- *Kjøremotor:* koden bruker i dag **tract** (ONNX i ren Rust), ikke ONNX Runtime. Samme modellfiler og samme resultater som OpenCV (se over). Bytte til ONNX Runtime (`ort`-pakken) krever at biblioteket pakkes med appen for Mac og Windows og sjekkes i `cargo deny`. Avklares med eieren før byttet.
+- *Byttbart grensesnitt:* `p2a-faces::FaceEngine` er én konkret type i dag. Gjenstår: et trekk (f.eks. `FaceAnalyzer`: `faces(bilde) -> Vec<Face>`, med modellnavn og versjon), så YuNet/SFace, ONNX Runtime eller Luxand kan byttes uten endringer i lagring og utvalg.
+- *Personer uavhengig av kjennetegn:* personer ligger i `persons`, ansiktene i `faces` med `person_id`. Gjenstår: i dag sletter ny analyse av et bilde ansiktene og dermed brukerens plassering. Ved modellbytte må `faces` få modellversjon, og brukerens bekreftede plasseringer må flyttes over til de nye ansiktene (samme bilde, overlappende boks), før de gamle kjennetegnene slettes.
 
 **Åpent spørsmål (juridisk):** vektene har tillatende lisenser, men SFace er trent på offentlige ansiktsdatasett (bl.a. avledet av MS-Celeb-1M/CASIA-WebFace) med egne vilkår. Bør vurderes før lansering; alternativet er å trene eller finjustere en egen modell på lisensierte data. Små ansikter (under ca. 1/60 av bildets lengste side) finnes ikke ennå; det kan løses med deteksjon i ruter for gruppebilder.
 
