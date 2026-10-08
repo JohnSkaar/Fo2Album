@@ -164,10 +164,19 @@ fn decode_jpeg_scaled(
 
 /// JPEG-miniatyr som passer innenfor [`THUMB_MAX`] × [`THUMB_MAX`].
 pub fn thumbnail_jpeg(decoded: &Decoded) -> Vec<u8> {
-    let thumb = decoded.image.thumbnail(THUMB_MAX, THUMB_MAX).to_rgb8();
+    preview_jpeg(decoded, THUMB_MAX, THUMB_QUALITY)
+}
+
+/// JPEG som passer innenfor `max` × `max` (stor visning lages i minnet og lagres ikke).
+pub fn preview_jpeg(decoded: &Decoded, max: u32, quality: u8) -> Vec<u8> {
+    let small = if decoded.image.width().max(decoded.image.height()) > max {
+        decoded.image.thumbnail(max, max).to_rgb8()
+    } else {
+        decoded.image.to_rgb8()
+    };
     let mut out = Vec::new();
-    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, THUMB_QUALITY)
-        .encode_image(&thumb)
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, quality)
+        .encode_image(&small)
         .expect("JPEG-koding i minnet feiler ikke");
     out
 }

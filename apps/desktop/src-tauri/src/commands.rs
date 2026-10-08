@@ -447,6 +447,12 @@ pub struct DraftPhotoDto {
     height: Option<u32>,
     /// Brukerens rotering med klokka (0, 90, 180, 270).
     rotation: u16,
+    /// Brukerens størrelse: -1 mindre, 0 like stort, 1–2 større, 3 egen side, 4 hele siden.
+    size: Option<i8>,
+    /// Utsnittet i en ramme som fylles: midtpunktet som andeler (0–1).
+    focus: [f32; 2],
+    /// Hele bildet vises i rammen.
+    whole: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -471,6 +477,8 @@ pub struct DraftEventDto {
     adult_trip: bool,
     /// Appen så selv at ingen av barna er med (M4).
     adult_trip_guess: bool,
+    /// Brukeren har laget historien selv («Egen historie»).
+    own_story: bool,
     layout: Vec<PageDto>,
 }
 
@@ -484,7 +492,61 @@ pub struct PageDto {
     kolonner: Option<u8>,
     /// Brukeren er fornøyd med siden; den beholdes i neste utkast.
     locked: bool,
+    /// Faste rammer brukeren har valgt.
+    mal: Option<String>,
     photos: Vec<String>,
+    /// Hvor bildene står, i prosent av den ferdige siden (samme som trykkfilen).
+    frames: Vec<FrameDto>,
+}
+
+/// Et felt på siden i prosent av bredden og høyden. Kan gå litt utenfor (utfallende kant).
+#[derive(Debug, Serialize)]
+pub struct FrameDto {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    /// Bildet fyller feltet (beskjæres); ellers har feltet bildets form.
+    fill: bool,
+}
+
+impl From<p2a_print::layout::Frame> for FrameDto {
+    fn from(f: p2a_print::layout::Frame) -> Self {
+        use p2a_print::layout::{TRIM_H, TRIM_W};
+        let r = |v: f32| (v * 1000.0).round() / 1000.0;
+        FrameDto {
+            x: r(f.x / TRIM_W * 100.0),
+            y: r(f.y / TRIM_H * 100.0),
+            w: r(f.w / TRIM_W * 100.0),
+            h: r(f.h / TRIM_H * 100.0),
+            fill: f.fill,
+        }
+    }
+}
+
+/// En fast ramme brukeren kan velge for en side.
+#[derive(Debug, Serialize)]
+pub struct TemplateDto {
+    id: &'static str,
+    photos: usize,
+    frames: Vec<FrameDto>,
+}
+
+/// Rammene brukeren kan velge for en side, med feltene til forhåndsvisning.
+#[tauri::command]
+pub fn page_templates() -> Vec<TemplateDto> {
+    p2a_print::layout::TEMPLATES
+        .iter()
+        .map(|&(id, photos)| TemplateDto {
+            id,
+            photos,
+            frames: p2a_print::layout::template_frames(id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(FrameDto::from)
+                .collect(),
+        })
+        .collect()
 }
 
 /// Forside og bakside: det som brukes nå, og forslagene.
@@ -600,6 +662,19 @@ fn draft_for(
         },
     );
     let id = |i: usize| draft.photos[i].hash.to_hex();
+    // Formen på bildet slik det vises (etter rotering), til feltene på sidene.
+    let aspect = |h: &ContentHash| {
+        let a = summaries
+            .get(h)
+            .and_then(|s| Some(s.width? as f32 / s.height?.max(1) as f32))
+            .filter(|a| *a > 0.0)
+            .unwrap_or(4.0 / 3.0);
+        if chosen.rotation_of(h) % 180 == 90 {
+            1.0 / a
+        } else {
+            a
+        }
+    };
     Ok(DraftDto {
         year,
         merge_suggestions: draft.merge_suggestions.clone(),
@@ -651,10 +726,12 @@ fn draft_for(
                     .iter()
                     .chain(&chosen.family_trips)
                     .any(|p| ids.contains(p));
-                (key, merged, page_target, trip_answered, e)
+                let own_story = ids.iter().any(|id| chosen.in_story(id));
+                (key, merged, page_target, trip_answered, own_story, e)
             })
             .map(
-                |(key, merged, page_target, trip_answered, e)| DraftEventDto {
+                |(key, merged, page_target, trip_answered, own_story, e)| DraftEventDto {
+                    own_story,
                     key,
                     merged,
                     page_target,
@@ -678,11 +755,25 @@ fn draft_for(
                                 PageKind::Luft => ("luft", None),
                                 PageKind::Rutenett { kolonner } => ("rutenett", Some(kolonner)),
                             };
+                            let hashes: Vec<ContentHash> =
+                                p.photos.iter().map(|&i| draft.photos[i].hash).collect();
+                            let mal = chosen.template_of(&hashes).map(str::to_string);
+                            let looks: Vec<(f32, p2a_print::layout::Look)> = hashes
+                                .iter()
+                                .map(|h| (aspect(h), chosen.look_of(h)))
+                                .collect();
+                            let frames =
+                                p2a_print::layout::page_frames(p.kind, mal.as_deref(), &looks)
+                                    .into_iter()
+                                    .map(FrameDto::from)
+                                    .collect();
                             PageDto {
                                 kind,
                                 kolonner,
                                 locked: e.locked_pages.contains(&n),
+                                mal,
                                 photos: p.photos.iter().map(|&i| id(i)).collect(),
+                                frames,
                             }
                         })
                         .collect(),
@@ -706,6 +797,12 @@ fn draft_for(
                     width: s.and_then(|s| s.width),
                     height: s.and_then(|s| s.height),
                     rotation: chosen.rotation_of(&p.hash),
+                    size: chosen.size.get(&p.hash.to_hex()).copied(),
+                    focus: {
+                        let l = chosen.look_of(&p.hash);
+                        [l.focus.0, l.focus.1]
+                    },
+                    whole: chosen.whole.contains(&p.hash.to_hex()),
                 }
             })
             .collect(),

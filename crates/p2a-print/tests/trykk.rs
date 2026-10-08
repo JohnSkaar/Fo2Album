@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use p2a_core::layout::PageKind;
+use p2a_print::layout::Look;
 use p2a_print::{render, Album, AlbumPage, AlbumText, PhotoSource};
 
 fn photo(dir: &Path, name: &str, w: u32, h: u32, seed: u8) -> PhotoSource {
@@ -22,6 +23,7 @@ fn photo(dir: &Path, name: &str, w: u32, h: u32, seed: u8) -> PhotoSource {
         width: w,
         height: h,
         rotation: 0,
+        look: Look::default(),
     }
 }
 
@@ -42,19 +44,41 @@ fn album(dir: &Path) -> Album {
         pages: vec![
             AlbumPage {
                 kind: PageKind::Helside,
+                mal: None,
                 photos: vec![p("a.jpg", 3)],
             },
             AlbumPage {
                 kind: PageKind::Luft,
+                mal: None,
                 photos: vec![l("b.jpg", 4)],
+            },
+            // Faste rammer med utsnitt, og et bilde gjort større.
+            AlbumPage {
+                kind: PageKind::Rutenett { kolonner: 2 },
+                mal: Some("2-side".into()),
+                photos: vec![l("g.jpg", 9), {
+                    let mut x = l("h.jpg", 10);
+                    x.look.focus = (0.0, 0.5);
+                    x
+                }],
             },
             AlbumPage {
                 kind: PageKind::Rutenett { kolonner: 3 },
-                photos: vec![l("c.jpg", 5), p("d.jpg", 6), l("e.jpg", 7), {
-                    let mut gone = l("f.jpg", 8);
-                    gone.path = dir.join("finnes-ikke.jpg");
-                    gone
-                }],
+                mal: None,
+                photos: vec![
+                    l("c.jpg", 5),
+                    p("d.jpg", 6),
+                    {
+                        let mut x = l("e.jpg", 7);
+                        x.look.size = 2;
+                        x
+                    },
+                    {
+                        let mut gone = l("f.jpg", 8);
+                        gone.path = dir.join("finnes-ikke.jpg");
+                        gone
+                    },
+                ],
             },
         ],
     }
@@ -67,19 +91,19 @@ fn trykkfil_med_forside_tekst_historier_og_bakside() {
     let mut calls = Vec::new();
     let (pdf, report) = render(&a, &mut |done, total| calls.push((done, total))).unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
-    // Forside, tekstside, tre historiesider og bakside: seks sider, partall.
-    assert_eq!(report.pages, 6);
+    // Forside, tekstside, fire historiesider, tom side og bakside: åtte sider, partall.
+    assert_eq!(report.pages, 8);
     let text = String::from_utf8_lossy(&pdf);
     assert_eq!(text.matches("/TrimBox").count(), report.pages);
     assert_eq!(text.matches("/BleedBox").count(), report.pages);
-    assert_eq!(report.photos, 8);
+    assert_eq!(report.photos, 10);
     assert_eq!(report.missing.len(), 1);
     assert!(report.missing[0].ends_with("finnes-ikke.jpg"));
     assert!(
         !report.low_resolution.is_empty(),
         "1200 punkter på en helside er for lite"
     );
-    assert_eq!(calls.last(), Some(&(8, 8)));
+    assert_eq!(calls.last(), Some(&(10, 10)));
 }
 
 #[test]
@@ -88,7 +112,7 @@ fn tom_side_gir_partall() {
     let mut a = album(dir.path());
     a.pages.pop();
     let (_, report) = render(&a, &mut |_, _| {}).unwrap();
-    // Forside, tekstside, to historiesider, tom side, bakside.
+    // Forside, tekstside, tre historiesider og bakside.
     assert_eq!(report.pages, 6);
 }
 

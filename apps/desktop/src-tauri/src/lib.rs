@@ -46,6 +46,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .register_uri_scheme_protocol(thumbs::SCHEME, thumbs::handle)
+        .register_asynchronous_uri_scheme_protocol(thumbs::LARGE_SCHEME, thumbs::handle_large)
         .setup(|app| {
             let data_dir = match std::env::var_os(DATA_DIR_ENV) {
                 Some(dir) => dir.into(),
@@ -76,6 +77,7 @@ pub fn run() {
             commands::choose_photo,
             commands::answer_why,
             commands::album_choice,
+            commands::page_templates,
             people::face_groups,
             people::name_face_group,
             people::ignore_face_group,

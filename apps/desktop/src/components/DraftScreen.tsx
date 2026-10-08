@@ -1,9 +1,11 @@
 import { useMemo, useState } from "react";
 import type {
+  Albumtekst,
   Albumvalg,
   Analysefase,
   Omslag,
   Handling,
+  Ramme,
   Laert,
   Side,
   Svar,
@@ -14,14 +16,33 @@ import type {
 import { pris, prisvalg } from "../pris";
 import { datoTekst, fmt, tekster } from "../tekster";
 import { datoSpenn, HVORFOR_VALG, oppdaterSider, spoerOmHvorfor } from "../utkast";
+import { Bla } from "./Bla";
+import { RammeIkon, Sidebilde } from "./Side";
+import { StorVisning } from "./StorVisning";
 
 const t = tekster.utkast;
+const r = tekster.redigering;
 /** Så mange bilder som ikke er med, vises før «Vis alle». */
 const VIS_IKKE_MED = 8;
 const FASER: Analysefase[] = ["henter", "hendelser", "serier", "velger", "begrunnelser"];
 
 type Valgt = { id: string; included: boolean; event: number };
-type Endre = (c: Albumvalg, melding?: string) => void;
+type Endre = (c: Albumvalg | Albumvalg[], melding?: string) => void;
+
+/** Neste størrelse når brukeren trykker «Større» eller «Mindre» (som prototypen). */
+export function nyStorrelse(
+  size: number | null,
+  side: Side | undefined,
+  retning: 1 | -1,
+): number | null {
+  const alene = side?.photos.length === 1;
+  if (retning === 1) {
+    if (alene) return 4;
+    return Math.min(3, Math.max(0, size ?? 0) + 1);
+  }
+  if (alene) return side?.kind === "helside" ? 3 : 0;
+  return Math.max(-1, (size ?? 0) - 1);
+}
 
 /** Brukerens rotering vist på miniatyren (stående bilder skaleres så de får plass). */
 const rotert = (deg: number | undefined): React.CSSProperties | undefined =>
@@ -65,26 +86,40 @@ function Kort({
   b,
   hendelse,
   valgt,
+  markert,
   liten,
   onClick,
+  onMark,
   thumbUrl,
 }: {
   b: UtkastBilde;
   hendelse: UtkastHendelse;
   valgt: boolean;
+  markert: boolean;
   liten?: boolean;
   onClick: () => void;
+  onMark: () => void;
   thumbUrl: (id: string) => string;
 }) {
   const hvorfor = tekster.begrunnelse(b.reason, hendelse.photos);
   return (
-    <li>
+    <li className={`dcwrap${markert ? " dcwrap--markert" : ""}`}>
+      <button
+        type="button"
+        className="dcard__mark"
+        aria-pressed={markert}
+        aria-label={`${r.marker}: ${t.bildeEtikett(datoTekst(b.takenAt), b.included)}`}
+        title={r.markerHjelp}
+        onClick={onMark}
+      >
+        ✓
+      </button>
       <button
         type="button"
         className={`dcard${liten ? " dcard--small" : ""}`}
         aria-pressed={valgt}
         aria-label={`${t.bildeEtikett(datoTekst(b.takenAt), b.included)}. ${hvorfor}`}
-        onClick={onClick}
+        onClick={(e) => (e.ctrlKey || e.metaKey || e.shiftKey ? onMark() : onClick())}
       >
         <span className="th">
           {b.hasThumbnail ? (
@@ -110,69 +145,136 @@ function Kort({
   );
 }
 
+/** «Rammer for siden»: automatisk eller faste rammer med like mange felt som bilder. */
+function Rammevalg({ s, rammer, onChange }: { s: Side; rammer: Ramme[]; onChange: Endre }) {
+  const passer = rammer.filter((r) => r.photos === s.photos.length);
+  const velg = (mal: string | null) =>
+    onChange(
+      {
+        type: "fornoyd",
+        page: { kind: s.kind, kolonner: s.kolonner ?? null, photos: s.photos, mal },
+        on: true,
+      },
+      mal ? tekster.sider.malValgt : t.fornoydMelding,
+    );
+  return (
+    <div className="tplbar" role="group" aria-label={tekster.sider.rammerTittel}>
+      <p className="dock__help">{tekster.sider.rammerIngress}</p>
+      <div className="tpls">
+        <button
+          type="button"
+          className="tpl"
+          aria-pressed={!s.mal}
+          title={tekster.sider.autoHjelp}
+          onClick={() => velg(null)}
+        >
+          <span className="tpl__auto" aria-hidden="true">
+            A
+          </span>
+          <span>{tekster.sider.auto}</span>
+        </button>
+        {passer.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            className="tpl"
+            aria-pressed={s.mal === r.id}
+            onClick={() => velg(r.id)}
+          >
+            <RammeIkon felt={r.frames} />
+            <span>{tekster.sider.mal[r.id] ?? r.id}</span>
+          </button>
+        ))}
+      </div>
+      {passer.length === 0 && <p className="ev__none">{tekster.sider.ingenMaler}</p>}
+    </div>
+  );
+}
+
 function Sider({
   sider,
   med,
-  rotasjon,
+  bilder,
+  valgt,
+  markert,
+  rammer,
+  onPhoto,
   onChange,
   thumbUrl,
 }: {
   sider: Side[];
   /** Bildene som er med nå, i tidsrekkefølge. */
   med: string[];
-  rotasjon: Map<string, number>;
+  bilder: Map<string, UtkastBilde>;
+  valgt: string | null;
+  markert: Set<string>;
+  rammer: Ramme[];
+  onPhoto: (id: string, marker: boolean) => void;
   onChange: Endre;
   thumbUrl: (id: string) => string;
 }) {
   const { sider: vis, endret } = oppdaterSider(sider, med);
+  const [aapen, setAapen] = useState<string | null>(null);
   return (
     <div className="pages">
       <h4 className="ev__colh">{tekster.sider.tittel}</h4>
       <ol className="pages__list">
-        {vis.map((s, i) => (
-          <li key={s.photos[0]} className="pgwrap">
-            <div
-              className={`pg pg--${s.kind}${s.locked ? " pg--locked" : ""}`}
-              style={s.kolonner ? { gridTemplateColumns: `repeat(${s.kolonner}, 1fr)` } : undefined}
-              role="img"
-              aria-label={`${tekster.sider.side(i + 1)}: ${
-                s.kind === "rutenett"
-                  ? tekster.sider.rutenett(s.photos.length)
-                  : tekster.sider[s.kind]
-              }`}
-            >
-              {s.photos.map((id) => (
-                <img
-                  key={id}
-                  src={thumbUrl(id)}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  style={rotert(rotasjon.get(id))}
-                />
-              ))}
-            </div>
-            <button
-              type="button"
-              className="pg__lock"
-              aria-pressed={!!s.locked}
-              title={tekster.sider.fornoydHjelp}
-              aria-label={`${tekster.sider.side(i + 1)}: ${tekster.sider.fornoyd}`}
-              onClick={() =>
-                onChange(
-                  {
-                    type: "fornoyd",
-                    page: { kind: s.kind, kolonner: s.kolonner ?? null, photos: s.photos },
-                    on: !s.locked,
-                  },
-                  s.locked ? t.ikkeFornoydMelding : t.fornoydMelding,
-                )
-              }
-            >
-              {s.locked ? tekster.sider.erFornoyd : tekster.sider.fornoyd}
-            </button>
-          </li>
-        ))}
+        {vis.map((s, i) => {
+          const nokkel = s.photos[0]!;
+          const etikett = `${tekster.sider.side(i + 1)}: ${
+            s.kind === "rutenett" ? tekster.sider.rutenett(s.photos.length) : tekster.sider[s.kind]
+          }`;
+          return (
+            <li key={nokkel} className={`pgwrap${aapen === nokkel ? " pgwrap--open" : ""}`}>
+              <Sidebilde
+                side={s}
+                bilder={bilder}
+                thumbUrl={thumbUrl}
+                etikett={etikett}
+                valgt={valgt}
+                markert={markert}
+                onPhoto={onPhoto}
+              />
+              <span className="pg__btns">
+                <button
+                  type="button"
+                  className="pg__lock"
+                  aria-pressed={!!s.locked}
+                  title={tekster.sider.fornoydHjelp}
+                  aria-label={`${tekster.sider.side(i + 1)}: ${tekster.sider.fornoyd}`}
+                  onClick={() =>
+                    onChange(
+                      {
+                        type: "fornoyd",
+                        page: {
+                          kind: s.kind,
+                          kolonner: s.kolonner ?? null,
+                          photos: s.photos,
+                          mal: s.mal ?? null,
+                        },
+                        on: !s.locked,
+                      },
+                      s.locked ? t.ikkeFornoydMelding : t.fornoydMelding,
+                    )
+                  }
+                >
+                  {s.locked ? tekster.sider.erFornoyd : tekster.sider.fornoyd}
+                </button>
+                <button
+                  type="button"
+                  className="pg__lock"
+                  aria-expanded={aapen === nokkel}
+                  title={tekster.sider.rammerHjelp}
+                  aria-label={`${tekster.sider.side(i + 1)}: ${tekster.sider.rammer}`}
+                  onClick={() => setAapen(aapen === nokkel ? null : nokkel)}
+                >
+                  {tekster.sider.rammer}
+                </button>
+              </span>
+              {aapen === nokkel && <Rammevalg s={s} rammer={rammer} onChange={onChange} />}
+            </li>
+          );
+        })}
       </ol>
       {endret && <p className="ev__none">{tekster.sider.endret}</p>}
     </div>
@@ -287,18 +389,24 @@ function Hendelse({
   index,
   bilder,
   valgt,
+  markert,
+  alleBilder,
+  rammer,
   onPick,
+  onMark,
   onChange,
-  rotasjon,
   thumbUrl,
 }: {
   e: UtkastHendelse;
   index: number;
   bilder: UtkastBilde[];
   valgt: Valgt | null;
+  markert: Set<string>;
+  alleBilder: Map<string, UtkastBilde>;
+  rammer: Ramme[];
   onPick: (b: UtkastBilde) => void;
+  onMark: (id: string) => void;
   onChange: Endre;
-  rotasjon: Map<string, number>;
   thumbUrl: (id: string) => string;
 }) {
   const [visAlle, setVisAlle] = useState(false);
@@ -316,12 +424,32 @@ function Hendelse({
           {tittel}
         </h3>
         <span className="count">{t.hendelseInfo(e.photos, e.pages)}</span>
+        {e.ownStory && (
+          <span className="ev__own">
+            <span className="ev__tag">{r.egenHistorieMerke}</span>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => onChange({ type: "legg_tilbake", photo: e.key }, r.lagtTilbake)}
+            >
+              {r.leggTilbake}
+            </button>
+          </span>
+        )}
       </header>
       <Verktoy key={`${e.key}-${e.pages}`} e={e} onChange={onChange} />
       <Sider
         sider={e.layout}
         med={med.map((b) => b.id)}
-        rotasjon={rotasjon}
+        bilder={alleBilder}
+        valgt={valgt?.id ?? null}
+        markert={markert}
+        rammer={rammer}
+        onPhoto={(id, marker) => {
+          const b = alleBilder.get(id);
+          if (marker) onMark(id);
+          else if (b) onPick(b);
+        }}
         onChange={onChange}
         thumbUrl={thumbUrl}
       />
@@ -337,7 +465,9 @@ function Hendelse({
                 b={b}
                 hendelse={e}
                 valgt={valgt?.id === b.id}
+                markert={markert.has(b.id)}
                 onClick={() => onPick(b)}
+                onMark={() => onMark(b.id)}
                 thumbUrl={thumbUrl}
               />
             ))}
@@ -358,7 +488,9 @@ function Hendelse({
                   hendelse={e}
                   liten
                   valgt={valgt?.id === b.id}
+                  markert={markert.has(b.id)}
                   onClick={() => onPick(b)}
+                  onMark={() => onMark(b.id)}
                   thumbUrl={thumbUrl}
                 />
               ))}
@@ -525,6 +657,7 @@ export function DraftScreen({
   year,
   draft,
   phase,
+  rammer = [],
   onMake,
   onPrint,
   onChange,
@@ -532,15 +665,20 @@ export function DraftScreen({
   onChoose,
   onAnswer,
   thumbUrl,
+  stortUrl = thumbUrl,
+  hentTekst,
 }: {
   /** Året albumet lages for (til tittelen mens gjennomgangen pågår). */
   year: number | null;
   draft: Utkast | null;
   phase: Analysefase | null;
+  /** Faste rammer brukeren kan velge for en side. */
+  rammer?: Ramme[];
   onMake: () => void;
   /** «Lag trykkfil»: albumet som PDF. */
   onPrint: () => void;
-  /** Et valg for albumet (fornøyd, tur, sider, slå sammen, omslag, rotering). */
+  /** Valg for albumet (fornøyd, rammer, tur, sider, slå sammen, omslag, rotering, størrelse,
+   * utsnitt, samle på én side, egen historie). Flere valg lagres samlet. */
   onChange: Endre;
   /** Lager utkastet på nytt med et sidetak (`null` = hele historien). */
   onSize: (sidetak: number | null) => void;
@@ -548,8 +686,16 @@ export function DraftScreen({
   onChoose: (action: Handling, id: string, other?: string) => Promise<number | null>;
   onAnswer: (feedbackId: number, reason: Svar | null) => void;
   thumbUrl: (id: string) => string;
+  /** Stor visning fra originalfilen (faller tilbake til miniatyren). */
+  stortUrl?: (id: string) => string;
+  /** Tekstene i albumet, til «Bla i albumet». */
+  hentTekst?: (year: number) => Promise<Albumtekst>;
 }) {
   const [valgt, setValgt] = useState<Valgt | null>(null);
+  const [markert, setMarkert] = useState<Set<string>>(new Set());
+  const [stor, setStor] = useState<{ id: string; utsnitt: boolean } | null>(null);
+  const [bla, setBla] = useState(false);
+  const [tekst, setTekst] = useState<Albumtekst | null>(null);
   const [spm, setSpm] = useState<Spørsmål | null>(null);
   const [handlinger, setHandlinger] = useState(0);
   const [hoppetOver, setHoppetOver] = useState(0);
@@ -565,6 +711,10 @@ export function DraftScreen({
     }
     return m;
   }, [draft]);
+  const alleBilder = useMemo(
+    () => new Map<string, UtkastBilde>((draft?.photos ?? []).map((b) => [b.id, b])),
+    [draft],
+  );
 
   if (phase) {
     return (
@@ -609,14 +759,54 @@ export function DraftScreen({
     setValgt(valgt?.id === b.id ? null : { id: b.id, included: b.included, event: b.event });
   };
 
-  const valgtBilde = valgt ? draft.photos.find((b) => b.id === valgt.id) : undefined;
+  const marker = (id: string) => {
+    const m = new Set(markert);
+    if (m.has(id)) m.delete(id);
+    else m.add(id);
+    setMarkert(m);
+    setValgt(null);
+  };
+
+  /** De markerte bildene i tidsrekkefølge. */
+  const markerte = draft.photos.filter((b) => markert.has(b.id));
+  const flere = async (action: "ta_med" | "ta_bort") => {
+    const ids = markerte.filter((b) => b.included === (action === "ta_bort")).map((b) => b.id);
+    for (const id of ids) await onChoose(action, id);
+    setMarkert(new Set());
+  };
+  const samlet = (c: Albumvalg | Albumvalg[], melding: string) => {
+    onChange(c, melding);
+    setMarkert(new Set());
+  };
+
+  const sideMed = (id: string) =>
+    draft.events.flatMap((e) => e.layout).find((s) => s.photos.includes(id));
+  const feltFor = (id: string) => {
+    const s = sideMed(id);
+    const i = s?.photos.indexOf(id) ?? -1;
+    return s?.frames && i >= 0 ? (s.frames[i] ?? null) : null;
+  };
+
+  const valgtBilde = valgt ? alleBilder.get(valgt.id) : undefined;
+  const valgtSide = valgtBilde ? sideMed(valgtBilde.id) : undefined;
+  const valgtFelt = valgtBilde ? feltFor(valgtBilde.id) : null;
+  const alene = valgtSide?.photos.length === 1;
   const lignende =
     valgtBilde && !valgtBilde.included && valgtBilde.related
       ? draft.photos.find((b) => b.id === valgtBilde.related && b.included)
       : undefined;
+  const storrelse = (retning: 1 | -1) => {
+    if (!valgtBilde) return;
+    const size = nyStorrelse(valgtBilde.size, valgtSide, retning);
+    onChange(
+      { type: "storrelse", photo: valgtBilde.id, size },
+      r.storrelse(size, size !== null && size >= 3, size === 4),
+    );
+  };
   const antallMed = draft.photos.filter((b) => b.included).length;
   const rotasjon = new Map(draft.photos.filter((b) => b.rotation).map((b) => [b.id, b.rotation]));
   const hendelserMed = draft.events.filter((e) => e.included > 0).length;
+  const storBilde = stor ? alleBilder.get(stor.id) : undefined;
 
   return (
     <section className="pick draft" aria-labelledby="utkast-tittel">
@@ -630,6 +820,13 @@ export function DraftScreen({
         <div className="draft__actions">
           <button type="button" className="btn btn--secondary" onClick={onMake}>
             {t.nyttUtkast}
+          </button>
+          <button type="button" className="btn btn--secondary" onClick={() => {
+              setBla(true);
+              hentTekst?.(draft.year).then(setTekst, () => {});
+            }}
+          >
+            {r.bla}
           </button>
           <button type="button" className="btn btn--primary" onClick={onPrint}>
             {tekster.trykk.knapp}
@@ -645,7 +842,7 @@ export function DraftScreen({
         const maaned = e.start.slice(0, 7);
         const ny = i === 0 || draft.events[i - 1]?.start.slice(0, 7) !== maaned;
         // Forslag om å slå sammen korte dager som starter her.
-        const forslag = draft.mergeSuggestions.find((r) => r[0] === i);
+        const forslag = draft.mergeSuggestions.find((m) => m[0] === i);
         const forslagNokkel = forslag?.map((k) => draft.events[k]?.key).join(",") ?? "";
         const forslagEvents = forslag
           ?.map((k) => draft.events[k])
@@ -690,18 +887,93 @@ export function DraftScreen({
               index={i}
               bilder={perHendelse.get(i) ?? []}
               valgt={valgt}
+              markert={markert}
+              alleBilder={alleBilder}
+              rammer={rammer}
               onPick={velg}
+              onMark={marker}
               onChange={onChange}
-              rotasjon={rotasjon}
               thumbUrl={thumbUrl}
             />
           </div>
         );
       })}
 
-      {(valgtBilde || spm || takk) && (
+      {(valgtBilde || spm || takk || markert.size > 0) && (
         <div className="dock" role="region" aria-label={tekster.nav.albumutkast}>
-          {spm ? (
+          {markert.size > 0 ? (
+            <div className="dock__photo">
+              <p className="dock__q" role="status">
+                {r.markert(markert.size)}
+              </p>
+              <div className="dock__actions">
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  title={r.samleSideHjelp}
+                  onClick={() =>
+                    samlet(
+                      { type: "samle_side", photos: markerte.map((b) => b.id) },
+                      r.samlet(markerte.length),
+                    )
+                  }
+                >
+                  {r.samleSide}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  title={r.egenHistorieHjelp}
+                  onClick={() =>
+                    samlet(
+                      { type: "egen_historie", photos: markerte.map((b) => b.id) },
+                      r.historieLaget(markerte.length),
+                    )
+                  }
+                >
+                  {r.egenHistorie}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() =>
+                    samlet(
+                      markerte.map((b) => ({ type: "roter", photo: b.id }) as Albumvalg),
+                      r.rotert(markerte.length),
+                    )
+                  }
+                >
+                  ↻ {t.roter}
+                </button>
+                {markerte.some((b) => !b.included) && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => void flere("ta_med")}
+                  >
+                    {t.taMed}
+                  </button>
+                )}
+                {markerte.some((b) => b.included) && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => void flere("ta_bort")}
+                  >
+                    {t.taBort}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  onClick={() => setMarkert(new Set())}
+                >
+                  {r.fjernMarkering}
+                </button>
+              </div>
+              <p className="dock__help">{r.markerHjelp}</p>
+            </div>
+          ) : spm ? (
             <div className="dock__ask">
               <p className="dock__q">
                 {
@@ -712,9 +984,9 @@ export function DraftScreen({
               </p>
               <p className="dock__help">{tekster.hvorfor.hjelp}</p>
               <div className="chips" role="group" aria-label={tekster.hvorfor.hjelp}>
-                {HVORFOR_VALG[spm.action].map((r) => (
-                  <button key={r} type="button" className="chip" onClick={() => svar(r)}>
-                    {tekster.hvorfor.svar[r]}
+                {HVORFOR_VALG[spm.action].map((x) => (
+                  <button key={x} type="button" className="chip" onClick={() => svar(x)}>
+                    {tekster.hvorfor.svar[x]}
                   </button>
                 ))}
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => svar(null)}>
@@ -730,15 +1002,40 @@ export function DraftScreen({
                   draft.events[valgtBilde.event]?.photos ?? 0,
                 )}
               </p>
+              {valgtBilde.included && valgtSide && !valgtSide.mal && (
+                <p className="dock__help" role="status">
+                  {r.storrelse(valgtBilde.size, alene, valgtSide.kind === "helside")}
+                </p>
+              )}
               <div className="dock__actions">
                 {valgtBilde.included ? (
-                  <button
-                    type="button"
-                    className="btn btn--secondary"
-                    onClick={() => void handling("ta_bort", valgtBilde.id)}
-                  >
-                    {t.taBort}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => void handling("ta_bort", valgtBilde.id)}
+                    >
+                      {t.taBort}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      title={r.storreHjelp}
+                      disabled={alene && valgtSide?.kind === "helside"}
+                      onClick={() => storrelse(1)}
+                    >
+                      {r.storre}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      title={r.mindreHjelp}
+                      disabled={!alene && valgtBilde.size === -1}
+                      onClick={() => storrelse(-1)}
+                    >
+                      {r.mindre}
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button
@@ -767,6 +1064,22 @@ export function DraftScreen({
                 >
                   ↻ {t.roter}
                 </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => setStor({ id: valgtBilde.id, utsnitt: false })}
+                >
+                  {r.visStort}
+                </button>
+                {valgtFelt && (valgtFelt.fill || valgtBilde.whole) && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => setStor({ id: valgtBilde.id, utsnitt: true })}
+                  >
+                    {r.utsnitt}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn--secondary"
@@ -800,6 +1113,21 @@ export function DraftScreen({
             </p>
           )}
         </div>
+      )}
+      {storBilde && stor && (
+        <StorVisning
+          key={stor.id + String(stor.utsnitt)}
+          b={storBilde}
+          felt={feltFor(storBilde.id)}
+          startUtsnitt={stor.utsnitt}
+          stortUrl={stortUrl}
+          thumbUrl={thumbUrl}
+          onChange={onChange}
+          onClose={() => setStor(null)}
+        />
+      )}
+      {bla && (
+        <Bla draft={draft} tekst={tekst} thumbUrl={thumbUrl} onClose={() => setBla(false)} />
       )}
     </section>
   );

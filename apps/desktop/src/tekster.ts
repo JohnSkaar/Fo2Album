@@ -220,6 +220,87 @@ export const tekster = {
     fornoyd: "Fornøyd",
     fornoydHjelp: "Siden beholdes som den er når utkastet lages på nytt",
     erFornoyd: "✓ Fornøyd",
+    rammer: "Rammer",
+    rammerHjelp: "Velg rammer for siden",
+    rammerTittel: "Rammer for siden",
+    rammerIngress:
+      "Automatisk viser hele bildene. Faste rammer fyller feltene, og du kan flytte utsnittet. Siden merkes «Fornøyd» så den beholdes.",
+    auto: "Automatisk",
+    autoHjelp: "Hele bildene, ingen beskjæring",
+    mal: {
+      "1-full": "Hele siden",
+      "1-kvadrat": "Ett kvadratisk",
+      "1-landskap": "Ett liggende",
+      "1-portrett": "Ett stående",
+      "2-over": "To over hverandre",
+      "2-side": "To ved siden av hverandre",
+      "3-topp": "Ett stort og to små",
+      "3-venstre": "Ett høyt og to ved siden",
+      "3-rader": "Tre liggende",
+      "4-kvadrat": "Fire kvadratiske",
+      "4-landskap": "Fire liggende",
+      "6": "Seks kvadratiske",
+      "9": "Ni kvadratiske",
+      "12": "Tolv kvadratiske",
+    } as Record<string, string>,
+    ingenMaler: "Det finnes ingen faste rammer for så mange bilder. Siden er automatisk.",
+    malValgt: "Rammene er valgt, og siden er merket «Fornøyd»",
+    bildePaaSiden: (dato: string) => `Bilde fra ${dato} på siden`,
+  },
+  redigering: {
+    storre: "Større",
+    mindre: "Mindre",
+    storreHjelp: "Større på siden, så egen side, til slutt hele siden",
+    mindreHjelp: "Mindre: tilbake til samme størrelse som de andre, så litt mindre",
+    storrelse: (s: number | null, alene: boolean, helside: boolean) =>
+      alene
+        ? helside
+          ? "Bildet tar hele siden"
+          : "Bildet har en egen side, med luft rundt"
+        : s === null
+          ? "Appen velger hvor stort bildet er på siden"
+          : s > 0
+            ? `Bildet er større på siden (trinn ${s} av 4)`
+            : s < 0
+              ? "Bildet er mindre enn de andre på siden"
+              : "Bildet er like stort som de andre på siden",
+    visStort: "Vis stort",
+    utsnitt: "Endre utsnitt",
+    utsnittHjelp: "Klikk i bildet for å velge hva som skal være i midten av rammen.",
+    fyll: "Fyll rammen",
+    hele: "Vis hele bildet",
+    ferdig: "Ferdig",
+    utsnittLagret: "Utsnittet er lagret",
+    forhaand:
+      "Dette er en forhåndsvisning på skjermen. Trykket bruker originalfilen i full oppløsning.",
+    markerHjelp: "Marker flere (eller hold Ctrl og klikk)",
+    marker: "Marker",
+    markert: (n: number) => `${antall(n, "bilde", "bilder")} markert`,
+    samleSide: "Sett på én side",
+    samleSideHjelp: "Bildene samles på en ny side, merket «Fornøyd»",
+    egenHistorie: "Egen historie",
+    egenHistorieHjelp: "Bildene blir en egen historie med egne sider",
+    fjernMarkering: "Fjern markering",
+    samlet: (n: number) =>
+      n > 12
+        ? `${fmt(n)} bilder er samlet på ${fmt(Math.ceil(n / 12))} sider, merket «Fornøyd».`
+        : `${antall(n, "bilde er", "bilder er")} samlet på én side, merket «Fornøyd». Velg gjerne rammer for siden.`,
+    historieLaget: (n: number) => `${antall(n, "bilde er", "bilder er")} nå en egen historie.`,
+    rotert: (n: number) => `${antall(n, "bilde er", "bilder er")} rotert`,
+    lagtTil: (n: number) => `${antall(n, "bilde er", "bilder er")} tatt med`,
+    tattBort: (n: number) => `${antall(n, "bilde er", "bilder er")} tatt bort`,
+    egenHistorieMerke: "Egen historie",
+    leggTilbake: "Legg tilbake",
+    lagtTilbake: "Bildene er lagt tilbake der de hørte til",
+    bla: "Bla i albumet",
+    blaTittel: (aar: number) => `Familiealbum ${aar}`,
+    forrige: "Forrige oppslag",
+    neste: "Neste oppslag",
+    oppslag: (n: number, av: number) => `Oppslag ${fmt(n)} av ${fmt(av)}`,
+    forsideSide: "Forsiden",
+    baksideSide: "Baksiden",
+    introSide: "Første side: teksten om året",
+    blaHjelp: "Bruk piltastene for å bla. Esc lukker.",
   },
   begrunnelse: (b: Begrunnelse, bilderIHendelsen: number): string => {
     const n = b.antall ?? 0;

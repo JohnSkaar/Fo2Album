@@ -15,6 +15,7 @@ import {
   type Albumvalg,
   type Ansiktsgruppe,
   type Personer,
+  type Ramme,
   type Rolle,
   type Sammendrag,
   type Svar,
@@ -76,6 +77,13 @@ export function App() {
     null,
   );
   const [utkast, setUtkast] = useState<Utkast | null>(null);
+  const [rammer, setRammer] = useState<Ramme[]>([]);
+  // Rammene brukeren kan velge for en side, hentet én gang når utkastet vises.
+  const harUtkast = utkast !== null;
+  useEffect(() => {
+    if (!harUtkast || rammer.length > 0) return;
+    api.rammer().then(setRammer, () => {});
+  }, [harUtkast, rammer.length]);
   const [analyse, setAnalyse] = useState<Analysefase | null>(null);
   // Valgt år leses av lastKatalog, som ikke skal lages på nytt hver gang året endres.
   const valgtAarRef = useRef<number | null>(null);
@@ -193,10 +201,10 @@ export function App() {
   };
 
   /** Et valg for albumet: lagres, og utkastet lages på nytt uten gjennomgangen på skjermen. */
-  const endreAlbum = async (change: Albumvalg, melding?: string) => {
+  const endreAlbum = async (change: Albumvalg | Albumvalg[], melding?: string) => {
     if (!utkast) return;
     try {
-      await api.albumvalg(utkast.year, change);
+      for (const c of Array.isArray(change) ? change : [change]) await api.albumvalg(utkast.year, c);
       setUtkast(await api.lagUtkast(utkast.year, utkast.pageCap, true));
       visMelding(melding ?? tekster.utkast.oppdatert);
     } catch (e) {
@@ -428,6 +436,9 @@ export function App() {
             onChoose={velgBilde}
             onAnswer={(id, r) => void svarHvorfor(id, r)}
             thumbUrl={api.miniatyrUrl}
+            stortUrl={api.stortUrl}
+            hentTekst={api.albumtekst}
+            rammer={rammer}
           />
         ) : (
           <PickScreen

@@ -19,6 +19,9 @@ const bilde = (id: string, event: number, included: boolean): UtkastBilde => ({
   width: 1200,
   height: 900,
   rotation: id === "b" ? 90 : 0,
+  size: null,
+  focus: [0.5, 0.5],
+  whole: false,
 });
 
 const hendelse = (
@@ -40,6 +43,7 @@ const hendelse = (
   looksLikeTrip: false,
   adultTrip: false,
   adultTripGuess: false,
+  ownStory: false,
   layout: [{ kind: "rutenett", kolonner: 2, photos: [h(key)] }],
   ...extra,
 });
@@ -91,7 +95,11 @@ describe("redigering i utkastet", () => {
     const onChange = vis();
     await userEvent.click(screen.getAllByRole("button", { name: /Fornøyd/ })[0]!);
     expect(onChange).toHaveBeenCalledWith(
-      { type: "fornoyd", page: { kind: "rutenett", kolonner: 2, photos: [h("a")] }, on: true },
+      {
+        type: "fornoyd",
+        page: { kind: "rutenett", kolonner: 2, photos: [h("a")], mal: null },
+        on: true,
+      },
       t.fornoydMelding,
     );
   });
@@ -127,7 +135,7 @@ describe("redigering i utkastet", () => {
     const onChange = vis();
     const ev = screen.getAllByRole("region")[0] ?? document.body;
     await userEvent.click(
-      within(ev as HTMLElement).getAllByRole("button", { name: /Bilde fra/ })[0]!,
+      within(ev as HTMLElement).getAllByRole("button", { name: /^Bilde fra/ })[0]!,
     );
     await userEvent.click(screen.getByRole("button", { name: `↻ ${t.roter}` }));
     expect(onChange).toHaveBeenCalledWith({ type: "roter", photo: h("a") });

@@ -116,6 +116,12 @@ export interface UtkastBilde {
   height: number | null;
   /** Brukerens rotering med klokka: 0, 90, 180 eller 270. */
   rotation: number;
+  /** Brukerens størrelse: -1 mindre, 0 like stort, 1–2 større, 3 egen side, 4 hele siden. */
+  size: number | null;
+  /** Utsnittet i en ramme som fylles: midtpunktet som andeler (0–1). */
+  focus: [number, number];
+  /** Hele bildet vises i rammen. */
+  whole: boolean;
 }
 
 export interface UtkastHendelse {
@@ -140,6 +146,8 @@ export interface UtkastHendelse {
   adultTrip: boolean;
   /** Appen så selv at ingen av barna er med (brukeren har ikke svart ennå). */
   adultTripGuess: boolean;
+  /** Brukeren har laget historien selv («Egen historie»). */
+  ownStory: boolean;
   /** Sidene historien får. */
   layout: Side[];
 }
@@ -150,8 +158,29 @@ export interface Side {
   kolonner?: number;
   /** Brukeren er fornøyd med siden; den beholdes i neste utkast. */
   locked?: boolean;
+  /** Faste rammer brukeren har valgt (`null` = automatisk). */
+  mal?: string | null;
   /** Bilde-id-er. */
   photos: string[];
+  /** Hvor bildene står, i prosent av siden (samme som trykkfilen). */
+  frames?: Felt[];
+}
+
+/** Et felt på siden i prosent av bredden og høyden. */
+export interface Felt {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Bildet fyller feltet (beskjæres); ellers har feltet bildets form. */
+  fill: boolean;
+}
+
+/** Faste rammer brukeren kan velge for en side. */
+export interface Ramme {
+  id: string;
+  photos: number;
+  frames: Felt[];
 }
 
 export type Laerdom =
@@ -200,7 +229,12 @@ export interface Omslag {
 export type Albumvalg =
   | {
       type: "fornoyd";
-      page: { kind: Side["kind"]; kolonner: number | null; photos: string[] };
+      page: {
+        kind: Side["kind"];
+        kolonner: number | null;
+        photos: string[];
+        mal?: string | null;
+      };
       on: boolean;
     }
   | { type: "tur_uten_barn"; photo: string; on: boolean }
@@ -209,7 +243,12 @@ export type Albumvalg =
   | { type: "sider"; photo: string; pages: number | null }
   | { type: "forside"; photo: string | null }
   | { type: "bakside"; photo: string | null }
-  | { type: "roter"; photo: string };
+  | { type: "roter"; photo: string }
+  | { type: "storrelse"; photo: string; size: number | null }
+  | { type: "utsnitt"; photo: string; focus: [number, number] | null; whole: boolean }
+  | { type: "samle_side"; photos: string[] }
+  | { type: "egen_historie"; photos: string[] }
+  | { type: "legg_tilbake"; photo: string };
 
 export type Analysefase =
   "venter" | "henter" | "hendelser" | "serier" | "velger" | "begrunnelser" | "ferdig";
@@ -331,6 +370,9 @@ export const api = {
   aar: () => invoke<Aar[]>("list_years"),
   bilderIAar: (year: number) => invoke<Bilde[]>("photos_in_year", { year }),
   miniatyrUrl: (id: string) => convertFileSrc(id, "miniatyr"),
+  /** Stor visning, lest fra originalfilen og skalert i minnet. */
+  stortUrl: (id: string) => convertFileSrc(id, "stort"),
+  rammer: () => invoke<Ramme[]>("page_templates"),
 
   /** `quiet`: lag utkastet på nytt uten gjennomgangen på skjermen (etter en endring). */
   lagUtkast: (year: number, pageCap: number | null = null, quiet = false) =>

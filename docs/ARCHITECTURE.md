@@ -118,7 +118,7 @@ Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 | Hashing | BLAKE3 (eksakt), pHash/dHash (perceptuell) | | |
 | ML-kjøring | **tract** (ONNX i ren Rust, CPU) for ansiktsmodellene. ONNX Runtime kan vurderes senere for tyngre modeller (CLIP) | Ingen eksterne biblioteker å pakke med, ingen nettverk, bygges likt på Mac og Windows | ONNX Runtime (CoreML/DirectML) |
 | Geokoding | Offline GeoNames-utdrag for Norden + resten av verden (by-nivå) | Ingen nettverkskall | |
-| PDF | **pdf-writer** (MIT/Apache-2.0) i `crates/p2a-print`: trykkfilen lages lokalt fra utkastet. Tekst tegnes som streker fra Fraunces og Nunito Sans (SIL OFL 1.1) med **ttf-parser** (MIT/Apache-2.0), bilder legges inn som JPEG i 300 ppi | Ingen fonter å bygge inn, likt resultat hos alle trykkerier, ingen eksterne biblioteker | Krav fra trykkeriet (CMYK/ICC, omslag med rygg) avgjør resten |
+| PDF | **pdf-writer** (MIT/Apache-2.0) i `crates/p2a-print`: trykkfilen lages lokalt fra utkastet. Tekst tegnes som streker fra Fraunces og Nunito Sans (SIL OFL 1.1) med **ttf-parser** (MIT/Apache-2.0), bilder legges inn som JPEG i 300 ppi | Ingen fonter å bygge inn, likt resultat hos alle trykkerier, ingen eksterne biblioteker | Krav fra trykkeriet (CMYK/ICC, omslag med rygg) avgjør resten. Feltene på sidene (rammer, større/mindre, utsnitt) regnes ut ett sted, `p2a_print::layout::page_frames`, og appen viser sidene med de samme feltene, så skjermen og trykket er like |
 
 ## Modeller (krever lisenssjekk før bruk)
 

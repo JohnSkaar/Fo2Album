@@ -1,6 +1,11 @@
 //! Hvor bildene står på en trykt side, i millimeter fra øverste venstre hjørne av den
-//! ferdige (beskårne) siden. Samme regler som utkastet og prototypen: hele motivet vises
-//! (ingen beskjæring), unntatt en helside der bildets form ligger nær sidens.
+//! ferdige (beskårne) siden. Samme regler som prototypen: automatisk viser hele motivet
+//! (ingen beskjæring), unntatt en helside der bildets form ligger nær sidens. Brukeren kan
+//! gjøre et bilde større eller mindre enn de andre, og velge faste rammer for siden; da
+//! fyller bildene rammene med et utsnitt brukeren kan flytte.
+//!
+//! Appen viser sidene med de samme feltene (`page_frames`), så det brukeren ser, er det som
+//! trykkes.
 
 use p2a_core::layout::PageKind;
 
@@ -131,14 +136,273 @@ fn justify(aspects: &[f32], b: Box_) -> Vec<Frame> {
     out
 }
 
-/// Feltene på en side med disse bildeformene (bredde/høyde, etter rotering).
-pub fn frames(kind: PageKind, aspects: &[f32]) -> Vec<Frame> {
-    let inner = Box_ {
+/// Hvordan brukeren vil ha et bilde på siden.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Look {
+    /// -1 mindre enn de andre, 0 like stort, 1–2 større (3 og 4 gir egen side i utkastet).
+    pub size: i8,
+    /// Punktet (andel av bredde og høyde) som skal være i midten når bildet fyller en ramme.
+    pub focus: (f32, f32),
+    /// Vis hele bildet i rammen, uten beskjæring.
+    pub whole: bool,
+}
+
+impl Default for Look {
+    fn default() -> Self {
+        Look {
+            size: 0,
+            focus: (0.5, 0.5),
+            whole: false,
+        }
+    }
+}
+
+/// Faste rammer brukeren kan velge for en side, med antall bilder. Samme utvalg som
+/// prototypen; navnene står i grensesnittet (tekster.ts).
+pub const TEMPLATES: &[(&str, usize)] = &[
+    ("1-full", 1),
+    ("1-kvadrat", 1),
+    ("1-landskap", 1),
+    ("1-portrett", 1),
+    ("2-over", 2),
+    ("2-side", 2),
+    ("3-topp", 3),
+    ("3-venstre", 3),
+    ("3-rader", 3),
+    ("4-kvadrat", 4),
+    ("4-landskap", 4),
+    ("6", 6),
+    ("9", 9),
+    ("12", 12),
+];
+
+fn inner() -> Box_ {
+    Box_ {
         x: MARGIN,
         y: MARGIN,
         w: TRIM_W - 2.0 * MARGIN,
         h: TRIM_H - 2.0 * MARGIN,
+    }
+}
+
+/// `cols × rows` like felt, med forholdet `ca` (bredde/høyde) om det er gitt, midtstilt.
+fn grid(cols: usize, rows: usize, ca: Option<f32>) -> Vec<Box_> {
+    let b = inner();
+    let mut cw = (b.w - GAP * (cols - 1) as f32) / cols as f32;
+    let mut ch = (b.h - GAP * (rows - 1) as f32) / rows as f32;
+    if let Some(ca) = ca {
+        if cw / ch > ca {
+            cw = ch * ca;
+        } else {
+            ch = cw / ca;
+        }
+    }
+    let tw = cols as f32 * cw + GAP * (cols - 1) as f32;
+    let th = rows as f32 * ch + GAP * (rows - 1) as f32;
+    let (x0, y0) = ((TRIM_W - tw) / 2.0, (TRIM_H - th) / 2.0);
+    (0..cols * rows)
+        .map(|i| Box_ {
+            x: x0 + (i % cols) as f32 * (cw + GAP),
+            y: y0 + (i / cols) as f32 * (ch + GAP),
+            w: cw,
+            h: ch,
+        })
+        .collect()
+}
+
+/// Feltene i en fast ramme.
+fn template(id: &str) -> Option<Vec<Box_>> {
+    let b = inner();
+    Some(match id {
+        "1-full" => vec![Box_ {
+            x: -BLEED,
+            y: -BLEED,
+            w: TRIM_W + 2.0 * BLEED,
+            h: TRIM_H + 2.0 * BLEED,
+        }],
+        "1-kvadrat" => grid(1, 1, Some(1.0)),
+        "1-landskap" => grid(1, 1, Some(4.0 / 3.0)),
+        "1-portrett" => grid(1, 1, Some(3.0 / 4.0)),
+        "2-over" => grid(1, 2, Some(4.0 / 3.0)),
+        "2-side" => grid(2, 1, Some(2.0 / 3.0)),
+        "3-topp" => {
+            let top = b.h * 0.56;
+            let w2 = (b.w - GAP) / 2.0;
+            let (y2, h2) = (b.y + top + GAP, b.h - top - GAP);
+            vec![
+                Box_ { h: top, ..b },
+                Box_ {
+                    x: b.x,
+                    y: y2,
+                    w: w2,
+                    h: h2,
+                },
+                Box_ {
+                    x: b.x + w2 + GAP,
+                    y: y2,
+                    w: w2,
+                    h: h2,
+                },
+            ]
+        }
+        "3-venstre" => {
+            let w1 = b.w * 0.55;
+            let w2 = b.w - w1 - GAP;
+            let h2 = (b.h - GAP) / 2.0;
+            vec![
+                Box_ { w: w1, ..b },
+                Box_ {
+                    x: b.x + w1 + GAP,
+                    y: b.y,
+                    w: w2,
+                    h: h2,
+                },
+                Box_ {
+                    x: b.x + w1 + GAP,
+                    y: b.y + h2 + GAP,
+                    w: w2,
+                    h: h2,
+                },
+            ]
+        }
+        "3-rader" => grid(1, 3, Some(4.0 / 3.0)),
+        "4-kvadrat" => grid(2, 2, Some(1.0)),
+        "4-landskap" => grid(2, 2, Some(4.0 / 3.0)),
+        "6" => grid(2, 3, Some(1.0)),
+        "9" => grid(3, 3, Some(1.0)),
+        "12" => grid(3, 4, Some(1.0)),
+        _ => return None,
+    })
+}
+
+/// Feltene i en fast ramme, til forhåndsvisning av rammevalget (`None` for ukjent navn).
+pub fn template_frames(id: &str) -> Option<Vec<Frame>> {
+    Some(
+        template(id)?
+            .into_iter()
+            .map(|b| Frame {
+                x: b.x,
+                y: b.y,
+                w: b.w,
+                h: b.h,
+                fill: true,
+            })
+            .collect(),
+    )
+}
+
+/// Ett bilde gjort større enn de andre: det får rundt 35 % (trinn 1) eller 55 % (trinn 2) av
+/// flaten innenfor margen, til venstre om det er stående og øverst ellers. De andre deler
+/// resten.
+fn hero(aspects: &[f32], sizes: &[i8], b: Box_) -> Vec<Frame> {
+    let top = sizes.iter().copied().max().unwrap_or(0);
+    let h = sizes.iter().position(|&s| s == top).unwrap_or(0);
+    let a = aspects[h];
+    let target = b.w * b.h * if top >= 2 { 0.55 } else { 0.35 };
+    let mut hw = (target * a).sqrt();
+    let mut hh = hw / a;
+    if hw > b.w {
+        hw = b.w;
+        hh = hw / a;
+    }
+    if hh > b.h * 0.75 {
+        hh = b.h * 0.75;
+        hw = hh * a;
+    }
+    let others: Vec<f32> = (0..aspects.len())
+        .filter(|&i| i != h)
+        .map(|i| aspects[i])
+        .collect();
+    let (big, rest) = if a < 1.0 {
+        let w = hw;
+        (
+            Box_ { w, ..b },
+            Box_ {
+                x: b.x + w + GAP,
+                w: b.w - w - GAP,
+                ..b
+            },
+        )
+    } else {
+        (
+            Box_ { h: hh, ..b },
+            Box_ {
+                y: b.y + hh + GAP,
+                h: b.h - hh - GAP,
+                ..b
+            },
+        )
     };
+    let mut rr = justify(&others, rest).into_iter();
+    (0..aspects.len())
+        .map(|i| {
+            if i == h {
+                fit_in(big, a)
+            } else {
+                rr.next().expect("ett felt per bilde")
+            }
+        })
+        .collect()
+}
+
+/// Feltene på en side, med brukerens størrelser, utsnitt og rammer. `photos` er formen
+/// (bredde/høyde, etter rotering) og ønsket for hvert bilde, i sidens rekkefølge.
+pub fn page_frames(kind: PageKind, mal: Option<&str>, photos: &[(f32, Look)]) -> Vec<Frame> {
+    let aspects: Vec<f32> = photos.iter().map(|(a, _)| *a).collect();
+    if let Some(rects) = mal.and_then(template) {
+        if rects.len() == photos.len() {
+            return rects
+                .into_iter()
+                .zip(photos)
+                .map(|(r, (a, look))| {
+                    if look.whole {
+                        fit_in(r, *a)
+                    } else {
+                        Frame {
+                            x: r.x,
+                            y: r.y,
+                            w: r.w,
+                            h: r.h,
+                            fill: true,
+                        }
+                    }
+                })
+                .collect();
+        }
+    }
+    let sizes: Vec<i8> = photos.iter().map(|(_, l)| l.size.clamp(-1, 2)).collect();
+    if photos.len() < 2 || sizes.iter().all(|&s| s == 0) {
+        return frames(kind, &aspects);
+    }
+    let top = sizes.iter().copied().max().unwrap_or(0);
+    let out = if top > 0 {
+        hero(&aspects, &sizes, inner())
+    } else {
+        justify(&aspects, inner())
+    };
+    // Mindre enn de andre: 72 % av feltet, midtstilt.
+    out.into_iter()
+        .zip(&sizes)
+        .map(|(f, &s)| {
+            if s < 0 && s < top {
+                let k = 0.72;
+                Frame {
+                    x: f.x + f.w * (1.0 - k) / 2.0,
+                    y: f.y + f.h * (1.0 - k) / 2.0,
+                    w: f.w * k,
+                    h: f.h * k,
+                    fill: false,
+                }
+            } else {
+                f
+            }
+        })
+        .collect()
+}
+
+/// Feltene på en side med disse bildeformene (bredde/høyde, etter rotering).
+pub fn frames(kind: PageKind, aspects: &[f32]) -> Vec<Frame> {
+    let inner = inner();
     match (kind, aspects) {
         (_, []) => Vec::new(),
         (PageKind::Helside, [a]) => {
@@ -229,6 +493,57 @@ mod tests {
         assert!(f.fill && f.x < 0.0 && f.w > TRIM_W);
         let f = frames(PageKind::Helside, &[1.5])[0];
         assert!(!f.fill && f.x < 0.0 && (f.w / f.h - 1.5).abs() < 0.01);
+    }
+
+    fn look(size: i8) -> (f32, Look) {
+        (
+            1.5,
+            Look {
+                size,
+                ..Look::default()
+            },
+        )
+    }
+
+    #[test]
+    fn storre_bilde_faar_mer_plass_og_mindre_faar_mindre() {
+        let kind = PageKind::Rutenett { kolonner: 2 };
+        let area = |f: &Frame| f.w * f.h;
+        let even = page_frames(kind, None, &[look(0), look(0), look(0), look(0)]);
+        let big = page_frames(kind, None, &[look(0), look(1), look(0), look(0)]);
+        let bigger = page_frames(kind, None, &[look(0), look(2), look(0), look(0)]);
+        let small = page_frames(kind, None, &[look(-1), look(0), look(0), look(0)]);
+        assert!(area(&big[1]) > area(&even[1]) * 1.3);
+        assert!(area(&bigger[1]) > area(&big[1]));
+        assert!(area(&big[1]) > area(&big[0]) * 2.0);
+        assert!(area(&small[0]) < area(&small[1]) * 0.6);
+        for f in big.iter().chain(&bigger).chain(&small) {
+            assert!(inside(f), "{f:?}");
+        }
+    }
+
+    #[test]
+    fn faste_rammer_fyller_og_hele_bildet_beskjaeres_ikke() {
+        for (id, n) in TEMPLATES {
+            let fs = template_frames(id).unwrap();
+            assert_eq!(fs.len(), *n, "{id}");
+        }
+        let mut photos = vec![look(0), look(0), look(0)];
+        photos[2].1.whole = true;
+        let fs = page_frames(PageKind::Luft, Some("3-topp"), &photos);
+        assert!(fs[0].fill && fs[1].fill);
+        assert!(!fs[2].fill && (fs[2].w / fs[2].h - 1.5).abs() < 0.01);
+        // Feil antall bilder for rammen: automatisk.
+        let fs = page_frames(
+            PageKind::Rutenett { kolonner: 2 },
+            Some("3-topp"),
+            &photos[..2],
+        );
+        assert!(fs.iter().all(|f| !f.fill));
+        assert_eq!(
+            page_frames(PageKind::Helside, Some("1-full"), &photos[..1])[0].x,
+            -BLEED
+        );
     }
 
     #[test]

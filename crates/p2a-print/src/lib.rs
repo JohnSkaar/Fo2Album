@@ -25,7 +25,7 @@ use image::imageops::FilterType;
 use p2a_core::layout::PageKind;
 use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref};
 
-use layout::{Frame, BLEED, MARGIN, TRIM_H, TRIM_W};
+use layout::{Frame, Look, BLEED, MARGIN, TRIM_H, TRIM_W};
 use text::Font;
 
 /// Oppløsningen bildene skaleres til (punkter per tomme på trykket papir).
@@ -44,10 +44,13 @@ pub struct PhotoSource {
     pub height: u32,
     /// Brukerens rotering med klokka (0, 90, 180, 270), i tillegg til EXIF-orienteringen.
     pub rotation: u16,
+    /// Størrelse og utsnitt brukeren har valgt.
+    pub look: Look,
 }
 
 impl PhotoSource {
-    fn aspect(&self) -> f32 {
+    /// Formen (bredde/høyde) slik bildet vises, etter brukerens rotering.
+    pub fn aspect(&self) -> f32 {
         if self.width == 0 || self.height == 0 {
             return 4.0 / 3.0;
         }
@@ -63,6 +66,8 @@ impl PhotoSource {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AlbumPage {
     pub kind: PageKind,
+    /// Faste rammer brukeren har valgt (`layout::TEMPLATES`).
+    pub mal: Option<String>,
     pub photos: Vec<PhotoSource>,
 }
 
@@ -331,8 +336,8 @@ pub fn render(
 
     // 3. Historiene.
     for page in &album.pages {
-        let aspects: Vec<f32> = page.photos.iter().map(PhotoSource::aspect).collect();
-        let frames = layout::frames(page.kind, &aspects);
+        let photos: Vec<(f32, Look)> = page.photos.iter().map(|p| (p.aspect(), p.look)).collect();
+        let frames = layout::page_frames(page.kind, page.mal.as_deref(), &photos);
         let mut blocks = Vec::new();
         for (photo, frame) in page.photos.iter().zip(frames) {
             placed.push(Placed {
@@ -469,7 +474,10 @@ pub fn render(
                         continue;
                     }
                     let (dw, dh) = p.drawn();
-                    let (dx, dy) = (f.x + (f.w - dw) / 2.0, f.y + (f.h - dh) / 2.0);
+                    // Utsnittet: punktet brukeren valgte, så nær midten av feltet som mulig
+                    // (som `object-position` i appen).
+                    let (fx, fy) = p.photo.look.focus;
+                    let (dx, dy) = (f.x + (f.w - dw) * fx, f.y + (f.h - dh) * fy);
                     c.save_state();
                     // Bare det som er innenfor feltet, vises.
                     c.rect(pt_x(f.x), pt_y(f.y + f.h), f.w * pt, f.h * pt);
@@ -527,6 +535,7 @@ mod tests {
             width: 1200,
             height: 800,
             rotation,
+            look: Look::default(),
         };
         assert!((p(0).aspect() - 1.5).abs() < 1e-6);
         assert!((p(90).aspect() - 2.0 / 3.0).abs() < 1e-6);

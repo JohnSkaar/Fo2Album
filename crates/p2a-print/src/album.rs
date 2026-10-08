@@ -137,6 +137,7 @@ fn source(
             width: f.width.unwrap_or(0),
             height: f.height.unwrap_or(0),
             rotation: chosen.rotation_of(h),
+            look: chosen.look_of(h),
         },
         // Ingen lokal fil (bare i skyen): blir et grått felt og står i rapporten.
         None => PhotoSource {
@@ -146,12 +147,13 @@ fn source(
             width: 0,
             height: 0,
             rotation: 0,
+            look: chosen.look_of(h),
         },
     }
 }
 
 /// Albumet slik utkastet viser det: alle sidene i alle historiene, i rekkefølge, med
-/// forsiden, baksiden og roteringen brukeren har valgt.
+/// forsiden, baksiden, rammene, roteringen, størrelsene og utsnittene brukeren har valgt.
 pub fn from_draft(
     store: &Store,
     year: i32,
@@ -176,6 +178,14 @@ pub fn from_draft(
         .filter(|p| !p.photos.is_empty())
         .map(|p| AlbumPage {
             kind: p.kind,
+            mal: chosen
+                .template_of(
+                    &p.photos
+                        .iter()
+                        .map(|&i| draft.photos[i].hash)
+                        .collect::<Vec<_>>(),
+                )
+                .map(str::to_string),
             photos: p
                 .photos
                 .iter()

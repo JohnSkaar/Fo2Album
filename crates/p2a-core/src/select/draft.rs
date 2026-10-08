@@ -245,6 +245,12 @@ pub struct DraftHints {
     pub faces: HashMap<ContentHash, Vec<FaceInfo>>,
     /// Personene (`FaceInfo::person`) som er barna i familien.
     pub children: HashSet<i64>,
+    /// Brukerens størrelse per bilde: -1 mindre enn de andre på siden, 0 like stort (aldri
+    /// alene), 1–2 større på siden, 3 egen side med luft, 4 hele siden. Mangler = appen velger.
+    pub sizes: HashMap<ContentHash, i8>,
+    /// «Egen historie»: disse bildene blir en egen historie med egne sider, i tidsrekkefølge
+    /// blant de andre.
+    pub own_stories: Vec<HashSet<ContentHash>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -318,7 +324,13 @@ pub fn make_draft(
         .into_iter()
         .map(|p| {
             let raw = p.quality;
-            let decision = decisions.get(&p.hash).copied();
+            // Bilder brukeren har gjort større eller lagt i en egen historie, er med.
+            let wanted = hints.sizes.get(&p.hash).is_some_and(|&s| s >= 1)
+                || hints.own_stories.iter().any(|s| s.contains(&p.hash));
+            let decision = decisions
+                .get(&p.hash)
+                .copied()
+                .or(wanted.then_some(Decision::Med));
             let rel = raw.map(|q| BasicQuality {
                 sharp: rank(q.sharp),
                 ..q
@@ -372,6 +384,8 @@ pub fn make_draft(
     }
     let mut groups = group_events(&items, cfg);
     merge_groups(&mut groups, &items, &hints.merged_events);
+    own_stories(&mut groups, &items, &hints.own_stories);
+    gather_locked(&mut groups, &items, &hints.locked_pages);
     let nature = mark_things(&mut items, &groups, prefs, cfg);
     let home_place = home(&items);
     let index: HashMap<ContentHash, usize> = items
@@ -548,6 +562,7 @@ pub fn make_draft(
                     left_pages[g],
                     group.adult_trip,
                     &portraits[g],
+                    &hints.sizes,
                     cfg,
                 )
                 .into_iter()
@@ -600,7 +615,16 @@ pub fn make_draft(
                 let r = reason_in(it, chosen.len(), &burst_size, first, out_of_order[i]);
                 (r, None)
             } else {
-                reason_out(it, &items, chosen, &burst_size, prefs, cfg)
+                match reason_out(it, &items, chosen, &burst_size, prefs, cfg) {
+                    // Med på fornøyde sider teller også.
+                    (Reason::IkkePlass { .. }, rel) => (
+                        Reason::IkkePlass {
+                            med: events[g].included,
+                        },
+                        rel,
+                    ),
+                    other => other,
+                }
             };
             DraftPhoto {
                 hash: it.p.hash,
@@ -719,6 +743,74 @@ fn merge_groups(groups: &mut Vec<Group>, items: &[Item], merged: &[HashSet<Conte
         into.members = members;
         into.everyday = false;
         into.adult_trip |= adult;
+    }
+}
+
+/// «Egen historie»: bildene tas ut av hendelsene sine og blir en egen historie, sortert inn
+/// etter første bilde. Hendelser som blir tomme, forsvinner.
+fn own_stories(groups: &mut Vec<Group>, items: &[Item], stories: &[HashSet<ContentHash>]) {
+    for set in stories {
+        let members: Vec<usize> = (0..items.len())
+            .filter(|&i| set.contains(&items[i].p.hash))
+            .collect();
+        let Some(&first) = members.first() else {
+            continue;
+        };
+        for g in groups.iter_mut() {
+            g.members.retain(|i| !members.contains(i));
+        }
+        groups.retain(|g| !g.members.is_empty());
+        let at = groups.partition_point(|g| g.members[0] < first);
+        groups.insert(
+            at,
+            Group {
+                members,
+                everyday: false,
+                adult_trip: false,
+                adult_trip_guess: false,
+                target: None,
+            },
+        );
+    }
+}
+
+/// Bildene på en side brukeren har satt sammen, hører til historien til sidens første bilde
+/// («Sett på én side» kan samle bilder fra flere dager).
+fn gather_locked(groups: &mut Vec<Group>, items: &[Item], locked: &[LockedPage]) {
+    let index: HashMap<ContentHash, usize> = items
+        .iter()
+        .enumerate()
+        .map(|(i, it)| (it.p.hash, i))
+        .collect();
+    for lp in locked {
+        let idx: Vec<usize> = lp
+            .photos
+            .iter()
+            .filter_map(|h| index.get(h).copied())
+            .collect();
+        let Some(&first) = idx.first() else { continue };
+        let Some(home) = groups.iter().position(|g| g.members.contains(&first)) else {
+            continue;
+        };
+        let moved: Vec<usize> = idx
+            .iter()
+            .copied()
+            .filter(|i| !groups[home].members.contains(i))
+            .collect();
+        if moved.is_empty() {
+            continue;
+        }
+        for (k, g) in groups.iter_mut().enumerate() {
+            if k != home {
+                g.members.retain(|i| !moved.contains(i));
+            }
+        }
+        let g = &mut groups[home];
+        g.members.extend(moved);
+        g.members.sort_unstable();
+        // Gruppene skal fortsatt stå i rekkefølge etter første bilde.
+        groups.retain(|g| !g.members.is_empty());
+        groups.sort_by_key(|g| g.members[0]);
     }
 }
 
@@ -933,6 +1025,7 @@ fn story_pages(
     pages: usize,
     adult_trip: bool,
     portraits: &[usize],
+    sizes: &HashMap<ContentHash, i8>,
     cfg: &DraftConfig,
 ) -> Vec<Page> {
     if chosen.is_empty() || pages == 0 {
@@ -977,22 +1070,36 @@ fn story_pages(
     let quality: Vec<f32> = rest.iter().map(|&i| items[i].q).collect();
     let single: Vec<Single> = rest
         .iter()
-        .map(|&i| match items[i].decision {
-            Some(Decision::Fremhev) => Single::Must,
-            Some(Decision::Demp) => Single::Never,
-            // Et virkelig flott stemningsbilde (natur, oversikt) kan få en hel side innimellom.
-            _ if items[i].mood && items[i].exceptional => Single::Free,
-            // Ellers er ting og stemningsbilder fyll mellom personbildene.
-            _ if items[i].people == Some(false) => Single::Never,
-            _ => Single::Free,
-        })
+        .map(
+            |&i| match (sizes.get(&items[i].p.hash), items[i].decision) {
+                // Brukerens størrelse: egen side (3 og 4), ellers på en side med andre.
+                (Some(&s), _) if s >= 3 => Single::Must,
+                (Some(_), _) => Single::Never,
+                (_, Some(Decision::Fremhev)) => Single::Must,
+                (_, Some(Decision::Demp)) => Single::Never,
+                // Et virkelig flott stemningsbilde (natur, oversikt) kan få en hel side innimellom.
+                _ if items[i].mood && items[i].exceptional => Single::Free,
+                // Ellers er ting og stemningsbilder fyll mellom personbildene.
+                _ if items[i].people == Some(false) => Single::Never,
+                _ => Single::Free,
+            },
+        )
         .collect();
     out.extend(
         layout::story_with(&quality, &single, pages)
             .into_iter()
-            .map(|p| Page {
-                kind: p.kind,
-                photos: p.photos.into_iter().map(|k| rest[k]).collect(),
+            .map(|p| {
+                let photos: Vec<usize> = p.photos.into_iter().map(|k| rest[k]).collect();
+                // Hele siden (4) eller egen side med luft (3), som brukeren valgte.
+                let kind = match photos.as_slice() {
+                    [i] => match sizes.get(&items[*i].p.hash) {
+                        Some(4) => PageKind::Helside,
+                        Some(3) => PageKind::Luft,
+                        _ => p.kind,
+                    },
+                    _ => p.kind,
+                };
+                Page { kind, photos }
             }),
     );
     out
@@ -2012,5 +2119,77 @@ mod tests {
         let out = auto.photos.iter().find(|p| !p.included).unwrap().hash;
         let d = draft(&photos, &HashMap::from([(out, Decision::Opp)]));
         assert!(d.photos.iter().find(|p| p.hash == out).unwrap().included);
+    }
+
+    #[test]
+    fn user_sizes_decide_own_page_full_page_and_grid() {
+        let photos = day(0, 8, 8, 60);
+        let auto = draft(&photos, &HashMap::new());
+        let out = auto.photos.iter().find(|p| !p.included).unwrap().hash;
+        let mut ins = auto.included().map(|p| p.hash);
+        let (a, b) = (ins.next().unwrap(), ins.next().unwrap());
+        let d = with(
+            &photos,
+            &DraftHints {
+                sizes: HashMap::from([(out, 4), (a, 3), (b, 1)]),
+                ..DraftHints::default()
+            },
+        );
+        let idx = |h: ContentHash| d.photos.iter().position(|p| p.hash == h).unwrap();
+        let page = |i: usize| {
+            d.events[0]
+                .layout
+                .iter()
+                .find(|p| p.photos.contains(&i))
+                .unwrap()
+        };
+        assert!(d.photos[idx(out)].included, "større betyr med");
+        assert_eq!(page(idx(out)).kind, PageKind::Helside);
+        assert_eq!(page(idx(a)).photos.len(), 1);
+        assert_eq!(page(idx(a)).kind, PageKind::Luft);
+        assert!(page(idx(b)).photos.len() > 1, "større på siden, ikke alene");
+    }
+
+    #[test]
+    fn own_story_becomes_its_own_event_in_time_order() {
+        let mut photos = day(0, 6, 1, 40);
+        photos.extend(day(100, 6, 20, 40));
+        let story: HashSet<ContentHash> = photos[30..36].iter().map(|p| p.hash).collect();
+        let d = with(
+            &photos,
+            &DraftHints {
+                own_stories: vec![story.clone()],
+                ..DraftHints::default()
+            },
+        );
+        assert_eq!(d.events.len(), 3);
+        assert_eq!(d.events[1].photos, 6);
+        assert!(d
+            .photos
+            .iter()
+            .filter(|p| story.contains(&p.hash))
+            .all(|p| p.event == 1 && p.included));
+        assert_eq!(d.events[2].photos, 40);
+    }
+
+    #[test]
+    fn gathered_page_takes_photos_from_other_days() {
+        let mut photos = day(0, 6, 1, 40);
+        photos.extend(day(100, 6, 20, 40));
+        let page = LockedPage {
+            kind: PageKind::Rutenett { kolonner: 2 },
+            photos: vec![photos[3].hash, photos[50].hash, photos[60].hash],
+        };
+        let d = with(&photos, &hints(&[], None, vec![page.clone()]));
+        assert_eq!(d.events.len(), 2);
+        let e = &d.events[0];
+        assert_eq!(e.locked_pages.len(), 1);
+        let got: Vec<ContentHash> = e.layout[e.locked_pages[0]]
+            .photos
+            .iter()
+            .map(|&i| d.photos[i].hash)
+            .collect();
+        assert_eq!(got, page.photos);
+        assert_eq!(d.events[1].photos, 38);
     }
 }
