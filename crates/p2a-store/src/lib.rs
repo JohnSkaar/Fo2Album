@@ -30,7 +30,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 pub use catalog::{
-    CatalogSummary, FileEntry, FileToRead, PhotoSummary, ReadOutcome, Source, SyncReport,
+    CatalogSummary, FileEntry, FileToRead, PhotoFile, PhotoSummary, ReadOutcome, Source, SyncReport,
 };
 pub use crypto::MasterKey;
 pub use faces::{FaceGroup, FaceSample, NewFace, StoredFace, GROUP_IGNORED, GROUP_UNNAMED};

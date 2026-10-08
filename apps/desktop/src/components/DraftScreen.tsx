@@ -289,6 +289,7 @@ export function DraftScreen({
   draft,
   phase,
   onMake,
+  onPrint,
   onSize,
   onChoose,
   onAnswer,
@@ -299,6 +300,8 @@ export function DraftScreen({
   draft: Utkast | null;
   phase: Analysefase | null;
   onMake: () => void;
+  /** «Lag trykkfil»: albumet som PDF. */
+  onPrint: () => void;
   /** Lager utkastet på nytt med et sidetak (`null` = hele historien). */
   onSize: (sidetak: number | null) => void;
   /** Lagrer valget og returnerer id-en til loggføringen (til «Hvorfor?»), eller `null`. */
@@ -382,9 +385,14 @@ export function DraftScreen({
           </h1>
           <p className="draft__sum">{t.sammendrag(antallMed, draft.pages, hendelserMed)}</p>
         </div>
-        <button type="button" className="btn btn--secondary" onClick={onMake}>
-          {t.nyttUtkast}
-        </button>
+        <div className="draft__actions">
+          <button type="button" className="btn btn--secondary" onClick={onMake}>
+            {t.nyttUtkast}
+          </button>
+          <button type="button" className="btn btn--primary" onClick={onPrint}>
+            {tekster.trykk.knapp}
+          </button>
+        </div>
       </div>
       <Pris draft={draft} onSize={onSize} />
       <p className="draft__help">{t.hjelp}</p>

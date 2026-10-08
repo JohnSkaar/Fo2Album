@@ -7,7 +7,11 @@
 //! p2a eval lag-gullsett --pdf ALBUM.pdf --aar 2010 --navn familie-2010 [--data STI]
 //! p2a eval liste [--data STI]
 //! p2a eval kjor [--data STI] [--resultater eval/RESULTS.md]
+//! p2a trykk --aar 2011 --ut album.pdf [--sider N] [--data STI]
 //! ```
+//!
+//! `trykk` lager trykkfilen (PDF) for årets album slik utkastet i appen ser ut, med tekstene
+//! brukeren har lagret (eller forslaget). Filen skrives bare til `--ut`.
 //!
 //! `les-inn` og `eval` bruker den samme krypterte katalogen som appen (standard datamappe,
 //! nøkkel fra nøkkelringen), så bildene du har lest inn i appen, kan brukes direkte.
@@ -38,6 +42,7 @@ fn main() {
         Some("bench") => bench(&args[1..]),
         Some("demo") => demo(&args[1..]),
         Some("les-inn") => read_in(&args[1..]),
+        Some("trykk") => print_album(&args[1..]),
         Some("eval") => match args.get(1).map(String::as_str) {
             Some("lag-gullsett") => eval_make_gold(&args[2..]),
             Some("liste") => eval_list(&args[2..]),
@@ -58,7 +63,8 @@ const USAGE: &str = "Bruk:
   p2a les-inn --mappe STI [--kilde pc|dropbox|icloud|google_disk] [--data STI]
   p2a eval lag-gullsett --pdf ALBUM.pdf --aar ÅR --navn NAVN [--data STI]
   p2a eval liste [--data STI]
-  p2a eval kjor [--data STI] [--resultater eval/RESULTS.md]";
+  p2a eval kjor [--data STI] [--resultater eval/RESULTS.md]
+  p2a trykk --aar ÅR --ut ALBUM.pdf [--sider N] [--data STI]";
 
 /// Samme datamappe som appen (Tauri `app_data_dir` for `no.fo2album.app`), eller `--data`.
 fn data_dir(args: &[String]) -> Result<PathBuf, String> {
@@ -91,6 +97,50 @@ fn open_store(args: &[String]) -> Result<(Store, PathBuf), String> {
         e => e.to_string(),
     })?;
     Ok((store, dir))
+}
+
+fn print_album(args: &[String]) -> Result<(), String> {
+    use p2a_print::album;
+    let year: i32 = flag(args, "--aar")
+        .ok_or("mangler --aar ÅR")?
+        .parse()
+        .map_err(|_| "ugyldig --aar")?;
+    let out = PathBuf::from(flag(args, "--ut").ok_or("mangler --ut FIL.pdf")?);
+    let pages = flag(args, "--sider")
+        .map(|v| v.parse::<usize>())
+        .transpose()
+        .map_err(|_| "ugyldig --sider")?;
+    let (store, _) = open_store(args)?;
+    let e = |e: p2a_store::StoreError| e.to_string();
+    let (draft, metas) = album::draft_for_year(&store, year, pages).map_err(e)?;
+    let (front, back) = album::default_covers(&metas);
+    let text = album::load_text(&store, year).map_err(e)?;
+    let a = album::from_draft(&store, year, &draft, text, front, back).map_err(e)?;
+    let t = Instant::now();
+    let (pdf, report) = p2a_print::render(&a, &mut |done, total| {
+        eprint!("\rBilder: {done} av {total}");
+    })
+    .map_err(|e| e.to_string())?;
+    eprintln!();
+    std::fs::write(&out, &pdf).map_err(|e| format!("kunne ikke skrive {}: {e}", out.display()))?;
+    println!(
+        "{}: {} sider, {} bilder, {:.1} MB, {:.1} s",
+        out.display(),
+        report.pages,
+        report.photos,
+        pdf.len() as f64 / 1e6,
+        t.elapsed().as_secs_f64()
+    );
+    if !report.missing.is_empty() {
+        println!("Mangler (grå felt): {}", report.missing.len());
+    }
+    if !report.low_resolution.is_empty() {
+        println!(
+            "Lav oppløsning for størrelsen: {}",
+            report.low_resolution.len()
+        );
+    }
+    Ok(())
 }
 
 fn read_in(args: &[String]) -> Result<(), String> {

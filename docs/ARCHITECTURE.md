@@ -118,7 +118,7 @@ Ikke ta inn GPL, LGPL eller AGPL uten en vurdering her først.
 | Hashing | BLAKE3 (eksakt), pHash/dHash (perceptuell) | | |
 | ML-kjøring | **tract** (ONNX i ren Rust, CPU) for ansiktsmodellene. ONNX Runtime kan vurderes senere for tyngre modeller (CLIP) | Ingen eksterne biblioteker å pakke med, ingen nettverk, bygges likt på Mac og Windows | ONNX Runtime (CoreML/DirectML) |
 | Geokoding | Offline GeoNames-utdrag for Norden + resten av verden (by-nivå) | Ingen nettverkskall | |
-| PDF | Generer trykkfil lokalt (Rust PDF-bibliotek, eller rendre layout i webview og skrive ut til PDF) | Krav fra trykkeri avgjør (se under) | |
+| PDF | **pdf-writer** (MIT/Apache-2.0) i `crates/p2a-print`: trykkfilen lages lokalt fra utkastet. Tekst tegnes som streker fra Fraunces og Nunito Sans (SIL OFL 1.1) med **ttf-parser** (MIT/Apache-2.0), bilder legges inn som JPEG i 300 ppi | Ingen fonter å bygge inn, likt resultat hos alle trykkerier, ingen eksterne biblioteker | Krav fra trykkeriet (CMYK/ICC, omslag med rygg) avgjør resten |
 
 ## Modeller (krever lisenssjekk før bruk)
 

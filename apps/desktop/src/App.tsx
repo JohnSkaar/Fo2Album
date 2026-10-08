@@ -11,6 +11,7 @@ import {
   type Kilde,
   type KildeType,
   type Handling,
+  type Albumtekst,
   type Ansiktsgruppe,
   type Personer,
   type Rolle,
@@ -21,6 +22,7 @@ import {
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { DraftScreen } from "./components/DraftScreen";
 import { PeopleScreen } from "./components/PeopleScreen";
+import { PrintDialog, type Trykkstatus } from "./components/PrintDialog";
 import { PickScreen } from "./components/PickScreen";
 import { RecoverScreen } from "./components/RecoverScreen";
 import { RecoveryKeyScreen } from "./components/RecoveryKeyScreen";
@@ -69,6 +71,9 @@ export function App() {
   // Albumutkastet er hovedvisningen; «Alle bilder» er for den som vil se alt.
   const [visning, setVisning] = useState<Visning>("utkast");
   const [personer, setPersoner] = useState<Personer | null>(null);
+  const [trykk, setTrykk] = useState<{ tekst: Albumtekst | null; status: Trykkstatus } | null>(
+    null,
+  );
   const [utkast, setUtkast] = useState<Utkast | null>(null);
   const [analyse, setAnalyse] = useState<Analysefase | null>(null);
   // Valgt år leses av lastKatalog, som ikke skal lages på nytt hver gang året endres.
@@ -292,6 +297,35 @@ export function App() {
     }
   };
 
+  // ---------- Trykkfil ----------
+  const visTrykk = async () => {
+    if (!utkast) return;
+    setTrykk({ tekst: null, status: { type: "skriver" } });
+    try {
+      const tekst = await api.albumtekst(utkast.year);
+      setTrykk({ tekst, status: { type: "skriver" } });
+    } catch (e) {
+      setTrykk(null);
+      visMelding(feiltekst(e));
+    }
+  };
+  const lagTrykk = async (tekst: Albumtekst) => {
+    if (!utkast) return;
+    const sti = await api.velgTrykkfil(tekster.trykk.filnavn(utkast.year));
+    if (!sti) return;
+    setTrykk({ tekst, status: { type: "lager", p: null } });
+    const stopp = await api.paTrykk((p) => setTrykk({ tekst, status: { type: "lager", p } }));
+    try {
+      const fil = await api.lagTrykkfil(utkast.year, utkast.pageCap, tekst, sti);
+      setTrykk({ tekst, status: { type: "ferdig", fil } });
+    } catch (e) {
+      setTrykk({ tekst, status: { type: "skriver" } });
+      visMelding(feiltekst(e));
+    } finally {
+      stopp();
+    }
+  };
+
   // ---------- Hvem er med? ----------
   useEffect(() => {
     if (visning !== "personer" || fase.type !== "klar") return;
@@ -375,6 +409,7 @@ export function App() {
             draft={utkast}
             phase={analyse}
             onMake={() => void lagUtkast()}
+            onPrint={() => void visTrykk()}
             onSize={(sidetak) => void lagUtkast(sidetak)}
             onChoose={velgBilde}
             onAnswer={(id, r) => void svarHvorfor(id, r)}
@@ -418,6 +453,16 @@ export function App() {
         onConfirm={() => void slettAlt()}
         onCancel={() => setBekreftSlett(false)}
       />
+      {utkast && (
+        <PrintDialog
+          open={trykk !== null}
+          year={utkast.year}
+          text={trykk?.tekst ?? null}
+          status={trykk?.status ?? { type: "skriver" }}
+          onMake={(t) => void lagTrykk(t)}
+          onClose={() => setTrykk(null)}
+        />
+      )}
       <Toast message={toast} />
     </div>
   );

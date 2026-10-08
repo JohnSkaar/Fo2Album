@@ -271,6 +271,34 @@ export const tekster = {
       liker_stemningsbilder: "Dere liker stemningsbilder uten personer.",
     } satisfies Record<Laerdom, string>,
   },
+  trykk: {
+    knapp: "Lag trykkfil",
+    tittel: "Lag trykkfilen",
+    ingress:
+      "Trykkfilen er albumet som PDF, med bildene i full oppløsning, slik det skal trykkes. Skriv tekstene først; de lagres til neste gang.",
+    trygt:
+      "Filen lagres der du velger, på denne maskinen. Den sendes ikke noe sted før du selv bestiller.",
+    tittelFelt: "Tittel på forsiden",
+    undertittel: "Undertittel",
+    undertittelHjelp: "For eksempel navnene i familien.",
+    intro: "Første side inne i albumet",
+    introHjelp: (aar: number) =>
+      `Skriv litt om ${aar}: hva som skjedde, hvem som kom til, hva dere husker best.`,
+    bakside: "Baksiden",
+    baksideHjelp: "En hilsen, et sitat eller et minne fra året.",
+    avbryt: "Avbryt",
+    lag: "Velg hvor filen skal lagres",
+    filnavn: (aar: number) => `Fo2Album ${aar}.pdf`,
+    lager: (done: number, total: number) =>
+      `Legger inn bildene i full oppløsning … ${fmt(done)} av ${fmt(total)}`,
+    ferdig: (sider: number, bilder: number, mb: number) =>
+      `Trykkfilen er lagret: ${antall(sider, "side", "sider")} og ${antall(bilder, "bilde", "bilder")} (${mb.toLocaleString("nb-NO", { maximumFractionDigits: 0 })} MB).`,
+    mangler: (n: number) =>
+      `${antall(n, "bilde", "bilder")} kunne ikke leses og står som grå felt. Sjekk at bildene finnes på maskinen (ikke bare i skyen), og lag filen på nytt.`,
+    lavOppl: (n: number) =>
+      `${antall(n, "bilde", "bilder")} har lav oppløsning for størrelsen i albumet og kan bli litt uskarpe på trykk.`,
+    lukk: "Lukk",
+  },
   personer: {
     tittel: "Hvem er med?",
     ingress:

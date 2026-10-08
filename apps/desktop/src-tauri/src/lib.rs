@@ -4,6 +4,7 @@
 mod commands;
 mod keys;
 mod people;
+mod print;
 mod thumbs;
 
 use tauri::Manager;
@@ -78,6 +79,8 @@ pub fn run() {
             people::name_face_group,
             people::ignore_face_group,
             people::move_face,
+            print::album_text,
+            print::export_album,
         ])
         .run(tauri::generate_context!())
         .expect("kunne ikke starte Fo2Album");

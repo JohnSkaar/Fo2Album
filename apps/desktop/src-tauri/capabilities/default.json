@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Minimale rettigheter for hovedvinduet: kjernefunksjoner og mappevelger. Ingen HTTP-, shell- eller filsystem-plugins; filer leses bare av Rust-kjernen.",
+  "description": "Minimale rettigheter for hovedvinduet: kjernefunksjoner, mappevelger og «lagre som» for trykkfilen. Ingen HTTP-, shell- eller filsystem-plugins; filer leses og skrives bare av Rust-kjernen.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open"]
+  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save"]
 }

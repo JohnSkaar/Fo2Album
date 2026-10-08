@@ -1,0 +1,27 @@
+[package]
+name = "p2a-print"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+p2a-core.workspace = true
+p2a-ingest.workspace = true
+p2a-store.workspace = true
+pdf-writer = "0.15"
+rayon = "1"
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror = "2"
+ttf-parser = "0.25"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+p2a-ingest = { workspace = true }
+tempfile = "3"

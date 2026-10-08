@@ -20,5 +20,6 @@ p2a-ingest = { path = "../p2a-ingest" }
 p2a-store.workspace = true
 p2a-eval = { path = "../p2a-eval" }
 p2a-keychain = { path = "../p2a-keychain" }
+p2a-print = { path = "../p2a-print" }
 rayon = "1"
 tempfile = "3"

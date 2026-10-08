@@ -4,7 +4,7 @@
  */
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 export type KildeType = "pc" | "dropbox" | "icloud" | "google_disk" | "apple_photos";
 export type LagringStatus = "tom" | "trenger_gjenoppretting" | "laast" | "klar";
@@ -232,6 +232,29 @@ export interface Personer {
   pending: number;
 }
 
+/** Tekstene i albumet: forsiden, første side inne og baksiden. */
+export interface Albumtekst {
+  title: string;
+  subtitle: string;
+  intro: string;
+  back: string;
+}
+
+export interface TrykkFremdrift {
+  done: number;
+  total: number;
+}
+
+export interface Trykkfil {
+  pages: number;
+  photos: number;
+  /** Bilder som ikke kunne leses (vises som grå felt). */
+  missing: number;
+  /** Bilder med for lav oppløsning for størrelsen i albumet. */
+  lowResolution: number;
+  megabytes: number;
+}
+
 /** Feil fra Rust-kjernen: en stabil kode og en teknisk melding. */
 export interface Kommandofeil {
   kode: string;
@@ -280,6 +303,15 @@ export const api = {
     invoke<number>("choose_photo", { year, action, id, other: other ?? null }),
   svarHvorfor: (feedbackId: number, reason: Svar | null) =>
     invoke<Laert>("answer_why", { feedbackId, reason }),
+
+  albumtekst: (year: number) => invoke<Albumtekst>("album_text", { year }),
+  /** Spør hvor trykkfilen skal lagres. `null` hvis brukeren avbryter. */
+  velgTrykkfil: async (navn: string): Promise<string | null> =>
+    (await save({ defaultPath: navn, filters: [{ name: "PDF", extensions: ["pdf"] }] })) ?? null,
+  lagTrykkfil: (year: number, pageCap: number | null, text: Albumtekst, path: string) =>
+    invoke<Trykkfil>("export_album", { year, pageCap, text, path }),
+  paTrykk: (cb: (p: TrykkFremdrift) => void): Promise<UnlistenFn> =>
+    listen<TrykkFremdrift>("trykk", (e) => cb(e.payload)),
 
   personer: () => invoke<Personer>("face_groups"),
   /** Gir gruppen navn og rolle; med `personId` slås den inn i en person som finnes. */

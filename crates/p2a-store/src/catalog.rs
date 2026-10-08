@@ -20,6 +20,17 @@ pub struct Source {
     pub label: String,
 }
 
+/// Originalfilen til et bilde.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhotoFile {
+    pub path: PathBuf,
+    pub format: Option<String>,
+    pub orientation: Option<u16>,
+    /// Mål etter rotering.
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+}
+
 /// En fil slik skanningen fant den.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileEntry {
@@ -515,6 +526,46 @@ impl Store {
     }
 
     /// Unike bilder fra et år, sortert på opptakstid.
+    /// Originalfilene til bildene (første lokale fil), med format, orientering og mål etter
+    /// rotering. Brukes av trykkfilen. Bilder uten lokal fil mangler i svaret.
+    pub fn photo_files(
+        &self,
+        hashes: &[ContentHash],
+    ) -> Result<HashMap<ContentHash, PhotoFile>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT s.path, f.rel_path, p.format, p.orientation, p.width, p.height
+             FROM photos p
+             JOIN files f ON f.id = (SELECT id FROM files WHERE content_hash = p.content_hash
+                                     AND status = 'lokal' LIMIT 1)
+             JOIN sources s ON s.id = f.source_id
+             WHERE p.content_hash = ?1",
+        )?;
+        let mut out = HashMap::new();
+        for h in hashes {
+            let row = stmt
+                .query_row([&h.0[..]], |r| {
+                    Ok(PhotoFile {
+                        // Relative stier lagres med «/»; delt opp så de også virker på Windows.
+                        path: r
+                            .get::<_, String>(1)?
+                            .split('/')
+                            .fold(PathBuf::from(r.get::<_, String>(0)?), |p, part| {
+                                p.join(part)
+                            }),
+                        format: r.get(2)?,
+                        orientation: r.get(3)?,
+                        width: r.get(4)?,
+                        height: r.get(5)?,
+                    })
+                })
+                .optional()?;
+            if let Some(f) = row {
+                out.insert(*h, f);
+            }
+        }
+        Ok(out)
+    }
+
     pub fn photos_in_year(&self, year: i32) -> Result<Vec<PhotoSummary>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT p.content_hash, p.taken_at, p.taken_offset, p.date_source, p.width, p.height,

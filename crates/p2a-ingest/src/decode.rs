@@ -41,8 +41,19 @@ pub fn decode_file(
     format: Option<&str>,
     orientation: Option<u16>,
 ) -> Result<Decoded, DecodeError> {
+    decode_file_at(path, format, orientation, ANALYSIS_MIN)
+}
+
+/// Som [`decode_file`], men med lengste side minst `min_long` punkter (eller full størrelse
+/// hvis bildet er mindre). Trykkfilen bruker dette for å få nok oppløsning til hvert felt.
+pub fn decode_file_at(
+    path: &Path,
+    format: Option<&str>,
+    orientation: Option<u16>,
+    min_long: u32,
+) -> Result<Decoded, DecodeError> {
     let image_format = match format {
-        Some("heic") => return decode_heic(&std::fs::read(path)?, orientation),
+        Some("heic") => return decode_heic(&std::fs::read(path)?, orientation, min_long),
         Some("jpeg") => ImageFormat::Jpeg,
         Some("png") => ImageFormat::Png,
         Some("webp") => ImageFormat::WebP,
@@ -50,7 +61,7 @@ pub fn decode_file(
     };
     let bytes = std::fs::read(path)?;
     let (mut image, (mut width, mut height)) = if image_format == ImageFormat::Jpeg {
-        decode_jpeg_scaled(&bytes)?
+        decode_jpeg_scaled(&bytes, min_long)?
     } else {
         let mut reader = ImageReader::new(Cursor::new(bytes));
         reader.set_format(image_format);
@@ -73,8 +84,12 @@ pub fn decode_file(
     })
 }
 
-fn decode_heic(bytes: &[u8], orientation: Option<u16>) -> Result<Decoded, DecodeError> {
-    let rgb = p2a_heic::decode(bytes, ANALYSIS_MIN).map_err(|e| match e {
+fn decode_heic(
+    bytes: &[u8],
+    orientation: Option<u16>,
+    min_long: u32,
+) -> Result<Decoded, DecodeError> {
+    let rgb = p2a_heic::decode(bytes, min_long).map_err(|e| match e {
         p2a_heic::HeicError::Unsupported => DecodeError::Unsupported,
         p2a_heic::HeicError::Corrupt(m) => DecodeError::Corrupt(m),
     })?;
@@ -99,11 +114,14 @@ fn decode_heic(bytes: &[u8], orientation: Option<u16>) -> Result<Decoded, Decode
 /// Dekoder JPEG fra minnet i redusert størrelse (lengste side minst [`ANALYSIS_MIN`]).
 /// Brukes bl.a. for bilder hentet ut av album-PDF-er.
 pub fn decode_jpeg_bytes(bytes: &[u8]) -> Result<DynamicImage, DecodeError> {
-    decode_jpeg_scaled(bytes).map(|(img, _)| img)
+    decode_jpeg_scaled(bytes, ANALYSIS_MIN).map(|(img, _)| img)
 }
 
 /// Dekoder JPEG i redusert størrelse. Returnerer bildet og originalens mål.
-fn decode_jpeg_scaled(bytes: &[u8]) -> Result<(DynamicImage, (u32, u32)), DecodeError> {
+fn decode_jpeg_scaled(
+    bytes: &[u8],
+    min_long: u32,
+) -> Result<(DynamicImage, (u32, u32)), DecodeError> {
     let corrupt = |e: jpeg_decoder::Error| DecodeError::Corrupt(e.to_string());
     let no_header = || DecodeError::Corrupt("mangler JPEG-hode".into());
     let mut dec = jpeg_decoder::Decoder::new(Cursor::new(bytes));
@@ -111,7 +129,7 @@ fn decode_jpeg_scaled(bytes: &[u8]) -> Result<(DynamicImage, (u32, u32)), Decode
     let info = dec.info().ok_or_else(no_header)?;
     let (fw, fh) = (info.width as u32, info.height as u32);
     let long = fw.max(fh).max(1);
-    let target = ANALYSIS_MIN.min(long);
+    let target = min_long.min(long);
     let request = |v: u32| (v * target).div_ceil(long).max(1) as u16;
     let (w, h) = dec.scale(request(fw), request(fh)).map_err(corrupt)?;
     let pixels = dec.decode().map_err(corrupt)?;

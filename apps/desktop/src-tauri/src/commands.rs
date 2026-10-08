@@ -11,7 +11,7 @@ use p2a_core::config::DedupConfig;
 use p2a_core::layout::PageKind;
 use p2a_core::learn::{learn, Action, Feedback, FeedbackReason, Lesson, Preferences};
 use p2a_core::select::draft::{make_draft, Decision, DraftConfig, DraftHints, Phase, Reason};
-use p2a_core::{ContentHash, Role, SourceKind};
+use p2a_core::{ContentHash, SourceKind};
 use p2a_ingest::pipeline::{ingest_all, IngestReport, Progress};
 use p2a_ingest::sources;
 use p2a_store::{CatalogSummary, PhotoSummary, RecoveryKey, Store, StoreError, VaultStatus};
@@ -540,17 +540,8 @@ fn draft_for(
         .collect();
     let decisions = store.decisions(year)?;
     let (prefs, learned) = learned_from(&store.feedback_log()?);
-    // Personene (M4): ansiktene i årets bilder og hvem som er barna i familien.
-    let people = DraftHints {
-        faces: store.faces_in_year(year)?,
-        children: store
-            .persons()?
-            .into_iter()
-            .filter(|p| p.role == Role::Barn)
-            .map(|p| p.id)
-            .collect(),
-        ..DraftHints::default()
-    };
+    // Personene (M4): ansiktene i årets bilder og hvem som er barna (samme som trykkfilen).
+    let people = p2a_print::album::people_hints(store, year)?;
     // Med sidetak regnes også hele historien ut, så brukeren ser hva den ville kostet.
     let full_pages = page_cap.map(|_| {
         make_draft(

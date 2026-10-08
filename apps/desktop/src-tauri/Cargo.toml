@@ -21,6 +21,7 @@ serde.workspace = true
 serde_json.workspace = true
 p2a-core.workspace = true
 p2a-ingest = { path = "../../../crates/p2a-ingest" }
+p2a-print = { path = "../../../crates/p2a-print" }
 p2a-store.workspace = true
 p2a-keychain = { path = "../../../crates/p2a-keychain" }
 
