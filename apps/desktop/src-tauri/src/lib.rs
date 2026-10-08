@@ -75,6 +75,7 @@ pub fn run() {
             commands::make_album_draft,
             commands::choose_photo,
             commands::answer_why,
+            commands::album_choice,
             people::face_groups,
             people::name_face_group,
             people::ignore_face_group,

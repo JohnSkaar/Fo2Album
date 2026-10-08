@@ -162,6 +162,40 @@ export const tekster = {
     lagtTil: "Bildet er med",
     tattBort: "Bildet er tatt bort",
     byttet: "Bildene er byttet",
+    roter: "Roter",
+    roterHjelp: "Roter en kvart omdreining med klokka",
+    brukForside: "Bruk som forside",
+    brukBakside: "Bruk som bakside",
+    turSporsmaal:
+      "Ser ut som en tur over flere dager. Var det en tur uten barn (gutte- eller jentetur, jobbtur)? Da får den færre sider, med et bilde av hver person.",
+    turGjettet:
+      "Ingen av barna er på bildene, så appen har gjort dette til en tur uten barn: færre sider og et bilde av hver person.",
+    turJa: "Ja, tur uten barn",
+    turNei: "Nei, familietur",
+    turUtenBarn: "Tur uten barn",
+    presenter: "Presenter på",
+    sider: (n: number) => (n === 1 ? "side" : "sider"),
+    farreSider: "Færre sider",
+    flereSider: "Flere sider",
+    lagForslag: "Lag forslag",
+    appensForslag: "Appens forslag",
+    delOpp: "Del opp igjen",
+    slaaSammenForslag: (dager: string) =>
+      `${dager} er korte dager tett etter hverandre. Vil du slå dem sammen til én historie?`,
+    slaaSammen: "Slå sammen",
+    neiTakk: "Nei takk",
+    omslag: "Forside og bakside",
+    omslagHjelp:
+      "Forslag fra de beste bildene gjennom året. Du kan også velge et hvilket som helst bilde: klikk det og trykk «Bruk som forside».",
+    forside: "Forside",
+    bakside: "Bakside",
+    valgtAvDeg: "Valgt av deg",
+    forslag: "Forslag",
+    medPersoner: "Med personer",
+    oversikt: "Oversiktsbilder",
+    oppdatert: "Utkastet er oppdatert",
+    fornoydMelding: "Siden beholdes som den er i neste utkast",
+    ikkeFornoydMelding: "Siden kan endres igjen i neste utkast",
   },
   pris: {
     naa: (sider: number, kr: number) =>
@@ -183,6 +217,9 @@ export const tekster = {
     rutenett: (n: number) => `${antall(n, "bilde", "bilder")} på siden`,
     side: (n: number) => `Side ${fmt(n)}`,
     endret: "Sidene ordnes på nytt når du lager utkastet igjen.",
+    fornoyd: "Fornøyd",
+    fornoydHjelp: "Siden beholdes som den er når utkastet lages på nytt",
+    erFornoyd: "✓ Fornøyd",
   },
   begrunnelse: (b: Begrunnelse, bilderIHendelsen: number): string => {
     const n = b.antall ?? 0;

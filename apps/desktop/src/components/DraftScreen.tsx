@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import type {
+  Albumvalg,
   Analysefase,
+  Omslag,
   Handling,
   Laert,
   Side,
@@ -19,6 +21,11 @@ const VIS_IKKE_MED = 8;
 const FASER: Analysefase[] = ["henter", "hendelser", "serier", "velger", "begrunnelser"];
 
 type Valgt = { id: string; included: boolean; event: number };
+type Endre = (c: Albumvalg, melding?: string) => void;
+
+/** Brukerens rotering vist på miniatyren (stående bilder skaleres så de får plass). */
+const rotert = (deg: number | undefined): React.CSSProperties | undefined =>
+  deg ? { transform: `rotate(${deg}deg)${deg % 180 ? " scale(0.75)" : ""}` } : undefined;
 type Spørsmål = { feedbackId: number; action: Handling };
 
 function Analyse({ fase }: { fase: Analysefase }) {
@@ -81,7 +88,13 @@ function Kort({
       >
         <span className="th">
           {b.hasThumbnail ? (
-            <img src={thumbUrl(b.id)} alt="" loading="lazy" decoding="async" />
+            <img
+              src={thumbUrl(b.id)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              style={rotert(b.rotation)}
+            />
           ) : (
             <span className="th__none">{tekster.bilder.ingenMiniatyr}</span>
           )}
@@ -100,11 +113,15 @@ function Kort({
 function Sider({
   sider,
   med,
+  rotasjon,
+  onChange,
   thumbUrl,
 }: {
   sider: Side[];
   /** Bildene som er med nå, i tidsrekkefølge. */
   med: string[];
+  rotasjon: Map<string, number>;
+  onChange: Endre;
   thumbUrl: (id: string) => string;
 }) {
   const { sider: vis, endret } = oppdaterSider(sider, med);
@@ -113,23 +130,154 @@ function Sider({
       <h4 className="ev__colh">{tekster.sider.tittel}</h4>
       <ol className="pages__list">
         {vis.map((s, i) => (
-          <li
-            key={s.photos[0]}
-            className={`pg pg--${s.kind}`}
-            style={s.kolonner ? { gridTemplateColumns: `repeat(${s.kolonner}, 1fr)` } : undefined}
-            aria-label={`${tekster.sider.side(i + 1)}: ${
-              s.kind === "rutenett"
-                ? tekster.sider.rutenett(s.photos.length)
-                : tekster.sider[s.kind]
-            }`}
-          >
-            {s.photos.map((id) => (
-              <img key={id} src={thumbUrl(id)} alt="" loading="lazy" decoding="async" />
-            ))}
+          <li key={s.photos[0]} className="pgwrap">
+            <div
+              className={`pg pg--${s.kind}${s.locked ? " pg--locked" : ""}`}
+              style={s.kolonner ? { gridTemplateColumns: `repeat(${s.kolonner}, 1fr)` } : undefined}
+              role="img"
+              aria-label={`${tekster.sider.side(i + 1)}: ${
+                s.kind === "rutenett"
+                  ? tekster.sider.rutenett(s.photos.length)
+                  : tekster.sider[s.kind]
+              }`}
+            >
+              {s.photos.map((id) => (
+                <img
+                  key={id}
+                  src={thumbUrl(id)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  style={rotert(rotasjon.get(id))}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              className="pg__lock"
+              aria-pressed={!!s.locked}
+              title={tekster.sider.fornoydHjelp}
+              aria-label={`${tekster.sider.side(i + 1)}: ${tekster.sider.fornoyd}`}
+              onClick={() =>
+                onChange(
+                  {
+                    type: "fornoyd",
+                    page: { kind: s.kind, kolonner: s.kolonner ?? null, photos: s.photos },
+                    on: !s.locked,
+                  },
+                  s.locked ? t.ikkeFornoydMelding : t.fornoydMelding,
+                )
+              }
+            >
+              {s.locked ? tekster.sider.erFornoyd : tekster.sider.fornoyd}
+            </button>
           </li>
         ))}
       </ol>
       {endret && <p className="ev__none">{tekster.sider.endret}</p>}
+    </div>
+  );
+}
+
+/** Turspørsmålet, sider per historie og «del opp igjen». */
+function Verktoy({ e, onChange }: { e: UtkastHendelse; onChange: Endre }) {
+  const [n, setN] = useState(e.pageTarget ?? e.pages);
+  const tur = e.looksLikeTrip && !e.everyday;
+  return (
+    <div className="ev__tools">
+      {tur && e.adultTripGuess && !e.tripAnswered && (
+        <p className="ev__ask">
+          <span>{t.turGjettet}</span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => onChange({ type: "tur_uten_barn", photo: e.key, on: false })}
+          >
+            {t.turNei}
+          </button>
+        </p>
+      )}
+      {tur && !e.adultTripGuess && !e.tripAnswered && (
+        <p className="ev__ask">
+          <span>{t.turSporsmaal}</span>
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            onClick={() => onChange({ type: "tur_uten_barn", photo: e.key, on: true })}
+          >
+            {t.turJa}
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => onChange({ type: "tur_uten_barn", photo: e.key, on: false })}
+          >
+            {t.turNei}
+          </button>
+        </p>
+      )}
+      <div className="ev__row">
+        {tur && e.tripAnswered && (
+          <button
+            type="button"
+            className="chip"
+            aria-pressed={e.adultTrip}
+            onClick={() => onChange({ type: "tur_uten_barn", photo: e.key, on: !e.adultTrip })}
+          >
+            {e.adultTrip ? `✓ ${t.turUtenBarn}` : `${t.turUtenBarn}?`}
+          </button>
+        )}
+        {!e.everyday && (
+          <span className="ev__pages" role="group" aria-label={t.presenter}>
+            {t.presenter}
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              aria-label={t.farreSider}
+              onClick={() => setN(Math.max(1, n - 1))}
+            >
+              −
+            </button>
+            <b aria-live="polite">{n}</b>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              aria-label={t.flereSider}
+              onClick={() => setN(n + 1)}
+            >
+              +
+            </button>
+            {t.sider(n)}
+            {n !== e.pages && (
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                onClick={() => onChange({ type: "sider", photo: e.key, pages: n })}
+              >
+                {t.lagForslag}
+              </button>
+            )}
+            {e.pageTarget !== null && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => onChange({ type: "sider", photo: e.key, pages: null })}
+              >
+                {t.appensForslag}
+              </button>
+            )}
+          </span>
+        )}
+        {e.merged && (
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => onChange({ type: "del_opp", photo: e.key })}
+          >
+            {t.delOpp}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -140,6 +288,8 @@ function Hendelse({
   bilder,
   valgt,
   onPick,
+  onChange,
+  rotasjon,
   thumbUrl,
 }: {
   e: UtkastHendelse;
@@ -147,6 +297,8 @@ function Hendelse({
   bilder: UtkastBilde[];
   valgt: Valgt | null;
   onPick: (b: UtkastBilde) => void;
+  onChange: Endre;
+  rotasjon: Map<string, number>;
   thumbUrl: (id: string) => string;
 }) {
   const [visAlle, setVisAlle] = useState(false);
@@ -165,7 +317,14 @@ function Hendelse({
         </h3>
         <span className="count">{t.hendelseInfo(e.photos, e.pages)}</span>
       </header>
-      <Sider sider={e.layout} med={med.map((b) => b.id)} thumbUrl={thumbUrl} />
+      <Verktoy key={`${e.key}-${e.pages}`} e={e} onChange={onChange} />
+      <Sider
+        sider={e.layout}
+        med={med.map((b) => b.id)}
+        rotasjon={rotasjon}
+        onChange={onChange}
+        thumbUrl={thumbUrl}
+      />
       <div className="ev__cols">
         <div className="ev__col">
           <h4 className="ev__colh">
@@ -266,6 +425,84 @@ function Pris({ draft, onSize }: { draft: Utkast; onSize: (sider: number | null)
   );
 }
 
+function Omslagsvalg({
+  o,
+  rotasjon,
+  onChange,
+  thumbUrl,
+}: {
+  o: Omslag;
+  rotasjon: Map<string, number>;
+  onChange: Endre;
+  thumbUrl: (id: string) => string;
+}) {
+  const bilde = (id: string, merke?: string) => (
+    <span className="cover__img">
+      <img src={thumbUrl(id)} alt="" loading="lazy" style={rotert(rotasjon.get(id))} />
+      {merke && <span className="cover__tag">{merke}</span>}
+    </span>
+  );
+  const kandidat = (id: string) => (
+    <li key={id} className="cover__cand">
+      {bilde(id, id === o.front ? t.forside : id === o.back ? t.bakside : undefined)}
+      <span className="cover__btns">
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={id === o.front}
+          onClick={() => onChange({ type: "forside", photo: id })}
+        >
+          {t.forside}
+        </button>
+        <button
+          type="button"
+          className="chip"
+          aria-pressed={id === o.back}
+          onClick={() => onChange({ type: "bakside", photo: id })}
+        >
+          {t.bakside}
+        </button>
+      </span>
+    </li>
+  );
+  return (
+    <details className="cover">
+      <summary>{t.omslag}</summary>
+      <p className="price__help">{t.omslagHjelp}</p>
+      <div className="cover__now">
+        {o.front && (
+          <figure>
+            {bilde(o.front)}
+            <figcaption>
+              {t.forside} · {o.chosenFront ? t.valgtAvDeg : t.forslag}
+            </figcaption>
+          </figure>
+        )}
+        {o.back && (
+          <figure>
+            {bilde(o.back)}
+            <figcaption>
+              {t.bakside} · {o.chosenBack ? t.valgtAvDeg : t.forslag}
+            </figcaption>
+          </figure>
+        )}
+      </div>
+      {o.people.length > 0 && (
+        <>
+          <h4 className="ev__colh">{t.medPersoner}</h4>
+          <ul className="cover__list">{o.people.map(kandidat)}</ul>
+        </>
+      )}
+      {o.overview.length > 0 && (
+        <>
+          <h4 className="ev__colh">{t.oversikt}</h4>
+          <ul className="cover__list">{o.overview.map(kandidat)}</ul>
+        </>
+      )}
+    </details>
+  );
+}
+
 function Laerdommer({ l }: { l: Laert }) {
   return (
     <details className="learned">
@@ -290,6 +527,7 @@ export function DraftScreen({
   phase,
   onMake,
   onPrint,
+  onChange,
   onSize,
   onChoose,
   onAnswer,
@@ -302,6 +540,8 @@ export function DraftScreen({
   onMake: () => void;
   /** «Lag trykkfil»: albumet som PDF. */
   onPrint: () => void;
+  /** Et valg for albumet (fornøyd, tur, sider, slå sammen, omslag, rotering). */
+  onChange: Endre;
   /** Lager utkastet på nytt med et sidetak (`null` = hele historien). */
   onSize: (sidetak: number | null) => void;
   /** Lagrer valget og returnerer id-en til loggføringen (til «Hvorfor?»), eller `null`. */
@@ -314,6 +554,7 @@ export function DraftScreen({
   const [handlinger, setHandlinger] = useState(0);
   const [hoppetOver, setHoppetOver] = useState(0);
   const [takk, setTakk] = useState(false);
+  const [avslatt, setAvslatt] = useState<Set<string>>(new Set());
 
   const perHendelse = useMemo(() => {
     const m = new Map<number, UtkastBilde[]>();
@@ -374,6 +615,7 @@ export function DraftScreen({
       ? draft.photos.find((b) => b.id === valgtBilde.related && b.included)
       : undefined;
   const antallMed = draft.photos.filter((b) => b.included).length;
+  const rotasjon = new Map(draft.photos.filter((b) => b.rotation).map((b) => [b.id, b.rotation]));
   const hendelserMed = draft.events.filter((e) => e.included > 0).length;
 
   return (
@@ -395,12 +637,19 @@ export function DraftScreen({
         </div>
       </div>
       <Pris draft={draft} onSize={onSize} />
+      <Omslagsvalg o={draft.cover} rotasjon={rotasjon} onChange={onChange} thumbUrl={thumbUrl} />
       <p className="draft__help">{t.hjelp}</p>
       <Laerdommer l={draft.learned} />
 
       {draft.events.map((e, i) => {
         const maaned = e.start.slice(0, 7);
         const ny = i === 0 || draft.events[i - 1]?.start.slice(0, 7) !== maaned;
+        // Forslag om å slå sammen korte dager som starter her.
+        const forslag = draft.mergeSuggestions.find((r) => r[0] === i);
+        const forslagNokkel = forslag?.map((k) => draft.events[k]?.key).join(",") ?? "";
+        const forslagEvents = forslag
+          ?.map((k) => draft.events[k])
+          .filter((x): x is UtkastHendelse => !!x);
         return (
           <div key={e.start + i}>
             {ny && (
@@ -408,12 +657,42 @@ export function DraftScreen({
                 {tekster.bilder.maaned(Number(maaned.slice(5, 7)) - 1, Number(maaned.slice(0, 4)))}
               </h2>
             )}
+            {forslagEvents && forslagEvents.length > 1 && !avslatt.has(forslagNokkel) && (
+              <p className="merge" role="note">
+                <span>
+                  {t.slaaSammenForslag(
+                    datoSpenn(
+                      forslagEvents[0]!.start,
+                      forslagEvents[forslagEvents.length - 1]!.end,
+                    ),
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn--secondary btn--sm"
+                  onClick={() =>
+                    onChange({ type: "slaa_sammen", photos: forslagEvents.map((x) => x.key) })
+                  }
+                >
+                  {t.slaaSammen}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => setAvslatt(new Set(avslatt).add(forslagNokkel))}
+                >
+                  {t.neiTakk}
+                </button>
+              </p>
+            )}
             <Hendelse
               e={e}
               index={i}
               bilder={perHendelse.get(i) ?? []}
               valgt={valgt}
               onPick={velg}
+              onChange={onChange}
+              rotasjon={rotasjon}
               thumbUrl={thumbUrl}
             />
           </div>
@@ -480,6 +759,28 @@ export function DraftScreen({
                     )}
                   </>
                 )}
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  title={t.roterHjelp}
+                  onClick={() => onChange({ type: "roter", photo: valgtBilde.id })}
+                >
+                  ↻ {t.roter}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => onChange({ type: "forside", photo: valgtBilde.id })}
+                >
+                  {t.brukForside}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => onChange({ type: "bakside", photo: valgtBilde.id })}
+                >
+                  {t.brukBakside}
+                </button>
                 <button type="button" className="btn btn--ghost" onClick={() => setValgt(null)}>
                   {t.lukk}
                 </button>

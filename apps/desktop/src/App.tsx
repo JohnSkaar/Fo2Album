@@ -12,6 +12,7 @@ import {
   type KildeType,
   type Handling,
   type Albumtekst,
+  type Albumvalg,
   type Ansiktsgruppe,
   type Personer,
   type Rolle,
@@ -188,6 +189,18 @@ export function App() {
     } finally {
       void stopp.then((s) => s());
       setAnalyse(null);
+    }
+  };
+
+  /** Et valg for albumet: lagres, og utkastet lages på nytt uten gjennomgangen på skjermen. */
+  const endreAlbum = async (change: Albumvalg, melding?: string) => {
+    if (!utkast) return;
+    try {
+      await api.albumvalg(utkast.year, change);
+      setUtkast(await api.lagUtkast(utkast.year, utkast.pageCap, true));
+      visMelding(melding ?? tekster.utkast.oppdatert);
+    } catch (e) {
+      visMelding(feiltekst(e));
     }
   };
 
@@ -410,6 +423,7 @@ export function App() {
             phase={analyse}
             onMake={() => void lagUtkast()}
             onPrint={() => void visTrykk()}
+            onChange={(c, m) => void endreAlbum(c, m)}
             onSize={(sidetak) => void lagUtkast(sidetak)}
             onChoose={velgBilde}
             onAnswer={(id, r) => void svarHvorfor(id, r)}

@@ -113,9 +113,8 @@ fn print_album(args: &[String]) -> Result<(), String> {
     let (store, _) = open_store(args)?;
     let e = |e: p2a_store::StoreError| e.to_string();
     let (draft, metas) = album::draft_for_year(&store, year, pages).map_err(e)?;
-    let (front, back) = album::default_covers(&metas);
     let text = album::load_text(&store, year).map_err(e)?;
-    let a = album::from_draft(&store, year, &draft, text, front, back).map_err(e)?;
+    let a = album::from_draft(&store, year, &draft, &metas, text).map_err(e)?;
     let t = Instant::now();
     let (pdf, report) = p2a_print::render(&a, &mut |done, total| {
         eprint!("\rBilder: {done} av {total}");

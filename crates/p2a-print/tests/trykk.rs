@@ -21,6 +21,7 @@ fn photo(dir: &Path, name: &str, w: u32, h: u32, seed: u8) -> PhotoSource {
         orientation: None,
         width: w,
         height: h,
+        rotation: 0,
     }
 }
 

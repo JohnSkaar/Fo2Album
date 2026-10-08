@@ -14,6 +14,7 @@
 //! trykkeriets krav, og oppskarping.
 
 pub mod album;
+pub mod choices;
 pub mod layout;
 pub mod text;
 
@@ -41,14 +42,20 @@ pub struct PhotoSource {
     pub orientation: Option<u16>,
     pub width: u32,
     pub height: u32,
+    /// Brukerens rotering med klokka (0, 90, 180, 270), i tillegg til EXIF-orienteringen.
+    pub rotation: u16,
 }
 
 impl PhotoSource {
     fn aspect(&self) -> f32 {
         if self.width == 0 || self.height == 0 {
-            4.0 / 3.0
+            return 4.0 / 3.0;
+        }
+        let a = self.width as f32 / self.height as f32;
+        if self.rotation % 180 == 90 {
+            1.0 / a
         } else {
-            self.width as f32 / self.height as f32
+            a
         }
     }
 }
@@ -197,7 +204,12 @@ fn encode(p: &Placed) -> Option<(Encoded, f32)> {
         need,
     )
     .ok()?;
-    let mut img = d.image.to_rgb8();
+    let mut img = match p.photo.rotation % 360 {
+        90 => image::imageops::rotate90(&d.image.to_rgb8()),
+        180 => image::imageops::rotate180(&d.image.to_rgb8()),
+        270 => image::imageops::rotate270(&d.image.to_rgb8()),
+        _ => d.image.to_rgb8(),
+    };
     let long_px = img.width().max(img.height());
     if long_px > need {
         let s = need as f32 / long_px as f32;
@@ -500,4 +512,25 @@ pub fn render(
         pdf.stream(*content_ref, &c.finish());
     }
     Ok((pdf.finish(), report))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rotering_snur_formen() {
+        let p = |rotation| PhotoSource {
+            path: PathBuf::new(),
+            format: None,
+            orientation: None,
+            width: 1200,
+            height: 800,
+            rotation,
+        };
+        assert!((p(0).aspect() - 1.5).abs() < 1e-6);
+        assert!((p(90).aspect() - 2.0 / 3.0).abs() < 1e-6);
+        assert!((p(180).aspect() - 1.5).abs() < 1e-6);
+        assert!((p(270).aspect() - 2.0 / 3.0).abs() < 1e-6);
+    }
 }

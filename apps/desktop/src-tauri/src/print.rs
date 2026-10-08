@@ -85,8 +85,7 @@ pub async fn export_album(
         let store = Store::open(&data_dir, keys.as_ref())?;
         album::save_text(&store, year, &text)?;
         let (draft, metas) = album::draft_for_year(&store, year, page_cap)?;
-        let (front, back) = album::default_covers(&metas);
-        let a = album::from_draft(&store, year, &draft, text, front, back)?;
+        let a = album::from_draft(&store, year, &draft, &metas, text)?;
         let (pdf, report) = p2a_print::render(&a, &mut |done, total| {
             let _ = app.emit("trykk", PrintProgressDto { done, total });
         })

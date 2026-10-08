@@ -445,11 +445,21 @@ pub struct DraftPhotoDto {
     has_thumbnail: bool,
     width: Option<u32>,
     height: Option<u32>,
+    /// Brukerens rotering med klokka (0, 90, 180, 270).
+    rotation: u16,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DraftEventDto {
+    /// Et bilde i hendelsen, som nøkkel for valgene (tur, sider, slå sammen).
+    key: String,
+    /// Dager brukeren har slått sammen.
+    merged: bool,
+    /// Brukerens «presenter på x sider».
+    page_target: Option<usize>,
+    /// Brukeren har svart på om dette var en tur uten barn.
+    trip_answered: bool,
     start: String,
     end: String,
     photos: usize,
@@ -472,7 +482,22 @@ pub struct PageDto {
     kind: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     kolonner: Option<u8>,
+    /// Brukeren er fornøyd med siden; den beholdes i neste utkast.
+    locked: bool,
     photos: Vec<String>,
+}
+
+/// Forside og bakside: det som brukes nå, og forslagene.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverDto {
+    front: Option<String>,
+    back: Option<String>,
+    /// Brukeren har valgt selv (ellers er det appens forslag).
+    chosen_front: bool,
+    chosen_back: bool,
+    people: Vec<String>,
+    overview: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -495,6 +520,7 @@ pub struct DraftDto {
     /// Sidene albumet får uten sidetak (hele historien), så prisvalgene kan vises.
     full_pages: usize,
     page_cap: Option<usize>,
+    cover: CoverDto,
     events: Vec<DraftEventDto>,
     photos: Vec<DraftPhotoDto>,
     learned: LearnedDto,
@@ -540,8 +566,9 @@ fn draft_for(
         .collect();
     let decisions = store.decisions(year)?;
     let (prefs, learned) = learned_from(&store.feedback_log()?);
-    // Personene (M4): ansiktene i årets bilder og hvem som er barna (samme som trykkfilen).
-    let people = p2a_print::album::people_hints(store, year)?;
+    // Personene (M4) og brukerens valg for albumet: de samme som trykkfilen bruker.
+    let people = p2a_print::album::hints_for(store, year, None)?;
+    let chosen = p2a_print::choices::load(store, year)?;
     // Med sidetak regnes også hele historien ut, så brukeren ser hva den ville kostet.
     let full_pages = page_cap.map(|_| {
         make_draft(
@@ -579,36 +606,88 @@ fn draft_for(
         pages: draft.pages(),
         full_pages: full_pages.unwrap_or_else(|| draft.pages()),
         page_cap,
+        cover: {
+            let (front, back) = p2a_print::album::covers(&metas, &chosen);
+            let c = p2a_core::select::cover::candidates(&metas, &Default::default(), 3, 5);
+            let hex = |v: Vec<ContentHash>| v.into_iter().map(|h| h.to_hex()).collect();
+            CoverDto {
+                front: front.map(|h| h.to_hex()),
+                back: back.map(|h| h.to_hex()),
+                chosen_front: chosen.cover.is_some(),
+                chosen_back: chosen.back.is_some(),
+                people: hex(c.people),
+                overview: hex(c.overview),
+            }
+        },
         events: draft
             .events
             .iter()
-            .map(|e| DraftEventDto {
-                start: e.start.to_iso(),
-                end: e.end.to_iso(),
-                photos: e.photos,
-                included: e.included,
-                pages: e.pages,
-                everyday: e.everyday,
-                looks_like_trip: e.looks_like_trip,
-                adult_trip: e.adult_trip,
-                adult_trip_guess: e.adult_trip_guess,
-                layout: e
-                    .layout
+            .enumerate()
+            .map(|(k, e)| {
+                // En hendelse er nøklet med det første bildet i den (for valgene).
+                let key = draft
+                    .photos
                     .iter()
-                    .map(|p| {
-                        let (kind, kolonner) = match p.kind {
-                            PageKind::Helside => ("helside", None),
-                            PageKind::Luft => ("luft", None),
-                            PageKind::Rutenett { kolonner } => ("rutenett", Some(kolonner)),
-                        };
-                        PageDto {
-                            kind,
-                            kolonner,
-                            photos: p.photos.iter().map(|&i| id(i)).collect(),
-                        }
-                    })
-                    .collect(),
+                    .find(|p| p.event == k)
+                    .map(|p| p.hash.to_hex())
+                    .unwrap_or_default();
+                let ids: Vec<String> = draft
+                    .photos
+                    .iter()
+                    .filter(|p| p.event == k)
+                    .map(|p| p.hash.to_hex())
+                    .collect();
+                let merged = chosen
+                    .merged
+                    .iter()
+                    .any(|m| m.iter().any(|id| ids.contains(id)));
+                let page_target = chosen
+                    .page_targets
+                    .iter()
+                    .find(|(p, _)| ids.contains(p))
+                    .map(|(_, n)| *n);
+                let trip_answered = chosen
+                    .adult_trips
+                    .iter()
+                    .chain(&chosen.family_trips)
+                    .any(|p| ids.contains(p));
+                (key, merged, page_target, trip_answered, e)
             })
+            .map(
+                |(key, merged, page_target, trip_answered, e)| DraftEventDto {
+                    key,
+                    merged,
+                    page_target,
+                    trip_answered,
+                    start: e.start.to_iso(),
+                    end: e.end.to_iso(),
+                    photos: e.photos,
+                    included: e.included,
+                    pages: e.pages,
+                    everyday: e.everyday,
+                    looks_like_trip: e.looks_like_trip,
+                    adult_trip: e.adult_trip,
+                    adult_trip_guess: e.adult_trip_guess,
+                    layout: e
+                        .layout
+                        .iter()
+                        .enumerate()
+                        .map(|(n, p)| {
+                            let (kind, kolonner) = match p.kind {
+                                PageKind::Helside => ("helside", None),
+                                PageKind::Luft => ("luft", None),
+                                PageKind::Rutenett { kolonner } => ("rutenett", Some(kolonner)),
+                            };
+                            PageDto {
+                                kind,
+                                kolonner,
+                                locked: e.locked_pages.contains(&n),
+                                photos: p.photos.iter().map(|&i| id(i)).collect(),
+                            }
+                        })
+                        .collect(),
+                },
+            )
             .collect(),
         photos: draft
             .photos
@@ -626,6 +705,7 @@ fn draft_for(
                     has_thumbnail: s.is_some_and(|s| s.has_thumbnail),
                     width: s.and_then(|s| s.width),
                     height: s.and_then(|s| s.height),
+                    rotation: chosen.rotation_of(&p.hash),
                 }
             })
             .collect(),
@@ -640,12 +720,17 @@ pub async fn make_album_draft(
     app: AppHandle,
     year: i32,
     page_cap: Option<usize>,
+    quiet: Option<bool>,
 ) -> CmdResult<DraftDto> {
     use tauri::Manager;
+    // Etter en endring i utkastet lages det på nytt uten gjennomgangen på skjermen.
+    let quiet = quiet.unwrap_or(false);
     let emit = {
         let app = app.clone();
         move |fase: &'static str| {
-            let _ = app.emit("analyse", AnalysePhaseDto { fase });
+            if !quiet {
+                let _ = app.emit("analyse", AnalysePhaseDto { fase });
+            }
         }
     };
     let (data_dir, keys) = {
@@ -731,4 +816,21 @@ pub fn answer_why(
     let store = guard.as_ref().expect("sjekket");
     store.set_feedback_reason(feedback_id, reason)?;
     Ok(learned_from(&store.feedback_log()?).1)
+}
+
+/// Ett valg for årets album (fornøyd med en side, turtype, slå sammen dager, sider per
+/// historie, forside og bakside, rotering). Lagres kryptert; grensesnittet lager utkastet på
+/// nytt etterpå.
+#[tauri::command]
+pub fn album_choice(
+    state: State<'_, AppState>,
+    year: i32,
+    change: p2a_print::choices::Change,
+) -> CmdResult<()> {
+    let guard = state.store()?;
+    let store = guard.as_ref().expect("sjekket");
+    let mut c = p2a_print::choices::load(store, year)?;
+    c.apply(change);
+    p2a_print::choices::save(store, year, &c)?;
+    Ok(())
 }

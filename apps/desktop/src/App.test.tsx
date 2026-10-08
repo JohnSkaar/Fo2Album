@@ -196,6 +196,14 @@ describe("albumutkast", () => {
     pages: 312,
     fullPages: 312,
     pageCap: null,
+    cover: {
+      front: null,
+      back: null,
+      chosenFront: false,
+      chosenBack: false,
+      people: [],
+      overview: [],
+    },
     events: [
       {
         start: "2011-06-05T11:00:00",
@@ -207,6 +215,10 @@ describe("albumutkast", () => {
         looksLikeTrip: false,
         adultTrip: false,
         adultTripGuess: false,
+        key: h("a"),
+        merged: false,
+        pageTarget: null,
+        tripAnswered: false,
         layout: [{ kind: "luft", photos: [h("a")] }],
       },
     ],
@@ -222,6 +234,7 @@ describe("albumutkast", () => {
         hasThumbnail: true,
         width: 4032,
         height: 3024,
+        rotation: 0,
       },
       {
         id: h("b"),
@@ -234,6 +247,7 @@ describe("albumutkast", () => {
         hasThumbnail: true,
         width: 4032,
         height: 3024,
+        rotation: 0,
       },
       {
         id: h("c"),
@@ -246,6 +260,7 @@ describe("albumutkast", () => {
         hasThumbnail: true,
         width: 4032,
         height: 3024,
+        rotation: 0,
       },
     ],
     learned: { lessons: [], choices: 0, answers: 0 },

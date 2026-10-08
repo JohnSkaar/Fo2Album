@@ -114,9 +114,19 @@ export interface UtkastBilde {
   hasThumbnail: boolean;
   width: number | null;
   height: number | null;
+  /** Brukerens rotering med klokka: 0, 90, 180 eller 270. */
+  rotation: number;
 }
 
 export interface UtkastHendelse {
+  /** Et bilde i hendelsen; nøkkelen for valgene (tur, sider, slå sammen). */
+  key: string;
+  /** Dager brukeren har slått sammen. */
+  merged: boolean;
+  /** Brukerens «presenter på x sider», hvis satt. */
+  pageTarget: number | null;
+  /** Brukeren har svart på om dette var en tur uten barn. */
+  tripAnswered: boolean;
   start: string;
   end: string;
   photos: number;
@@ -138,6 +148,8 @@ export interface UtkastHendelse {
 export interface Side {
   kind: "helside" | "luft" | "rutenett";
   kolonner?: number;
+  /** Brukeren er fornøyd med siden; den beholdes i neste utkast. */
+  locked?: boolean;
   /** Bilde-id-er. */
   photos: string[];
 }
@@ -168,10 +180,36 @@ export interface Utkast {
   /** Sider uten sidetak (hele historien). */
   fullPages: number;
   pageCap: number | null;
+  cover: Omslag;
   events: UtkastHendelse[];
   photos: UtkastBilde[];
   learned: Laert;
 }
+
+/** Forside og bakside: det som brukes nå (valgt eller foreslått) og forslagene. */
+export interface Omslag {
+  front: string | null;
+  back: string | null;
+  chosenFront: boolean;
+  chosenBack: boolean;
+  people: string[];
+  overview: string[];
+}
+
+/** Et valg for albumet utover enkeltbilder. Lagres kryptert per år. */
+export type Albumvalg =
+  | {
+      type: "fornoyd";
+      page: { kind: Side["kind"]; kolonner: number | null; photos: string[] };
+      on: boolean;
+    }
+  | { type: "tur_uten_barn"; photo: string; on: boolean }
+  | { type: "slaa_sammen"; photos: string[] }
+  | { type: "del_opp"; photo: string }
+  | { type: "sider"; photo: string; pages: number | null }
+  | { type: "forside"; photo: string | null }
+  | { type: "bakside"; photo: string | null }
+  | { type: "roter"; photo: string };
 
 export type Analysefase =
   "venter" | "henter" | "hendelser" | "serier" | "velger" | "begrunnelser" | "ferdig";
@@ -294,8 +332,10 @@ export const api = {
   bilderIAar: (year: number) => invoke<Bilde[]>("photos_in_year", { year }),
   miniatyrUrl: (id: string) => convertFileSrc(id, "miniatyr"),
 
-  lagUtkast: (year: number, pageCap: number | null = null) =>
-    invoke<Utkast>("make_album_draft", { year, pageCap }),
+  /** `quiet`: lag utkastet på nytt uten gjennomgangen på skjermen (etter en endring). */
+  lagUtkast: (year: number, pageCap: number | null = null, quiet = false) =>
+    invoke<Utkast>("make_album_draft", { year, pageCap, quiet }),
+  albumvalg: (year: number, change: Albumvalg) => invoke<void>("album_choice", { year, change }),
   paAnalyse: (cb: (fase: Analysefase) => void): Promise<UnlistenFn> =>
     listen<{ fase: Analysefase }>("analyse", (e) => cb(e.payload.fase)),
   /** Ved bytte er `id` bildet som tas med og `other` bildet som tas ut. */

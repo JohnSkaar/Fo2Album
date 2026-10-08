@@ -9,6 +9,7 @@ use p2a_core::select::draft::{make_draft, Draft, DraftConfig, DraftHints};
 use p2a_core::{ContentHash, PhotoMeta, Role};
 use p2a_store::{Store, StoreError};
 
+use crate::choices::{self, AlbumChoices};
 use crate::{Album, AlbumPage, AlbumText, PhotoSource};
 
 /// Forslag til tittel: «Øyeblikk fra 2011».
@@ -73,6 +74,19 @@ pub fn people_hints(store: &Store, year: i32) -> Result<DraftHints, StoreError> 
     })
 }
 
+/// Alt utkastet trenger utover bildene: personene og brukerens valg for albumet.
+pub fn hints_for(
+    store: &Store,
+    year: i32,
+    album_pages: Option<usize>,
+) -> Result<DraftHints, StoreError> {
+    let base = DraftHints {
+        album_pages,
+        ..people_hints(store, year)?
+    };
+    Ok(choices::load(store, year)?.hints(base))
+}
+
 /// Utkastet for året, slik appen lager det: brukerens valg, det appen har lært og personene.
 pub fn draft_for_year(
     store: &Store,
@@ -80,10 +94,7 @@ pub fn draft_for_year(
     album_pages: Option<usize>,
 ) -> Result<(Draft, Vec<PhotoMeta>), StoreError> {
     let metas = store.photo_metas_in_year(year)?;
-    let hints = DraftHints {
-        album_pages,
-        ..people_hints(store, year)?
-    };
+    let hints = hints_for(store, year, album_pages)?;
     let draft = make_draft(
         &metas,
         &store.decisions(year)?,
@@ -97,19 +108,27 @@ pub fn draft_for_year(
 
 /// Forside og bakside: brukerens valg, ellers appens forslag (et bilde med personer på
 /// forsiden, et oversiktsbilde på baksiden).
-pub fn default_covers(metas: &[PhotoMeta]) -> (Option<ContentHash>, Option<ContentHash>) {
+pub fn covers(
+    metas: &[PhotoMeta],
+    chosen: &AlbumChoices,
+) -> (Option<ContentHash>, Option<ContentHash>) {
     let c = cover::candidates(metas, &HashSet::new(), 2, 4);
-    let front = c.people.first().or(c.overview.first()).copied();
-    let back = c
+    let pick = |s: &Option<String>| s.as_deref().and_then(ContentHash::from_hex);
+    let front = pick(&chosen.cover).or(c.people.first().or(c.overview.first()).copied());
+    let back = pick(&chosen.back).or(c
         .overview
         .iter()
         .chain(&c.people)
         .find(|h| Some(**h) != front)
-        .copied();
+        .copied());
     (front, back)
 }
 
-fn source(files: &HashMap<ContentHash, p2a_store::PhotoFile>, h: &ContentHash) -> PhotoSource {
+fn source(
+    files: &HashMap<ContentHash, p2a_store::PhotoFile>,
+    chosen: &AlbumChoices,
+    h: &ContentHash,
+) -> PhotoSource {
     match files.get(h) {
         Some(f) => PhotoSource {
             path: f.path.clone(),
@@ -117,6 +136,7 @@ fn source(files: &HashMap<ContentHash, p2a_store::PhotoFile>, h: &ContentHash) -
             orientation: f.orientation,
             width: f.width.unwrap_or(0),
             height: f.height.unwrap_or(0),
+            rotation: chosen.rotation_of(h),
         },
         // Ingen lokal fil (bare i skyen): blir et grått felt og står i rapporten.
         None => PhotoSource {
@@ -125,19 +145,22 @@ fn source(files: &HashMap<ContentHash, p2a_store::PhotoFile>, h: &ContentHash) -
             orientation: None,
             width: 0,
             height: 0,
+            rotation: 0,
         },
     }
 }
 
-/// Albumet slik utkastet viser det: alle sidene i alle historiene, i rekkefølge.
+/// Albumet slik utkastet viser det: alle sidene i alle historiene, i rekkefølge, med
+/// forsiden, baksiden og roteringen brukeren har valgt.
 pub fn from_draft(
     store: &Store,
     year: i32,
     draft: &Draft,
+    metas: &[PhotoMeta],
     text: AlbumText,
-    front: Option<ContentHash>,
-    back: Option<ContentHash>,
 ) -> Result<Album, StoreError> {
+    let chosen = choices::load(store, year)?;
+    let (front, back) = covers(metas, &chosen);
     let mut hashes: Vec<ContentHash> = draft
         .events
         .iter()
@@ -156,15 +179,15 @@ pub fn from_draft(
             photos: p
                 .photos
                 .iter()
-                .map(|&i| source(&files, &draft.photos[i].hash))
+                .map(|&i| source(&files, &chosen, &draft.photos[i].hash))
                 .collect(),
         })
         .collect();
     Ok(Album {
         year,
         text,
-        cover: front.map(|h| source(&files, &h)),
-        back: back.map(|h| source(&files, &h)),
+        cover: front.map(|h| source(&files, &chosen, &h)),
+        back: back.map(|h| source(&files, &chosen, &h)),
         pages,
     })
 }

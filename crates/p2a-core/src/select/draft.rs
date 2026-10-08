@@ -373,6 +373,7 @@ pub fn make_draft(
     let mut groups = group_events(&items, cfg);
     merge_groups(&mut groups, &items, &hints.merged_events);
     let nature = mark_things(&mut items, &groups, prefs, cfg);
+    let home_place = home(&items);
     let index: HashMap<ContentHash, usize> = items
         .iter()
         .enumerate()
@@ -385,6 +386,7 @@ pub fn make_draft(
         if !g.adult_trip
             && !said(&hints.family_trips)
             && no_children(g, &items, nature[k], hints, cfg)
+            && away(&items, &g.members, home_place, cfg)
         {
             g.adult_trip = true;
             g.adult_trip_guess = true;
@@ -455,7 +457,16 @@ pub fn make_draft(
         if pool.is_empty() {
             continue;
         }
-        let quota = quota(pool.len(), left_pages[g], scale, prefs, cfg);
+        // Sider brukeren er fornøyd med, teller med i historiens budsjett, så resten av
+        // historien ikke endrer seg av at en side låses.
+        let locked_photos: usize = locked_in[g].iter().map(|(_, idx)| idx.len()).sum();
+        let quota = if locked_photos == 0 {
+            quota(pool.len(), left_pages[g], scale, prefs, cfg)
+        } else {
+            quota(group.members.len(), targets[g], scale, prefs, cfg)
+                .saturating_sub(locked_photos)
+                .clamp(1, pool.len())
+        };
         // Personer først: stemningsbilder er drypp. Høyst ett per hendelse (tre på turer uten
         // barn), og i naturen høyst fire, så ingen side blir fylt av bare ting.
         let mood_max = if nature[g] {
@@ -465,8 +476,20 @@ pub fn make_draft(
         } else {
             1
         };
-        let (mut picked, first, jumped) =
-            pick(&pool, &items, quota, mood_max, &hints.children, prefs, cfg);
+        let already: Vec<usize> = locked_in[g]
+            .iter()
+            .flat_map(|(_, idx)| idx.iter().copied())
+            .collect();
+        let (mut picked, first, jumped) = pick(
+            &pool,
+            &already,
+            &items,
+            quota,
+            mood_max,
+            &hints.children,
+            prefs,
+            cfg,
+        );
         // Tur uten barn: alle personene får ett bilde hver, det beste ansiktet de har.
         if group.adult_trip {
             portraits[g] = portraits_for(&pool, &items, cfg.portrait_page_max);
@@ -555,7 +578,10 @@ pub fn make_draft(
                 everyday: group.everyday,
                 adult_trip: group.adult_trip,
                 adult_trip_guess: group.adult_trip_guess,
-                looks_like_trip: !group.everyday && !nature[g] && days >= 2,
+                looks_like_trip: !group.everyday
+                    && !nature[g]
+                    && days >= 2
+                    && away(&items, &group.members, home_place, cfg),
                 locked_pages,
             }
         })
@@ -750,13 +776,22 @@ fn km(a: (f64, f64), b: (f64, f64)) -> f64 {
 
 /// Midtpunktet (median) for bildene med GPS i en hendelse.
 fn place(items: &[Item], a: usize, b: usize) -> Option<(f64, f64)> {
-    let mut la: Vec<f64> = items[a..b]
-        .iter()
-        .filter_map(|it| it.p.gps.map(|g| g.0))
+    place_of(items, a..b)
+}
+
+/// Midtpunktet (median) for bildene med GPS blant `members`.
+fn place_of(
+    items: &[Item],
+    members: impl IntoIterator<Item = usize> + Clone,
+) -> Option<(f64, f64)> {
+    let mut la: Vec<f64> = members
+        .clone()
+        .into_iter()
+        .filter_map(|i| items[i].p.gps.map(|g| g.0))
         .collect();
-    let mut lo: Vec<f64> = items[a..b]
-        .iter()
-        .filter_map(|it| it.p.gps.map(|g| g.1))
+    let mut lo: Vec<f64> = members
+        .into_iter()
+        .filter_map(|i| items[i].p.gps.map(|g| g.1))
         .collect();
     if la.is_empty() {
         return None;
@@ -769,21 +804,9 @@ fn place(items: &[Item], a: usize, b: usize) -> Option<(f64, f64)> {
 /// Påfølgende dager på samme sted, langt hjemmefra, er én tur (SCORING.md §4.2). «Hjemme» er
 /// stedet med flest bilder (ruter på ca. 10 km). Uten GPS slås ingenting sammen.
 fn merge_trips(items: &[Item], raw: Vec<(usize, usize)>, cfg: &DraftConfig) -> Vec<(usize, usize)> {
-    let mut cells: HashMap<(i32, i32), usize> = HashMap::new();
-    for it in items {
-        if let Some((la, lo)) = it.p.gps {
-            *cells
-                .entry(((la * 10.0).floor() as i32, (lo * 10.0).floor() as i32))
-                .or_default() += 1;
-        }
-    }
-    let Some((&(cla, clo), _)) = cells
-        .iter()
-        .max_by_key(|(c, n)| (**n, std::cmp::Reverse(**c)))
-    else {
+    let Some(home) = home(items) else {
         return raw;
     };
-    let home = ((cla as f64 + 0.5) / 10.0, (clo as f64 + 0.5) / 10.0);
     let mut out: Vec<(usize, usize)> = Vec::with_capacity(raw.len());
     for (a, b) in raw {
         if let Some(last) = out.last_mut() {
@@ -802,6 +825,31 @@ fn merge_trips(items: &[Item], raw: Vec<(usize, usize)>, cfg: &DraftConfig) -> V
         out.push((a, b));
     }
     out
+}
+
+/// «Hjemme»: ruten (ca. 10 km) med flest bilder. `None` uten GPS i bildene.
+fn home(items: &[Item]) -> Option<(f64, f64)> {
+    let mut cells: HashMap<(i32, i32), usize> = HashMap::new();
+    for it in items {
+        if let Some((la, lo)) = it.p.gps {
+            *cells
+                .entry(((la * 10.0).floor() as i32, (lo * 10.0).floor() as i32))
+                .or_default() += 1;
+        }
+    }
+    let (&(cla, clo), _) = cells
+        .iter()
+        .max_by_key(|(c, n)| (**n, std::cmp::Reverse(**c)))?;
+    Some(((cla as f64 + 0.5) / 10.0, (clo as f64 + 0.5) / 10.0))
+}
+
+/// Borte hjemmefra: midtpunktet for gruppen ligger mer enn `trip_km` fra hjemme. Uten GPS
+/// kan appen ikke vite det, og regner det som mulig.
+fn away(items: &[Item], members: &[usize], home: Option<(f64, f64)>, cfg: &DraftConfig) -> bool {
+    match (home, place_of(items, members.iter().copied())) {
+        (Some(h), Some(p)) => km(p, h) > cfg.trip_km,
+        _ => true,
+    }
 }
 
 struct Group {
@@ -1054,8 +1102,12 @@ fn portraits_for(pool: &[usize], items: &[Item], max: usize) -> Vec<usize> {
     out
 }
 
+/// `already` er bilder på sider brukeren er fornøyd med: de regnes som valgt (for spredning i
+/// tid, serier og like bilder), men kommer ikke med i svaret.
+#[allow(clippy::too_many_arguments)]
 fn pick(
     members: &[usize],
+    already: &[usize],
     items: &[Item],
     quota: usize,
     mood_max: usize,
@@ -1063,10 +1115,15 @@ fn pick(
     prefs: &Preferences,
     cfg: &DraftConfig,
 ) -> (Vec<usize>, Option<usize>, Vec<usize>) {
-    let mut chosen: Vec<usize> = members
+    let mut chosen: Vec<usize> = already
         .iter()
         .copied()
-        .filter(|&i| items[i].decision.is_some_and(Decision::includes))
+        .chain(
+            members
+                .iter()
+                .copied()
+                .filter(|&i| items[i].decision.is_some_and(Decision::includes)),
+        )
         .collect();
     let mut cands: Vec<usize> = members
         .iter()
@@ -1074,16 +1131,17 @@ fn pick(
         .filter(|&i| usable(&items[i]) && items[i].decision.is_none())
         .collect();
     // Helhetsvurdering: finnes ingenting brukbart, er det beste av resten bedre enn ingenting.
-    let mut quota = quota;
-    if chosen.is_empty() && cands.is_empty() {
-        quota = 1;
+    let mut quota = quota + already.len();
+    if chosen.len() == already.len() && cands.is_empty() {
+        quota = already.len() + 1;
         cands = members
             .iter()
             .copied()
             .filter(|&i| items[i].decision.is_none() && items[i].noise != Some(Reason::Skjermbilde))
             .collect();
     }
-    let span = (items[*members.last().expect("ikke tom")].t - items[members[0]].t).max(1);
+    let times = || members.iter().chain(already).map(|&i| items[i].t);
+    let span = (times().max().unwrap_or(0) - times().min().unwrap_or(0)).max(1);
     let step = (span as f32 / (quota as f32 + 1.0)).max(60.0);
     let imp = prefs.quality_importance;
     let mut first = None;
@@ -1147,6 +1205,7 @@ fn pick(
         }
         chosen.push(best);
     }
+    chosen.retain(|i| !already.contains(i));
     (chosen, first, jumped)
 }
 
@@ -1767,6 +1826,48 @@ mod tests {
             faces.included().count(),
             skin.included().count()
         );
+    }
+
+    #[test]
+    fn locking_a_page_keeps_the_rest_of_the_story() {
+        let photos = day(0, 9, 9, 60);
+        let auto = draft(&photos, &HashMap::new());
+        let e = &auto.events[0];
+        assert!(e.layout.len() >= 2);
+        let keep = &e.layout[e.layout.len() - 1];
+        let locked = LockedPage {
+            kind: keep.kind,
+            photos: keep.photos.iter().map(|&i| auto.photos[i].hash).collect(),
+        };
+        let d = with(&photos, &hints(&[], None, vec![locked]));
+        assert_eq!(
+            d.events[0].included, e.included,
+            "like mange bilder som før"
+        );
+        assert_eq!(d.events[0].pages, e.pages, "like mange sider som før");
+        let before: HashSet<_> = auto.included().map(|p| p.hash).collect();
+        let after: HashSet<_> = d.included().map(|p| p.hash).collect();
+        assert_eq!(before, after, "de samme bildene");
+    }
+
+    #[test]
+    fn days_at_home_are_not_a_trip() {
+        // Tre dager på rad hjemme (stedet med flest bilder), slått sammen av brukeren.
+        let mut photos: Vec<PhotoMeta> = (0..3u8)
+            .flat_map(|d| day(100 * d as u16, 4, 22 + d, 20))
+            .collect();
+        for p in &mut photos {
+            p.gps = Some((59.91, 10.75));
+        }
+        let merged = DraftHints {
+            merged_events: vec![photos.iter().map(|p| p.hash).collect()],
+            ..DraftHints::default()
+        };
+        let d = with(&photos, &merged);
+        assert_eq!(d.events.len(), 1);
+        assert!(!d.events[0].looks_like_trip, "hjemme er ikke en tur");
+        // Turen i fjellet (borte fra hjemmet) er fortsatt en tur.
+        assert!(trip_event(&draft(&trip(), &HashMap::new())).looks_like_trip);
     }
 
     #[test]
