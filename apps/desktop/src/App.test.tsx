@@ -33,6 +33,7 @@ vi.mock("./api", async (importOriginal) => {
       miniatyrUrl: (id: string) => `miniatyr://localhost/${id}`,
       stortUrl: (id: string) => `stort://localhost/${id}`,
       rammer: vi.fn(() => Promise.resolve([])),
+      angreAntall: vi.fn(() => Promise.resolve(0)),
       lagUtkast: vi.fn(),
       paAnalyse: vi.fn(noop),
       velgBilde: vi.fn(() => Promise.resolve(7)),

@@ -6,6 +6,7 @@ mod keys;
 mod people;
 mod print;
 mod thumbs;
+mod undo;
 
 use tauri::Manager;
 
@@ -78,6 +79,10 @@ pub fn run() {
             commands::answer_why,
             commands::album_choice,
             commands::page_templates,
+            commands::choose_photos,
+            undo::undo_last,
+            undo::undo_count,
+            print::save_album_text,
             people::face_groups,
             people::name_face_group,
             people::ignore_face_group,

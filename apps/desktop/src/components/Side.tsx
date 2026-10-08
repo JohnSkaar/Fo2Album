@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, DragEvent } from "react";
 import type { Felt, Side as SideData, UtkastBilde } from "../api";
 
 /** Siden er 21 × 28 cm; feltene er i prosent av bredden og høyden. */
@@ -50,6 +50,25 @@ export function bildeStil(b: Utseende, fill: boolean, forhold: number): CSSPrope
 const pst = (v: number) => `${v.toFixed(3)}%`;
 
 /** Feltene stemmer med bildene (sider som er endret lokalt, mangler feltene til de lages). */
+/** Dra og slipp mellom sidene. */
+export interface Dra {
+  start: (id: string) => void;
+  slipp: (foran: string | null) => void;
+}
+
+/** Felles for alt som kan slippes på: godta slipp, og si hvor bildet havner. */
+const slippMaal = (dra: Dra | undefined, foran: string | null) =>
+  dra
+    ? {
+        onDragOver: (e: DragEvent) => e.preventDefault(),
+        onDrop: (e: DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          dra.slipp(foran);
+        },
+      }
+    : {};
+
 export const harFelt = (s: SideData): s is SideData & { frames: Felt[] } =>
   !!s.frames && s.frames.length === s.photos.length;
 
@@ -65,6 +84,7 @@ export function Sidebilde({
   valgt,
   markert,
   onPhoto,
+  dra,
 }: {
   side: SideData;
   bilder: Map<string, UtkastBilde>;
@@ -74,6 +94,8 @@ export function Sidebilde({
   markert?: Set<string>;
   /** Klikk på et bilde på siden (med Ctrl/Cmd/Shift: marker). */
   onPhoto?: (id: string, marker: boolean) => void;
+  /** Dra og slipp: et bilde dras fra siden, eller slippes foran et bilde (`null` = sist). */
+  dra?: Dra;
 }) {
   const utseende = (id: string): Utseende =>
     bilder.get(id) ?? { rotation: 0, focus: [0.5, 0.5], whole: false };
@@ -84,6 +106,7 @@ export function Sidebilde({
         style={side.kolonner ? { gridTemplateColumns: `repeat(${side.kolonner}, 1fr)` } : undefined}
         role="img"
         aria-label={etikett}
+        {...slippMaal(dra, null)}
       >
         {side.photos.map((id) => (
           <img
@@ -103,6 +126,7 @@ export function Sidebilde({
       className={`pg2${side.locked ? " pg2--locked" : ""}`}
       role={onPhoto ? "group" : "img"}
       aria-label={etikett}
+      {...slippMaal(dra, null)}
     >
       {side.photos.map((id, i) => {
         const f = side.frames[i]!;
@@ -134,6 +158,12 @@ export function Sidebilde({
             aria-pressed={valgt === id || !!markert?.has(id)}
             aria-label={`${etikett}, bilde ${i + 1}`}
             onClick={(e) => onPhoto(id, e.ctrlKey || e.metaKey || e.shiftKey)}
+            draggable={!!dra}
+            onDragStart={(e) => {
+              e.dataTransfer?.setData("text/plain", id);
+              dra?.start(id);
+            }}
+            {...slippMaal(dra, id)}
           >
             {img}
           </button>

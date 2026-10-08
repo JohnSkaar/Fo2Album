@@ -97,6 +97,13 @@ impl Store {
         Ok(self.conn.last_insert_rowid())
     }
 
+    /// Fjerner en handling fra loggen (brukeren angret den), så appen ikke lærer av den.
+    pub fn delete_feedback(&self, id: i64) -> Result<(), StoreError> {
+        self.conn
+            .execute("DELETE FROM feedback WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
     pub fn set_feedback_reason(
         &self,
         id: i64,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Albumtekst,
   Albumvalg,
@@ -17,7 +17,7 @@ import { pris, prisvalg } from "../pris";
 import { datoTekst, fmt, tekster } from "../tekster";
 import { datoSpenn, HVORFOR_VALG, oppdaterSider, spoerOmHvorfor } from "../utkast";
 import { Bla } from "./Bla";
-import { RammeIkon, Sidebilde } from "./Side";
+import { type Dra, RammeIkon, Sidebilde } from "./Side";
 import { StorVisning } from "./StorVisning";
 
 const t = tekster.utkast;
@@ -28,6 +28,46 @@ const FASER: Analysefase[] = ["henter", "hendelser", "serier", "velger", "begrun
 
 type Valgt = { id: string; included: boolean; event: number };
 type Endre = (c: Albumvalg | Albumvalg[], melding?: string) => void;
+
+/** Siden som «Fornøyd»-valg, med nye bilder (rammene beholdes bare når antallet er likt). */
+function somValgt(s: Side, photos: string[]): Albumvalg {
+  const kind: Side["kind"] =
+    photos.length > 1 ? "rutenett" : s.kind === "rutenett" ? "luft" : s.kind;
+  return {
+    type: "fornoyd",
+    page: {
+      kind,
+      kolonner: kind === "rutenett" ? (s.kolonner ?? (photos.length > 4 ? 3 : 2)) : null,
+      photos,
+      mal: photos.length === s.photos.length ? (s.mal ?? null) : null,
+    },
+    on: true,
+  };
+}
+
+/**
+ * Flytter et bilde til en side, foran bildet `foran` (ellers sist), eller til et annet sted
+ * på samme side. Sidene brukeren har ordnet, merkes «Fornøyd» så de beholdes. `fra` er siden
+ * bildet står på nå (mangler for et bilde som ikke er med).
+ */
+export function flytt(
+  fra: Side | undefined,
+  til: Side,
+  id: string,
+  foran: string | null,
+): Albumvalg[] {
+  if (foran === id) return [];
+  const uten = til.photos.filter((x) => x !== id);
+  const k = foran ? uten.indexOf(foran) : -1;
+  const nye = k < 0 ? [...uten, id] : [...uten.slice(0, k), id, ...uten.slice(k)];
+  if (fra && fra.photos[0] === til.photos[0]) {
+    return nye.join() === til.photos.join() ? [] : [somValgt(til, nye)];
+  }
+  const ut: Albumvalg[] = [somValgt(til, nye)];
+  const igjen = fra?.photos.filter((x) => x !== id) ?? [];
+  if (fra && igjen.length > 0) ut.push(somValgt(fra, igjen));
+  return ut;
+}
 
 /** Neste størrelse når brukeren trykker «Større» eller «Mindre» (som prototypen). */
 export function nyStorrelse(
@@ -90,6 +130,7 @@ function Kort({
   liten,
   onClick,
   onMark,
+  onDrag,
   thumbUrl,
 }: {
   b: UtkastBilde;
@@ -99,6 +140,7 @@ function Kort({
   liten?: boolean;
   onClick: () => void;
   onMark: () => void;
+  onDrag?: () => void;
   thumbUrl: (id: string) => string;
 }) {
   const hvorfor = tekster.begrunnelse(b.reason, hendelse.photos);
@@ -120,6 +162,11 @@ function Kort({
         aria-pressed={valgt}
         aria-label={`${t.bildeEtikett(datoTekst(b.takenAt), b.included)}. ${hvorfor}`}
         onClick={(e) => (e.ctrlKey || e.metaKey || e.shiftKey ? onMark() : onClick())}
+        draggable={!!onDrag}
+        onDragStart={(e) => {
+          e.dataTransfer?.setData("text/plain", b.id);
+          onDrag?.();
+        }}
       >
         <span className="th">
           {b.hasThumbnail ? (
@@ -200,6 +247,7 @@ function Sider({
   rammer,
   onPhoto,
   onChange,
+  dra,
   thumbUrl,
 }: {
   sider: Side[];
@@ -211,6 +259,8 @@ function Sider({
   rammer: Ramme[];
   onPhoto: (id: string, marker: boolean) => void;
   onChange: Endre;
+  /** Dra og slipp til denne siden. */
+  dra: (s: Side) => Dra;
   thumbUrl: (id: string) => string;
 }) {
   const { sider: vis, endret } = oppdaterSider(sider, med);
@@ -234,6 +284,7 @@ function Sider({
                 valgt={valgt}
                 markert={markert}
                 onPhoto={onPhoto}
+                dra={endret ? undefined : dra(s)}
               />
               <span className="pg__btns">
                 <button
@@ -395,6 +446,7 @@ function Hendelse({
   onPick,
   onMark,
   onChange,
+  dra,
   thumbUrl,
 }: {
   e: UtkastHendelse;
@@ -407,6 +459,7 @@ function Hendelse({
   onPick: (b: UtkastBilde) => void;
   onMark: (id: string) => void;
   onChange: Endre;
+  dra: { side: (s: Side) => Dra; start: (id: string) => void };
   thumbUrl: (id: string) => string;
 }) {
   const [visAlle, setVisAlle] = useState(false);
@@ -451,6 +504,7 @@ function Hendelse({
           else if (b) onPick(b);
         }}
         onChange={onChange}
+        dra={dra.side}
         thumbUrl={thumbUrl}
       />
       <div className="ev__cols">
@@ -468,6 +522,7 @@ function Hendelse({
                 markert={markert.has(b.id)}
                 onClick={() => onPick(b)}
                 onMark={() => onMark(b.id)}
+                onDrag={() => dra.start(b.id)}
                 thumbUrl={thumbUrl}
               />
             ))}
@@ -491,6 +546,7 @@ function Hendelse({
                   markert={markert.has(b.id)}
                   onClick={() => onPick(b)}
                   onMark={() => onMark(b.id)}
+                  onDrag={() => dra.start(b.id)}
                   thumbUrl={thumbUrl}
                 />
               ))}
@@ -663,7 +719,11 @@ export function DraftScreen({
   onChange,
   onSize,
   onChoose,
+  onChooseMany,
   onAnswer,
+  canUndo = false,
+  onUndo,
+  onSaveText,
   thumbUrl,
   stortUrl = thumbUrl,
   hentTekst,
@@ -684,7 +744,14 @@ export function DraftScreen({
   onSize: (sidetak: number | null) => void;
   /** Lagrer valget og returnerer id-en til loggføringen (til «Hvorfor?»), eller `null`. */
   onChoose: (action: Handling, id: string, other?: string) => Promise<number | null>;
+  /** Tar med eller tar bort mange bilder på en gang (angres samlet). */
+  onChooseMany?: (action: "ta_med" | "ta_bort", ids: string[]) => void;
   onAnswer: (feedbackId: number, reason: Svar | null) => void;
+  /** Det finnes endringer som kan angres. */
+  canUndo?: boolean;
+  onUndo?: () => void;
+  /** Lagrer tekstene skrevet i «Bla i albumet». */
+  onSaveText?: (tekst: Albumtekst) => void;
   thumbUrl: (id: string) => string;
   /** Stor visning fra originalfilen (faller tilbake til miniatyren). */
   stortUrl?: (id: string) => string;
@@ -715,6 +782,23 @@ export function DraftScreen({
     () => new Map<string, UtkastBilde>((draft?.photos ?? []).map((b) => [b.id, b])),
     [draft],
   );
+  const draId = useRef<string | null>(null);
+
+  // Ctrl+Z (Cmd+Z på Mac) angrer, utenom når brukeren skriver.
+  const vises = !!draft && !phase;
+  useEffect(() => {
+    if (!vises || !onUndo) return;
+    const tast = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el?.closest("input, textarea, [contenteditable]")) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        onUndo();
+      }
+    };
+    window.addEventListener("keydown", tast);
+    return () => window.removeEventListener("keydown", tast);
+  }, [vises, onUndo]);
 
   if (phase) {
     return (
@@ -771,7 +855,8 @@ export function DraftScreen({
   const markerte = draft.photos.filter((b) => markert.has(b.id));
   const flere = async (action: "ta_med" | "ta_bort") => {
     const ids = markerte.filter((b) => b.included === (action === "ta_bort")).map((b) => b.id);
-    for (const id of ids) await onChoose(action, id);
+    if (onChooseMany) onChooseMany(action, ids);
+    else for (const id of ids) await onChoose(action, id);
     setMarkert(new Set());
   };
   const samlet = (c: Albumvalg | Albumvalg[], melding: string) => {
@@ -779,8 +864,27 @@ export function DraftScreen({
     setMarkert(new Set());
   };
 
-  const sideMed = (id: string) =>
-    draft.events.flatMap((e) => e.layout).find((s) => s.photos.includes(id));
+  const alleSider = draft.events.flatMap((e) => e.layout);
+  const sideMed = (id: string) => alleSider.find((s) => s.photos.includes(id));
+  const flyttTil = (id: string, til: Side, foran: string | null) => {
+    const c = flytt(sideMed(id), til, id, foran);
+    if (c.length > 0) onChange(c, r.flyttet);
+  };
+  const dra = {
+    start: (id: string) => {
+      draId.current = id;
+    },
+    side: (s: Side): Dra => ({
+      start: (id) => {
+        draId.current = id;
+      },
+      slipp: (foran) => {
+        const id = draId.current;
+        draId.current = null;
+        if (id) flyttTil(id, s, foran);
+      },
+    }),
+  };
   const feltFor = (id: string) => {
     const s = sideMed(id);
     const i = s?.photos.indexOf(id) ?? -1;
@@ -791,6 +895,11 @@ export function DraftScreen({
   const valgtSide = valgtBilde ? sideMed(valgtBilde.id) : undefined;
   const valgtFelt = valgtBilde ? feltFor(valgtBilde.id) : null;
   const alene = valgtSide?.photos.length === 1;
+  // Sidene før og etter i samme historie, for «Forrige side» og «Neste side».
+  const historieSider = valgtBilde ? (draft.events[valgtBilde.event]?.layout ?? []) : [];
+  const sideNr = valgtSide ? historieSider.indexOf(valgtSide) : -1;
+  const forrigeSide = sideNr > 0 ? historieSider[sideNr - 1] : undefined;
+  const nesteSide = sideNr >= 0 ? historieSider[sideNr + 1] : undefined;
   const lignende =
     valgtBilde && !valgtBilde.included && valgtBilde.related
       ? draft.photos.find((b) => b.id === valgtBilde.related && b.included)
@@ -818,10 +927,24 @@ export function DraftScreen({
           <p className="draft__sum">{t.sammendrag(antallMed, draft.pages, hendelserMed)}</p>
         </div>
         <div className="draft__actions">
+          {onUndo && (
+            <button
+              type="button"
+              className="btn btn--secondary"
+              disabled={!canUndo}
+              title={r.angreHjelp}
+              onClick={onUndo}
+            >
+              ↶ {r.angre}
+            </button>
+          )}
           <button type="button" className="btn btn--secondary" onClick={onMake}>
             {t.nyttUtkast}
           </button>
-          <button type="button" className="btn btn--secondary" onClick={() => {
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() => {
               setBla(true);
               hentTekst?.(draft.year).then(setTekst, () => {});
             }}
@@ -893,6 +1016,7 @@ export function DraftScreen({
               onPick={velg}
               onMark={marker}
               onChange={onChange}
+              dra={dra}
               thumbUrl={thumbUrl}
             />
           </div>
@@ -1064,6 +1188,26 @@ export function DraftScreen({
                 >
                   ↻ {t.roter}
                 </button>
+                {forrigeSide && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    title={r.flyttHjelp}
+                    onClick={() => flyttTil(valgtBilde.id, forrigeSide, null)}
+                  >
+                    {r.forrigeSide}
+                  </button>
+                )}
+                {nesteSide && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    title={r.flyttHjelp}
+                    onClick={() => flyttTil(valgtBilde.id, nesteSide, nesteSide.photos[0] ?? null)}
+                  >
+                    {r.nesteSide}
+                  </button>
+                )}
                 <button
                   type="button"
                   className="btn btn--secondary"
@@ -1127,7 +1271,19 @@ export function DraftScreen({
         />
       )}
       {bla && (
-        <Bla draft={draft} tekst={tekst} thumbUrl={thumbUrl} onClose={() => setBla(false)} />
+        <Bla
+          draft={draft}
+          tekst={tekst}
+          thumbUrl={thumbUrl}
+          onClose={() => setBla(false)}
+          onSaveText={
+            onSaveText &&
+            ((x) => {
+              setTekst(x);
+              onSaveText(x);
+            })
+          }
+        />
       )}
     </section>
   );

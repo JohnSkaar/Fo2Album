@@ -377,7 +377,16 @@ export const api = {
   /** `quiet`: lag utkastet på nytt uten gjennomgangen på skjermen (etter en endring). */
   lagUtkast: (year: number, pageCap: number | null = null, quiet = false) =>
     invoke<Utkast>("make_album_draft", { year, pageCap, quiet }),
-  albumvalg: (year: number, change: Albumvalg) => invoke<void>("album_choice", { year, change }),
+  /** Ett eller flere valg; flere lagres samlet og angres samlet. */
+  albumvalg: (year: number, change: Albumvalg | Albumvalg[]) =>
+    invoke<void>("album_choice", { year, changes: Array.isArray(change) ? change : [change] }),
+  /** Tar med eller tar bort mange bilder på en gang (angres samlet). */
+  velgFlere: (year: number, action: "ta_med" | "ta_bort", ids: string[]) =>
+    invoke<void>("choose_photos", { year, action, ids }),
+  /** Angrer siste endring; gir antall steg som kan angres etterpå, eller `null`. */
+  angre: (year: number) => invoke<number | null>("undo_last", { year }),
+  angreAntall: (year: number) => invoke<number>("undo_count", { year }),
+  lagreTekst: (year: number, text: Albumtekst) => invoke<void>("save_album_text", { year, text }),
   paAnalyse: (cb: (fase: Analysefase) => void): Promise<UnlistenFn> =>
     listen<{ fase: Analysefase }>("analyse", (e) => cb(e.payload.fase)),
   /** Ved bytte er `id` bildet som tas med og `other` bildet som tas ut. */

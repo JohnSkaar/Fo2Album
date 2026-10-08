@@ -4,6 +4,80 @@ import { tekster } from "../tekster";
 import { bildeStil, Sidebilde } from "./Side";
 
 const t = tekster.redigering;
+const tt = tekster.trykk;
+
+type Tekstside = "forside" | "intro" | "bakside";
+
+/** Tekstfeltene for én side i albumet. */
+function Skriv({
+  side,
+  aar,
+  start,
+  onSave,
+  onClose,
+}: {
+  side: Tekstside;
+  aar: number;
+  start: Albumtekst;
+  onSave: (x: Albumtekst) => void;
+  onClose: () => void;
+}) {
+  const [x, setX] = useState(start);
+  const felt = (key: keyof Albumtekst, label: string, lang = false) => (
+    <div className="field">
+      <label htmlFor={`bla-${key}`}>{label}</label>
+      {lang ? (
+        <textarea
+          id={`bla-${key}`}
+          className="input input--area"
+          rows={key === "intro" ? 6 : 3}
+          value={x[key]}
+          onChange={(e) => setX({ ...x, [key]: e.target.value })}
+        />
+      ) : (
+        <input
+          id={`bla-${key}`}
+          className="input"
+          value={x[key]}
+          onChange={(e) => setX({ ...x, [key]: e.target.value })}
+        />
+      )}
+    </div>
+  );
+  return (
+    <form
+      className="bla__skriv"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(x);
+        onClose();
+      }}
+    >
+      {side === "forside" && (
+        <>
+          {felt("title", tt.tittelFelt)}
+          {felt("subtitle", tt.undertittel)}
+        </>
+      )}
+      {side === "intro" && (
+        <>
+          {felt("intro", tt.intro, true)}
+          <p className="field__help">{tt.introHjelp(aar)}</p>
+        </>
+      )}
+      {side === "bakside" && felt("back", tt.bakside, true)}
+      <p className="field__help">{t.tekstHjelp}</p>
+      <div className="dialog__actions">
+        <button type="button" className="btn btn--secondary btn--sm" onClick={onClose}>
+          {tt.avbryt}
+        </button>
+        <button type="submit" className="btn btn--primary btn--sm">
+          {t.lagreTekst}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 type Blad =
   | { type: "forside"; id: string | null }
@@ -36,15 +110,19 @@ export function Bla({
   tekst,
   thumbUrl,
   onClose,
+  onSaveText,
 }: {
   draft: Utkast;
   /** Tekstene i albumet (forsiden, første side, baksiden), når de er hentet. */
   tekst: Albumtekst | null;
   thumbUrl: (id: string) => string;
   onClose: () => void;
+  /** Lagrer tekstene brukeren skriver rett i albumet. */
+  onSaveText?: (x: Albumtekst) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [n, setN] = useState(0);
+  const [skriv, setSkriv] = useState<Tekstside | null>(null);
   const alle = oppslag(draft);
   const bilder = new Map<string, UtkastBilde>(draft.photos.map((b) => [b.id, b]));
   useEffect(() => {
@@ -55,7 +133,22 @@ export function Bla({
   }, []);
 
   const blad = (b: Blad | null, k: number) => {
-    if (!b) return <div key={k} className="bla__blank" />;
+    if (!b) {
+      // Tekstfeltene står i den tomme halvdelen, ved siden av siden de hører til.
+      if (skriv && tekst && onSaveText) {
+        return (
+          <Skriv
+            key={skriv}
+            side={skriv}
+            aar={draft.year}
+            start={tekst}
+            onSave={onSaveText}
+            onClose={() => setSkriv(null)}
+          />
+        );
+      }
+      return <div key={k} className="bla__blank" />;
+    }
     if (b.type === "side") {
       return (
         <Sidebilde
@@ -70,8 +163,10 @@ export function Bla({
     if (b.type === "intro") {
       return (
         <div key={k} className="bla__intro" role="img" aria-label={t.introSide}>
-          <span className="bla__aar">{draft.year}</span>
-          {tekst?.intro && <p>{tekst.intro}</p>}
+          <div className="bla__introtekst">
+            <span className="bla__aar">{draft.year}</span>
+            {tekst?.intro && <p>{tekst.intro}</p>}
+          </div>
         </div>
       );
     }
@@ -104,7 +199,14 @@ export function Bla({
     );
   };
 
-  const gaa = (d: number) => setN((x) => Math.min(alle.length - 1, Math.max(0, x + d)));
+  const gaa = (d: number) => {
+    setSkriv(null);
+    setN((x) => Math.min(alle.length - 1, Math.max(0, x + d)));
+  };
+  // Siden i dette oppslaget som har tekst (forsiden, første side eller baksiden).
+  const tekstside = (alle[n] ?? [])
+    .map((b) => b?.type)
+    .find((x): x is Tekstside => x === "forside" || x === "intro" || x === "bakside");
   return (
     <dialog
       ref={ref}
@@ -115,6 +217,7 @@ export function Bla({
         onClose();
       }}
       onKeyDown={(e) => {
+        if ((e.target as HTMLElement).closest("input, textarea")) return;
         if (e.key === "ArrowRight") gaa(1);
         if (e.key === "ArrowLeft") gaa(-1);
       }}
@@ -127,6 +230,18 @@ export function Bla({
         </button>
       </div>
       <div className="bla__opp">{(alle[n] ?? []).map(blad)}</div>
+      {!skriv && tekstside && onSaveText && (
+        <div className="bla__tekstknapp">
+          <button
+            type="button"
+            className="btn btn--secondary btn--sm"
+            disabled={!tekst}
+            onClick={() => setSkriv(tekstside)}
+          >
+            ✎ {t.endreTekst}
+          </button>
+        </div>
+      )}
       <div className="bla__nav">
         <button
           type="button"

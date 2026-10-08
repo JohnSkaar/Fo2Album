@@ -78,6 +78,8 @@ export function App() {
   );
   const [utkast, setUtkast] = useState<Utkast | null>(null);
   const [rammer, setRammer] = useState<Ramme[]>([]);
+  /** Hvor mange endringer i utkastet som kan angres. */
+  const [kanAngre, setKanAngre] = useState(0);
   // Rammene brukeren kan velge for en side, hentet én gang når utkastet vises.
   const harUtkast = utkast !== null;
   useEffect(() => {
@@ -204,8 +206,9 @@ export function App() {
   const endreAlbum = async (change: Albumvalg | Albumvalg[], melding?: string) => {
     if (!utkast) return;
     try {
-      for (const c of Array.isArray(change) ? change : [change]) await api.albumvalg(utkast.year, c);
+      await api.albumvalg(utkast.year, change);
       setUtkast(await api.lagUtkast(utkast.year, utkast.pageCap, true));
+      setKanAngre(await api.angreAntall(utkast.year));
       visMelding(melding ?? tekster.utkast.oppdatert);
     } catch (e) {
       visMelding(feiltekst(e));
@@ -217,6 +220,7 @@ export function App() {
     try {
       const feedbackId = await api.velgBilde(utkast.year, action, id, other);
       setUtkast((u) => (u ? brukValg(u, action, id, other) : u));
+      setKanAngre((n) => n + 1);
       visMelding(
         action === "bytt"
           ? tekster.utkast.byttet
@@ -228,6 +232,50 @@ export function App() {
     } catch (e) {
       visMelding(feiltekst(e));
       return null;
+    }
+  };
+
+  /** Tar med eller tar bort mange markerte bilder på en gang. */
+  const velgFlere = async (action: "ta_med" | "ta_bort", ids: string[]) => {
+    if (!utkast || ids.length === 0) return;
+    try {
+      await api.velgFlere(utkast.year, action, ids);
+      setUtkast((u) => (u ? ids.reduce((x, id) => brukValg(x, action, id), u) : u));
+      setKanAngre((n) => n + 1);
+      visMelding(
+        action === "ta_med"
+          ? tekster.redigering.lagtTil(ids.length)
+          : tekster.redigering.tattBort(ids.length),
+      );
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
+  /** Angrer siste endring og lager utkastet på nytt. */
+  const angre = async () => {
+    if (!utkast) return;
+    try {
+      const igjen = await api.angre(utkast.year);
+      if (igjen === null) {
+        setKanAngre(0);
+        return;
+      }
+      setUtkast(await api.lagUtkast(utkast.year, utkast.pageCap, true));
+      setKanAngre(igjen);
+      visMelding(tekster.redigering.angret);
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
+  const lagreTekst = async (tekst: Albumtekst) => {
+    if (!utkast) return;
+    try {
+      await api.lagreTekst(utkast.year, tekst);
+      visMelding(tekster.redigering.tekstLagret);
+    } catch (e) {
+      visMelding(feiltekst(e));
     }
   };
 
@@ -434,6 +482,10 @@ export function App() {
             onChange={(c, m) => void endreAlbum(c, m)}
             onSize={(sidetak) => void lagUtkast(sidetak)}
             onChoose={velgBilde}
+            onChooseMany={(a, ids) => void velgFlere(a, ids)}
+            canUndo={kanAngre > 0}
+            onUndo={() => void angre()}
+            onSaveText={(x) => void lagreTekst(x)}
             onAnswer={(id, r) => void svarHvorfor(id, r)}
             thumbUrl={api.miniatyrUrl}
             stortUrl={api.stortUrl}

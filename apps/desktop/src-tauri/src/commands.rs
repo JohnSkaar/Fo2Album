@@ -26,6 +26,8 @@ pub struct AppState {
     pub store: Mutex<Option<Store>>,
     /// Satt mens innlesing pågår; `true` ber den stoppe.
     pub ingest_cancel: Mutex<Option<Arc<AtomicBool>>>,
+    /// Endringer i utkastet som kan angres.
+    pub undo: crate::undo::History,
 }
 
 impl AppState {
@@ -36,6 +38,7 @@ impl AppState {
             keys,
             store: Mutex::new(None),
             ingest_cancel: Mutex::new(None),
+            undo: Default::default(),
         }
     }
 
@@ -877,6 +880,11 @@ pub fn choose_photo(
     let other = other.as_deref().map(parse_id).transpose()?;
     let guard = state.store()?;
     let store = guard.as_ref().expect("sjekket");
+    let decisions = store.decisions(year)?;
+    let before = std::iter::once(hash)
+        .chain(other)
+        .map(|h| (h, decisions.get(&h).copied()))
+        .collect();
     match (action, other) {
         (Action::TaMed, _) => store.set_decision(year, &hash, Some(Decision::Med))?,
         (Action::TaBort, _) => store.set_decision(year, &hash, Some(Decision::IkkeMed))?,
@@ -893,7 +901,50 @@ pub fn choose_photo(
         // En dag tas bort bilde for bilde av grensesnittet; her logges bare handlingen.
         (Action::FjernDag | Action::SlaaSammen, _) => {}
     }
-    Ok(store.add_feedback(year, action, &hash, other.as_ref())?)
+    let id = store.add_feedback(year, action, &hash, other.as_ref())?;
+    state.undo.push(crate::undo::Step::Photos {
+        year,
+        before,
+        feedback: vec![id],
+    });
+    Ok(id)
+}
+
+/// Tar med eller tar bort mange bilder på en gang (markerte bilder). Angres samlet.
+#[tauri::command]
+pub fn choose_photos(
+    state: State<'_, AppState>,
+    year: i32,
+    action: String,
+    ids: Vec<String>,
+) -> CmdResult<()> {
+    let (action, decision) = match action.as_str() {
+        "ta_med" => (Action::TaMed, Decision::Med),
+        "ta_bort" => (Action::TaBort, Decision::IkkeMed),
+        _ => return Err(CommandError::new("ukjent_handling", action)),
+    };
+    let hashes = ids
+        .iter()
+        .map(|id| parse_id(id))
+        .collect::<CmdResult<Vec<_>>>()?;
+    let guard = state.store()?;
+    let store = guard.as_ref().expect("sjekket");
+    let decisions = store.decisions(year)?;
+    let before = hashes
+        .iter()
+        .map(|h| (*h, decisions.get(h).copied()))
+        .collect();
+    let mut feedback = Vec::with_capacity(hashes.len());
+    for h in &hashes {
+        store.set_decision(year, h, Some(decision))?;
+        feedback.push(store.add_feedback(year, action, h, None)?);
+    }
+    state.undo.push(crate::undo::Step::Photos {
+        year,
+        before,
+        feedback,
+    });
+    Ok(())
 }
 
 /// Svaret på «Hvorfor?». `None` betyr at brukeren hoppet over.
@@ -915,19 +966,28 @@ pub fn answer_why(
     Ok(learned_from(&store.feedback_log()?).1)
 }
 
-/// Ett valg for årets album (fornøyd med en side, turtype, slå sammen dager, sider per
-/// historie, forside og bakside, rotering). Lagres kryptert; grensesnittet lager utkastet på
-/// nytt etterpå.
+/// Valg for årets album (fornøyd med en side, rammer, turtype, slå sammen dager, sider per
+/// historie, forside og bakside, rotering, størrelse, utsnitt, samle på én side, egen
+/// historie). Lagres kryptert og angres samlet; grensesnittet lager utkastet på nytt etterpå.
 #[tauri::command]
 pub fn album_choice(
     state: State<'_, AppState>,
     year: i32,
-    change: p2a_print::choices::Change,
+    changes: Vec<p2a_print::choices::Change>,
 ) -> CmdResult<()> {
     let guard = state.store()?;
     let store = guard.as_ref().expect("sjekket");
-    let mut c = p2a_print::choices::load(store, year)?;
-    c.apply(change);
-    p2a_print::choices::save(store, year, &c)?;
+    let before = p2a_print::choices::load(store, year)?;
+    let mut c = before.clone();
+    for change in changes {
+        c.apply(change);
+    }
+    if c != before {
+        p2a_print::choices::save(store, year, &c)?;
+        state.undo.push(crate::undo::Step::Choices {
+            year,
+            before: Box::new(before),
+        });
+    }
     Ok(())
 }

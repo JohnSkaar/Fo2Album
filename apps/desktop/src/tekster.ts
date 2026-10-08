@@ -301,6 +301,17 @@ export const tekster = {
     baksideSide: "Baksiden",
     introSide: "Første side: teksten om året",
     blaHjelp: "Bruk piltastene for å bla. Esc lukker.",
+    angre: "Angre",
+    angreHjelp: "Angre siste endring (Ctrl+Z)",
+    angret: "Endringen er angret",
+    flyttHjelp: "Dra bildet til en annen side, eller til et annet sted på samme side",
+    flyttet: "Bildet er flyttet, og sidene er merket «Fornøyd»",
+    forrigeSide: "← Forrige side",
+    nesteSide: "Neste side →",
+    endreTekst: "Skriv tekst",
+    tekstLagret: "Teksten er lagret",
+    lagreTekst: "Lagre teksten",
+    tekstHjelp: "Teksten kommer med i trykkfilen.",
   },
   begrunnelse: (b: Begrunnelse, bilderIHendelsen: number): string => {
     const n = b.antall ?? 0;

@@ -64,6 +64,14 @@ pub fn album_text(state: State<'_, AppState>, year: i32) -> CmdResult<TextDto> {
     Ok(album::load_text(guard.as_ref().expect("sjekket"), year)?.into())
 }
 
+/// Lagrer tekstene (skrevet i «Bla i albumet» eller i trykkdialogen).
+#[tauri::command]
+pub fn save_album_text(state: State<'_, AppState>, year: i32, text: TextDto) -> CmdResult<()> {
+    let guard = state.store()?;
+    album::save_text(guard.as_ref().expect("sjekket"), year, &text.into())?;
+    Ok(())
+}
+
 /// Lagrer tekstene og lager trykkfilen for utkastet slik det er nå (med sidetaket brukeren
 /// har valgt). Fremdrift sendes som hendelsen `trykk`.
 #[tauri::command]
