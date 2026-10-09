@@ -98,7 +98,9 @@ fn people(store: &Store) -> CmdResult<PeopleDto> {
                 role: p.role.as_str(),
             })
             .collect(),
-        pending: store.photos_missing_faces()?.len(),
+        pending: store
+            .photos_missing_faces(p2a_ingest::pipeline::face_model())?
+            .len(),
     })
 }
 

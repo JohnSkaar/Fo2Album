@@ -155,6 +155,13 @@ const MIGRATIONS: &[&str] = &[
     CREATE INDEX faces_grp ON faces(grp);
     ALTER TABLE photos ADD COLUMN faces_done INTEGER NOT NULL DEFAULT 0;
     "#,
+    // 6: Hvilken ansiktsmodell bildet er analysert med (`p2a_faces::FaceAnalyzer::model`).
+    // Kjennetegn fra ulike modeller kan ikke sammenlignes; ved modellbytte analyseres bildene
+    // på nytt, og navnene brukeren har gitt, flyttes over til de nye ansiktene.
+    r#"
+    ALTER TABLE photos ADD COLUMN faces_model TEXT;
+    UPDATE photos SET faces_model = 'yunet-2023mar+sface-2021dec' WHERE faces_done = 1;
+    "#,
 ];
 
 pub const CURRENT_VERSION: i64 = MIGRATIONS.len() as i64;

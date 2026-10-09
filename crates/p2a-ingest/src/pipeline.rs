@@ -11,7 +11,7 @@ use std::sync::OnceLock;
 
 use p2a_core::config::DedupConfig;
 use p2a_core::{dedup, ContentHash, DateSource, PhotoMeta, TakenAt};
-use p2a_faces::{cluster, Embedding, FaceEngine};
+use p2a_faces::{cluster, Embedding, FaceAnalyzer};
 use p2a_store::{
     CatalogSummary, FileEntry, FileToRead, NewFace, ReadOutcome, Store, StoreError, SyncReport,
     GROUP_UNNAMED,
@@ -79,11 +79,19 @@ struct Analyzed {
     faces: Option<Vec<NewFace>>,
 }
 
-/// Ansiktsmodellene lastes én gang per kjøring av programmet. `None` hvis de ikke kan lastes
-/// (da blir ansiktene funnet neste gang).
-fn engine() -> Option<&'static FaceEngine> {
-    static ENGINE: OnceLock<Option<FaceEngine>> = OnceLock::new();
-    ENGINE.get_or_init(|| FaceEngine::new().ok()).as_ref()
+/// Ansiktsmodellen lastes én gang per kjøring av programmet. `None` hvis den ikke kan lastes
+/// (da blir ansiktene funnet neste gang). Byttes i `p2a_faces::default_analyzer`.
+fn engine() -> Option<&'static dyn FaceAnalyzer> {
+    static ENGINE: OnceLock<Option<Box<dyn FaceAnalyzer>>> = OnceLock::new();
+    ENGINE
+        .get_or_init(|| p2a_faces::default_analyzer().ok())
+        .as_deref()
+}
+
+/// Navnet på ansiktsmodellen appen bruker. Bilder analysert med en annen modell analyseres på
+/// nytt, og brukerens navngiving følger med (`Store::put_faces`).
+pub fn face_model() -> &'static str {
+    engine().map_or(p2a_faces::DEFAULT_MODEL, |e| e.model())
 }
 
 /// Ansiktene i et dekodet bilde, med boks og landemerker som andeler av bildet.
@@ -123,7 +131,7 @@ const MIN_FACE_PX: f32 = 36.0;
 
 /// Grupperer alle ansiktene i personer på nytt. Ansikter brukeren har plassert, flyttes ikke.
 pub fn group_faces(store: &mut Store) -> Result<usize, StoreError> {
-    let stored = store.stored_faces()?;
+    let stored = store.stored_faces(face_model())?;
     let embeddings: Vec<Option<Embedding>> = stored
         .iter()
         .map(|f| Embedding::from_bytes(&f.embedding))
@@ -144,7 +152,8 @@ pub fn group_faces(store: &mut Store) -> Result<usize, StoreError> {
             });
         }
     }
-    let labels = cluster::cluster(&items, p2a_faces::SAME_PERSON, GROUP_UNNAMED as u32);
+    let same = engine().map_or(p2a_faces::SAME_PERSON, |e| e.same_person());
+    let labels = cluster::cluster(&items, same, GROUP_UNNAMED as u32);
     let groups: Vec<(i64, i64)> = ids
         .into_iter()
         .zip(labels.into_iter().map(i64::from))
@@ -270,7 +279,7 @@ pub fn ingest_all(
             .iter()
             .filter_map(|(h, a)| Some((*h, a.as_ref()?.faces.clone()?)))
             .collect();
-        store.put_faces(&faces)?;
+        store.put_faces(&faces, face_model())?;
     }
     progress(Progress {
         phase: Phase::Leser,
@@ -315,9 +324,10 @@ pub fn ingest_all(
         });
     }
 
-    // 4. Ansikter i bilder som er lest av en eldre versjon (eller der modellene manglet).
+    // 4. Ansikter i bilder som er lest av en eldre versjon, med en annen ansiktsmodell, eller
+    // der modellene manglet.
     if !report.cancelled && engine().is_some() {
-        let missing = store.photos_missing_faces()?;
+        let missing = store.photos_missing_faces(face_model())?;
         let total = missing.len();
         for (n, chunk) in missing.chunks(BATCH).enumerate() {
             if cancel.load(Ordering::Relaxed) {
@@ -337,7 +347,7 @@ pub fn ingest_all(
                     Some((*h, find_faces(&d.image)?))
                 })
                 .collect();
-            store.put_faces(&found)?;
+            store.put_faces(&found, face_model())?;
         }
     }
 

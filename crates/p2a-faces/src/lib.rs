@@ -98,6 +98,28 @@ impl Face {
 
 /// Modellene, lastet og optimalisert. Lag én og bruk den til alle bildene; den kan deles
 /// mellom tråder.
+/// Navn og versjon på modellene i [`FaceEngine`]. Lagres med ansiktene, så appen vet hvilke
+/// bilder som må analyseres på nytt når modellen byttes.
+pub const DEFAULT_MODEL: &str = "yunet-2023mar+sface-2021dec";
+
+/// Det appen trenger fra en ansiktsmodell. Byttbart (beslutning 6. oktober 2026): en annen
+/// motor (ONNX Runtime) eller leverandør (f.eks. Luxand) kan settes inn uten at resten av appen
+/// endres. Kjennetegn fra ulike modeller kan ikke sammenlignes, så `model()` må endres når
+/// modellen endres; da analyseres bildene på nytt, og navnene brukeren har gitt, beholdes.
+pub trait FaceAnalyzer: Send + Sync {
+    /// Navn og versjon, f.eks. [`DEFAULT_MODEL`].
+    fn model(&self) -> &str;
+    /// Ansiktene i bildet med kjennetegn og skarphet, største først.
+    fn faces(&self, img: &RgbImage) -> Result<Vec<Face>, FaceError>;
+    /// Likhet (cosinus) over denne er trolig samme person.
+    fn same_person(&self) -> f32;
+}
+
+/// Modellen appen bruker nå.
+pub fn default_analyzer() -> Result<Box<dyn FaceAnalyzer>, FaceError> {
+    Ok(Box::new(FaceEngine::new()?))
+}
+
 pub struct FaceEngine {
     detector: Plan,
     recognizer: Plan,
@@ -180,5 +202,19 @@ impl FaceEngine {
                 })
             })
             .collect()
+    }
+}
+
+impl FaceAnalyzer for FaceEngine {
+    fn model(&self) -> &str {
+        DEFAULT_MODEL
+    }
+
+    fn faces(&self, img: &RgbImage) -> Result<Vec<Face>, FaceError> {
+        FaceEngine::faces(self, img)
+    }
+
+    fn same_person(&self) -> f32 {
+        SAME_PERSON
     }
 }

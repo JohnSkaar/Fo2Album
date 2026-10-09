@@ -399,5 +399,8 @@ fn ansikter_grupperes_i_personer() {
         "samme person i flere bilder"
     );
     // Andre gang er alt gjort: ingen ansikter mangler.
-    assert!(store.photos_missing_faces().unwrap().is_empty());
+    assert!(store
+        .photos_missing_faces(p2a_ingest::pipeline::face_model())
+        .unwrap()
+        .is_empty());
 }

@@ -47,6 +47,52 @@ pub struct StoredFace {
     pub pixels: f32,
 }
 
+/// Et ansikt som fantes fra før, med det brukeren har bestemt.
+struct OldFace {
+    /// x, y, w, h som andeler.
+    bx: [f32; 4],
+    grp: Option<i64>,
+    person: Option<i64>,
+    confirmed: bool,
+    ignored: bool,
+}
+
+/// Hvor mye to bokser overlapper (snitt delt på union), 0–1.
+fn overlap(a: [f32; 4], b: [f32; 4]) -> f32 {
+    let w = (a[0] + a[2]).min(b[0] + b[2]) - a[0].max(b[0]);
+    let h = (a[1] + a[3]).min(b[1] + b[3]) - a[1].max(b[1]);
+    if w <= 0.0 || h <= 0.0 {
+        return 0.0;
+    }
+    let inter = w * h;
+    inter / (a[2] * a[3] + b[2] * b[3] - inter)
+}
+
+/// Det gamle ansiktet hvert nytt ansikt tilsvarer (samme sted i bildet), parvis etter størst
+/// overlapp, hvert gamle høyst én gang.
+fn carry_over(old: &[OldFace], new: &[NewFace]) -> Vec<Option<usize>> {
+    const MIN_OVERLAP: f32 = 0.4;
+    let mut pairs: Vec<(f32, usize, usize)> = Vec::new();
+    for (i, n) in new.iter().enumerate() {
+        for (j, o) in old.iter().enumerate() {
+            let v = overlap([n.x, n.y, n.w, n.h], o.bx);
+            if v >= MIN_OVERLAP {
+                pairs.push((v, i, j));
+            }
+        }
+    }
+    pairs.sort_by(|a, b| b.0.total_cmp(&a.0).then(a.1.cmp(&b.1)).then(a.2.cmp(&b.2)));
+    let mut out = vec![None; new.len()];
+    let mut used = vec![false; old.len()];
+    for (_, i, j) in pairs {
+        if out[i].is_none() && !used[j] {
+            out[i] = Some(j);
+            used[j] = true;
+        }
+    }
+    out
+}
+
 /// Et utsnitt å vise for en gruppe: bildet og boksen.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FaceSample {
@@ -75,6 +121,7 @@ impl Store {
     #[allow(clippy::type_complexity)]
     pub fn photos_missing_faces(
         &self,
+        model: &str,
     ) -> Result<Vec<(ContentHash, PathBuf, String, Option<String>, Option<u16>)>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT p.content_hash, s.path, f.rel_path, p.format, p.orientation
@@ -82,10 +129,11 @@ impl Store {
              JOIN files f ON f.id = (SELECT id FROM files WHERE content_hash = p.content_hash
                                      AND status = 'lokal' LIMIT 1)
              JOIN sources s ON s.id = f.source_id
-             WHERE p.faces_done = 0 AND p.has_thumbnail = 1 AND p.duplicate_of IS NULL
+             WHERE (p.faces_done = 0 OR p.faces_model IS NOT ?1)
+               AND p.has_thumbnail = 1 AND p.duplicate_of IS NULL
              ORDER BY p.taken_at",
         )?;
-        let rows = stmt.query_map([], |r| {
+        let rows = stmt.query_map([model], |r| {
             Ok((
                 hash_from(r.get(0)?)?,
                 PathBuf::from(r.get::<_, String>(1)?),
@@ -97,36 +145,77 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
-    /// Lagrer ansiktene i et bilde (erstatter de gamle) og merker bildet som ferdig.
-    pub fn put_faces(&mut self, items: &[(ContentHash, Vec<NewFace>)]) -> Result<(), StoreError> {
+    /// Lagrer ansiktene i et bilde, funnet med `model`, og merker bildet som ferdig. Ansikter som
+    /// fantes fra før (en eldre modell), erstattes; der et nytt ansikt ligger på samme sted som
+    /// et gammelt, beholder det brukerens valg (person, «ikke viktig») og gruppen.
+    pub fn put_faces(
+        &mut self,
+        items: &[(ContentHash, Vec<NewFace>)],
+        model: &str,
+    ) -> Result<(), StoreError> {
         let tx = self.conn.transaction()?;
         for (h, faces) in items {
+            let old: Vec<OldFace> = {
+                let mut stmt = tx.prepare(
+                    "SELECT x, y, w, h, grp, person_id, confirmed, ignored
+                     FROM faces WHERE content_hash = ?1 ORDER BY id",
+                )?;
+                let rows = stmt.query_map([&h.0[..]], |r| {
+                    Ok(OldFace {
+                        bx: [r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?],
+                        grp: r.get(4)?,
+                        person: r.get(5)?,
+                        confirmed: r.get(6)?,
+                        ignored: r.get(7)?,
+                    })
+                })?;
+                rows.collect::<Result<_, _>>()?
+            };
+            let keep = carry_over(&old, faces);
             tx.execute("DELETE FROM faces WHERE content_hash = ?1", [&h.0[..]])?;
-            for f in faces {
+            for (f, prev) in faces.iter().zip(keep) {
                 let lm: Vec<u8> = f.landmarks.iter().flat_map(|v| v.to_le_bytes()).collect();
+                let prev = prev.map(|k| &old[k]);
                 tx.execute(
-                    "INSERT INTO faces (content_hash, x, y, w, h, landmarks, score, sharpness, embedding)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                    params![&h.0[..], f.x, f.y, f.w, f.h, lm, f.score, f.sharpness, f.embedding],
+                    "INSERT INTO faces (content_hash, x, y, w, h, landmarks, score, sharpness,
+                                        embedding, grp, person_id, confirmed, ignored)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                    params![
+                        &h.0[..],
+                        f.x,
+                        f.y,
+                        f.w,
+                        f.h,
+                        lm,
+                        f.score,
+                        f.sharpness,
+                        f.embedding,
+                        prev.and_then(|p| p.grp),
+                        prev.and_then(|p| p.person),
+                        prev.is_some_and(|p| p.confirmed),
+                        prev.is_some_and(|p| p.ignored),
+                    ],
                 )?;
             }
             tx.execute(
-                "UPDATE photos SET faces_done = 1 WHERE content_hash = ?1",
-                [&h.0[..]],
+                "UPDATE photos SET faces_done = 1, faces_model = ?2 WHERE content_hash = ?1",
+                params![&h.0[..], model],
             )?;
         }
         tx.commit()?;
         Ok(())
     }
 
-    /// Alle ansiktene, til grupperingen. Sortert på id, så grupperingen blir lik hver gang.
-    pub fn stored_faces(&self) -> Result<Vec<StoredFace>, StoreError> {
+    /// Ansiktene funnet med `model`, til grupperingen (kjennetegn fra andre modeller kan ikke
+    /// sammenlignes). Sortert på id, så grupperingen blir lik hver gang.
+    pub fn stored_faces(&self, model: &str) -> Result<Vec<StoredFace>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT f.id, f.embedding, f.h * f.sharpness, f.confirmed, f.ignored, f.person_id,
                     p.rowid, f.h * COALESCE(p.height, 0)
-             FROM faces f JOIN photos p ON p.content_hash = f.content_hash ORDER BY f.id",
+             FROM faces f JOIN photos p ON p.content_hash = f.content_hash
+             WHERE p.faces_model = ?1 ORDER BY f.id",
         )?;
-        let rows = stmt.query_map([], |r| {
+        let rows = stmt.query_map([model], |r| {
             let confirmed: bool = r.get(3)?;
             let ignored: bool = r.get(4)?;
             let person: Option<i64> = r.get(5)?;

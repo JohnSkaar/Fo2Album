@@ -5,6 +5,9 @@ use p2a_store::{
     FileEntry, MemoryKeyStore, NewFace, ReadOutcome, Store, GROUP_IGNORED, GROUP_UNNAMED,
 };
 
+/// Ansiktsmodellen i testene.
+const M: &str = "modell-a";
+
 fn face(x: f32, h: f32, emb: u8) -> NewFace {
     NewFace {
         x,
@@ -56,14 +59,17 @@ fn store_with_photos() -> (tempfile::TempDir, Store, Vec<ContentHash>) {
 #[test]
 fn ansikter_lagres_og_bildet_er_ferdig() {
     let (_dir, mut store, hashes) = store_with_photos();
-    assert_eq!(store.photos_missing_faces().unwrap().len(), 4);
+    assert_eq!(store.photos_missing_faces(M).unwrap().len(), 4);
     store
-        .put_faces(&[
-            (hashes[0], vec![face(0.1, 0.3, 1), face(0.6, 0.02, 2)]),
-            (hashes[1], vec![]),
-        ])
+        .put_faces(
+            &[
+                (hashes[0], vec![face(0.1, 0.3, 1), face(0.6, 0.02, 2)]),
+                (hashes[1], vec![]),
+            ],
+            M,
+        )
         .unwrap();
-    assert_eq!(store.photos_missing_faces().unwrap().len(), 2);
+    assert_eq!(store.photos_missing_faces(M).unwrap().len(), 2);
     let year = store.faces_in_year(2011).unwrap();
     assert_eq!(year.len(), 2, "bare bilder som er gått gjennom");
     assert_eq!(year[&hashes[0]].len(), 2);
@@ -72,7 +78,7 @@ fn ansikter_lagres_og_bildet_er_ferdig() {
     assert!(year[&hashes[1]].is_empty());
     // Gjentatt analyse erstatter ansiktene.
     store
-        .put_faces(&[(hashes[0], vec![face(0.1, 0.3, 1)])])
+        .put_faces(&[(hashes[0], vec![face(0.1, 0.3, 1)])], M)
         .unwrap();
     assert_eq!(store.faces_in_year(2011).unwrap()[&hashes[0]].len(), 1);
 }
@@ -81,13 +87,16 @@ fn ansikter_lagres_og_bildet_er_ferdig() {
 fn navngiving_overlever_ny_gruppering() {
     let (_dir, mut store, hashes) = store_with_photos();
     store
-        .put_faces(&[
-            (hashes[0], vec![face(0.1, 0.3, 1), face(0.5, 0.3, 2)]),
-            (hashes[1], vec![face(0.1, 0.3, 1)]),
-            (hashes[2], vec![face(0.1, 0.3, 3)]),
-        ])
+        .put_faces(
+            &[
+                (hashes[0], vec![face(0.1, 0.3, 1), face(0.5, 0.3, 2)]),
+                (hashes[1], vec![face(0.1, 0.3, 1)]),
+                (hashes[2], vec![face(0.1, 0.3, 3)]),
+            ],
+            M,
+        )
         .unwrap();
-    let faces = store.stored_faces().unwrap();
+    let faces = store.stored_faces(M).unwrap();
     assert_eq!(faces.len(), 4);
     assert!(faces.iter().all(|f| f.fixed.is_none()));
     // Grupper: ansikt 1 og 3 er samme person; 2 og 4 er hver sin.
@@ -111,7 +120,7 @@ fn navngiving_overlever_ny_gruppering() {
     let ella = store.add_person("Ella", Role::Barn, false, None).unwrap();
     store.name_face_group(g(0), ella).unwrap();
     store.ignore_face_group(g(2)).unwrap();
-    let faces = store.stored_faces().unwrap();
+    let faces = store.stored_faces(M).unwrap();
     assert_eq!(faces[0].fixed, Some(ella));
     assert_eq!(faces[3].fixed, Some(GROUP_IGNORED));
     assert_eq!(faces[1].fixed, None);
@@ -129,4 +138,58 @@ fn navngiving_overlever_ny_gruppering() {
     // Flytt ett ansikt ut igjen.
     store.move_face(faces[1].id, None).unwrap();
     assert_eq!(store.face_groups(1, 3).unwrap()[0].faces, 2);
+}
+
+#[test]
+fn navnene_beholdes_naar_ansiktsmodellen_byttes() {
+    let (_dir, mut store, hashes) = store_with_photos();
+    store
+        .put_faces(
+            &[
+                (hashes[0], vec![face(0.1, 0.3, 1), face(0.5, 0.3, 2)]),
+                (hashes[1], vec![]),
+            ],
+            M,
+        )
+        .unwrap();
+    let ella = store.add_person("Ella", Role::Barn, false, None).unwrap();
+    let faces = store.stored_faces(M).unwrap();
+    store.move_face(faces[0].id, Some(ella)).unwrap();
+    store.move_face(faces[1].id, None).unwrap();
+
+    // Ny modell: alle bildene må analyseres på nytt, også de uten ansikter.
+    let b = "modell-b";
+    assert_eq!(store.photos_missing_faces(b).unwrap().len(), 4);
+    assert_eq!(store.photos_missing_faces(M).unwrap().len(), 2);
+
+    // Den nye modellen finner de samme ansiktene litt forskjøvet, og ett til.
+    store
+        .put_faces(
+            &[(
+                hashes[0],
+                vec![face(0.52, 0.29, 7), face(0.11, 0.31, 8), face(0.8, 0.1, 9)],
+            )],
+            b,
+        )
+        .unwrap();
+    let new = store.stored_faces(b).unwrap();
+    assert_eq!(new.len(), 3);
+    assert_eq!(
+        new[0].fixed,
+        Some(GROUP_IGNORED),
+        "«ikke viktig» følger med"
+    );
+    assert_eq!(new[1].fixed, Some(ella), "navnet følger med");
+    assert_eq!(new[2].fixed, None, "nytt ansikt er ikke plassert");
+    // Kjennetegn fra den gamle modellen grupperes ikke sammen med de nye.
+    assert!(store.stored_faces(M).unwrap().is_empty());
+    assert_eq!(store.photos_missing_faces(b).unwrap().len(), 3);
+    let year = store.faces_in_year(2011).unwrap();
+    assert_eq!(
+        year[&hashes[0]]
+            .iter()
+            .filter(|f| f.person == Some(ella))
+            .count(),
+        1
+    );
 }
