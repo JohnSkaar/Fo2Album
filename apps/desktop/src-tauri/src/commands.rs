@@ -589,6 +589,46 @@ pub struct DraftDto {
     events: Vec<DraftEventDto>,
     photos: Vec<DraftPhotoDto>,
     learned: LearnedDto,
+    /// Kvalitetssjekk før trykk.
+    checks: Vec<CheckDto>,
+}
+
+/// Et funn i kvalitetssjekken. `kind`: lav_opplosning, mangler eller uskarpt_stort.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckDto {
+    photo: String,
+    kind: &'static str,
+    /// Oppløsningen bildet får i albumet (ved lav oppløsning).
+    ppi: Option<u32>,
+    /// forside, bakside eller side.
+    place: &'static str,
+    event: Option<usize>,
+    page: Option<usize>,
+}
+
+impl From<p2a_print::album::Check> for CheckDto {
+    fn from(c: p2a_print::album::Check) -> Self {
+        use p2a_print::album::{CheckKind, Place};
+        let (kind, ppi) = match c.kind {
+            CheckKind::LowResolution { ppi } => ("lav_opplosning", Some(ppi)),
+            CheckKind::Missing => ("mangler", None),
+            CheckKind::BlurryBig => ("uskarpt_stort", None),
+        };
+        let (place, event, page) = match c.place {
+            Place::Cover => ("forside", None, None),
+            Place::Back => ("bakside", None, None),
+            Place::Page { event, page } => ("side", Some(event), Some(page)),
+        };
+        CheckDto {
+            photo: c.photo.to_hex(),
+            kind,
+            ppi,
+            place,
+            event,
+            page,
+        }
+    }
 }
 
 fn lesson_code(l: Lesson) -> &'static str {
@@ -664,6 +704,10 @@ fn draft_for(
             })
         },
     );
+    let checks = p2a_print::album::checks(store, year, &draft, &metas)?
+        .into_iter()
+        .map(CheckDto::from)
+        .collect();
     let id = |i: usize| draft.photos[i].hash.to_hex();
     // Formen på bildet slik det vises (etter rotering), til feltene på sidene.
     let aspect = |h: &ContentHash| {
@@ -810,6 +854,7 @@ fn draft_for(
             })
             .collect(),
         learned,
+        checks,
     })
 }
 

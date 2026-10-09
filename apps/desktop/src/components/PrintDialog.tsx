@@ -18,6 +18,7 @@ export function PrintDialog({
   year,
   text,
   status,
+  checks = 0,
   onMake,
   onClose,
 }: {
@@ -26,6 +27,8 @@ export function PrintDialog({
   /** Lagrede tekster eller forslaget; `null` mens de hentes. */
   text: Albumtekst | null;
   status: Trykkstatus;
+  /** Antall funn i kvalitetssjekken før trykk. */
+  checks?: number;
   onMake: (text: Albumtekst) => void;
   onClose: () => void;
 }) {
@@ -72,6 +75,7 @@ export function PrintDialog({
             year={year}
             initial={text}
             busy={status.type === "lager" ? status : null}
+            checks={checks}
             onMake={onMake}
             onClose={onClose}
           />
@@ -85,12 +89,14 @@ function Skjema({
   year,
   initial,
   busy,
+  checks,
   onMake,
   onClose,
 }: {
   year: number;
   initial: Albumtekst;
   busy: { p: TrykkFremdrift | null } | null;
+  checks: number;
   onMake: (text: Albumtekst) => void;
   onClose: () => void;
 }) {
@@ -126,6 +132,11 @@ function Skjema({
       }}
     >
       <p>{t.ingress}</p>
+      {checks > 0 && (
+        <p className="warn" role="note">
+          {tekster.sjekk.trykkOppsummering(checks)}
+        </p>
+      )}
       {felt("title", t.tittelFelt)}
       {felt("subtitle", t.undertittel, t.undertittelHjelp)}
       {felt("intro", t.intro, t.introHjelp(year), true)}

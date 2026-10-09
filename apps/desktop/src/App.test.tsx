@@ -277,6 +277,7 @@ describe("albumutkast", () => {
       },
     ],
     learned: { lessons: [], choices: 0, answers: 0 },
+    checks: [],
   };
 
   beforeEach(() => {

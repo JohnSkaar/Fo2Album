@@ -69,6 +69,7 @@ const utkast: Utkast = {
   ],
   photos: [bilde("a", 0, true), bilde("b", 0, true), bilde("c", 1, true), bilde("e", 2, true)],
   learned: { lessons: [], choices: 0, answers: 0 },
+  checks: [],
 };
 
 function vis(u: Utkast = utkast) {

@@ -46,6 +46,8 @@ pub struct PhotoSource {
     pub rotation: u16,
     /// Størrelse og utsnitt brukeren har valgt.
     pub look: Look,
+    /// Bildet i katalogen (til kvalitetssjekken), når det er kjent.
+    pub hash: Option<p2a_core::ContentHash>,
 }
 
 impl PhotoSource {
@@ -256,6 +258,103 @@ fn centered(font: Font, size: f32, color: [f32; 3], cx: f32, y: f32, t: &str) ->
     text_block(font, size, color, cx - w / 2.0, y, t)
 }
 
+/// Andel av forsiden og baksiden bildet dekker, øverst og ut i kantene.
+const COVER_PHOTO: f32 = 0.70;
+const BACK_PHOTO: f32 = 0.6;
+
+fn cover_frame(share: f32) -> Frame {
+    Frame {
+        x: -BLEED,
+        y: -BLEED,
+        w: TRIM_W + 2.0 * BLEED,
+        h: TRIM_H * share + BLEED,
+        fill: true,
+    }
+}
+
+/// Hvor i albumet et bilde står.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Spot {
+    Cover,
+    Back,
+    /// Indeks i `Album::pages`.
+    Page(usize),
+}
+
+/// Hva kvalitetssjekken fant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IssueKind {
+    /// For få punkter for størrelsen bildet har i albumet; `ppi` er det det får.
+    LowResolution { ppi: u32 },
+    /// Originalfilen finnes ikke på maskinen (flyttet, slettet, bare i skyen).
+    Missing,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Issue {
+    pub spot: Spot,
+    pub photo: PhotoSource,
+    pub kind: IssueKind,
+}
+
+/// Kvalitetssjekk før trykk, uten å lese bildene: samme felt som trykkfilen, oppløsningen
+/// regnet ut fra målene i katalogen, og om originalfilen finnes.
+pub fn check(album: &Album) -> Vec<Issue> {
+    let mut placed: Vec<(Spot, Placed)> = Vec::new();
+    if let Some(c) = &album.cover {
+        placed.push((
+            Spot::Cover,
+            Placed {
+                photo: c.clone(),
+                frame: cover_frame(COVER_PHOTO),
+            },
+        ));
+    }
+    for (k, page) in album.pages.iter().enumerate() {
+        let photos: Vec<(f32, Look)> = page.photos.iter().map(|p| (p.aspect(), p.look)).collect();
+        let frames = layout::page_frames(page.kind, page.mal.as_deref(), &photos);
+        for (photo, frame) in page.photos.iter().zip(frames) {
+            placed.push((
+                Spot::Page(k),
+                Placed {
+                    photo: photo.clone(),
+                    frame,
+                },
+            ));
+        }
+    }
+    if let Some(b) = &album.back {
+        placed.push((
+            Spot::Back,
+            Placed {
+                photo: b.clone(),
+                frame: cover_frame(BACK_PHOTO),
+            },
+        ));
+    }
+    let mut out = Vec::new();
+    for (spot, p) in placed {
+        let kind = if !p.photo.path.is_file() {
+            Some(IssueKind::Missing)
+        } else {
+            let (dw, dh) = p.drawn();
+            let long_px = p.photo.width.max(p.photo.height) as f32;
+            let ppi = long_px / (dw.max(dh) / 25.4);
+            (long_px > 0.0 && ppi < LOW_PPI).then(|| IssueKind::LowResolution {
+                ppi: ppi.round() as u32,
+            })
+        };
+        if let Some(kind) = kind {
+            out.push(Issue {
+                spot,
+                photo: p.photo,
+                kind,
+            });
+        }
+    }
+    out
+}
+
 /// Lager trykkfilen. `progress(ferdig, totalt)` kalles mens bildene behandles.
 pub fn render(
     album: &Album,
@@ -271,17 +370,11 @@ pub fn render(
 
     // 1. Forsiden: bildet øverst ut i kantene, tittel og undertittel under.
     let mut cover = vec![Block::Fill(color::PAPER_TINT)];
-    let photo_h = TRIM_H * 0.70;
+    let photo_h = TRIM_H * COVER_PHOTO;
     if let Some(c) = &album.cover {
         placed.push(Placed {
             photo: c.clone(),
-            frame: Frame {
-                x: -BLEED,
-                y: -BLEED,
-                w: TRIM_W + 2.0 * BLEED,
-                h: photo_h + BLEED,
-                fill: true,
-            },
+            frame: cover_frame(COVER_PHOTO),
         });
         cover.push(Block::Photo(placed.len() - 1));
     }
@@ -358,16 +451,10 @@ pub fn render(
     let mut back = vec![Block::Fill(color::PAPER_TINT)];
     let mut y = TRIM_H * 0.45;
     if let Some(b) = &album.back {
-        let h = TRIM_H * 0.6;
+        let h = TRIM_H * BACK_PHOTO;
         placed.push(Placed {
             photo: b.clone(),
-            frame: Frame {
-                x: -BLEED,
-                y: -BLEED,
-                w: TRIM_W + 2.0 * BLEED,
-                h: h + BLEED,
-                fill: true,
-            },
+            frame: cover_frame(BACK_PHOTO),
         });
         back.push(Block::Photo(placed.len() - 1));
         y = h + 22.0;
@@ -536,6 +623,7 @@ mod tests {
             height: 800,
             rotation,
             look: Look::default(),
+            hash: None,
         };
         assert!((p(0).aspect() - 1.5).abs() < 1e-6);
         assert!((p(90).aspect() - 2.0 / 3.0).abs() < 1e-6);

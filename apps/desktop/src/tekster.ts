@@ -428,6 +428,26 @@ export const tekster = {
       `${antall(n, "bilde", "bilder")} har lav oppløsning for størrelsen i albumet og kan bli litt uskarpe på trykk.`,
     lukk: "Lukk",
   },
+  sjekk: {
+    tittel: (n: number) =>
+      n === 0 ? "Før trykk: alt ser bra ut" : `Før trykk: ${antall(n, "ting", "ting")} å se på`,
+    ingress:
+      "Appen sjekker bildene slik de blir trykt: oppløsningen for størrelsen de får, at originalfilen finnes på maskinen, og uskarpe bilder som står stort.",
+    ingenting:
+      "Ingen bilder har for lav oppløsning, alle finnes på maskinen, og ingen uskarpe bilder står stort.",
+    lavOpplosning: (ppi: number) =>
+      `Lav oppløsning for størrelsen (${fmt(ppi)} ppi, bør være minst 150). Kan bli uskarpt på trykk. Gjør bildet mindre, eller bytt det ut.`,
+    mangler:
+      "Originalfilen finnes ikke på maskinen (flyttet, slettet eller bare i skyen). Hent bildet til maskinen, eller bytt det ut.",
+    uskarptStort: "Ser uskarpt ut og står stort. Gjør det mindre, eller bytt det ut.",
+    forside: "Forsiden",
+    bakside: "Baksiden",
+    side: (historie: string, side: number) => `${historie}, side ${fmt(side)}`,
+    vis: "Vis",
+    merke: "Se på før trykk",
+    trykkOppsummering: (n: number) =>
+      `${antall(n, "ting", "ting")} bør ses på før trykk (lav oppløsning, manglende eller uskarpe bilder). Se «Før trykk» i utkastet. Du kan likevel lage filen.`,
+  },
   personer: {
     tittel: "Hvem er med?",
     ingress:

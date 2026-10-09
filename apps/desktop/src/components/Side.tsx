@@ -1,5 +1,6 @@
 import type { CSSProperties, DragEvent } from "react";
 import type { Felt, Side as SideData, UtkastBilde } from "../api";
+import { tekster } from "../tekster";
 
 /** Siden er 21 × 28 cm; feltene er i prosent av bredden og høyden. */
 export const SIDE_FORHOLD = 210 / 280;
@@ -85,6 +86,7 @@ export function Sidebilde({
   markert,
   onPhoto,
   dra,
+  varsel,
 }: {
   side: SideData;
   bilder: Map<string, UtkastBilde>;
@@ -96,6 +98,8 @@ export function Sidebilde({
   onPhoto?: (id: string, marker: boolean) => void;
   /** Dra og slipp: et bilde dras fra siden, eller slippes foran et bilde (`null` = sist). */
   dra?: Dra;
+  /** Kvalitetssjekken: bildene på siden som bør ses på før trykk. */
+  varsel?: Set<string>;
 }) {
   const utseende = (id: string): Utseende =>
     bilder.get(id) ?? { rotation: 0, focus: [0.5, 0.5], whole: false };
@@ -148,7 +152,7 @@ export function Sidebilde({
         );
         const klasse = `pg2__fr${valgt === id ? " pg2__fr--valgt" : ""}${
           markert?.has(id) ? " pg2__fr--markert" : ""
-        }`;
+        }${varsel?.has(id) ? " pg2__fr--varsel" : ""}`;
         return onPhoto ? (
           <button
             key={id}
@@ -156,7 +160,8 @@ export function Sidebilde({
             className={klasse}
             style={stil}
             aria-pressed={valgt === id || !!markert?.has(id)}
-            aria-label={`${etikett}, bilde ${i + 1}`}
+            aria-label={`${etikett}, bilde ${i + 1}${varsel?.has(id) ? `, ${tekster.sjekk.merke}` : ""}`}
+            title={varsel?.has(id) ? tekster.sjekk.merke : undefined}
             onClick={(e) => onPhoto(id, e.ctrlKey || e.metaKey || e.shiftKey)}
             draggable={!!dra}
             onDragStart={(e) => {

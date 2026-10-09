@@ -78,6 +78,7 @@ const utkast: Utkast = {
   events: [hendelse],
   photos: [bilde("a"), bilde("b"), bilde("c"), bilde("d", { included: false })],
   learned: { lessons: [], choices: 0, answers: 0 },
+  checks: [],
 };
 
 const rammer: Ramme[] = [
@@ -236,5 +237,39 @@ describe("utsnitt og visning", () => {
     expect(screen.getByText(r.oppslag(1, 4))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: `${r.neste} →` }));
     expect(screen.getByText(r.oppslag(2, 4))).toBeInTheDocument();
+  });
+});
+
+describe("kvalitetssjekk før trykk", () => {
+  it("lister funnene, merker bildet på siden og viser det", async () => {
+    const u: Utkast = {
+      ...utkast,
+      checks: [
+        { photo: h("c"), kind: "lav_opplosning", ppi: 96, place: "side", event: 0, page: 1 },
+        { photo: h("a"), kind: "mangler", ppi: null, place: "forside", event: null, page: null },
+      ],
+    };
+    render(
+      <DraftScreen
+        year={2011}
+        draft={u}
+        phase={null}
+        onMake={() => {}}
+        onPrint={() => {}}
+        onChange={() => {}}
+        onSize={() => {}}
+        onChoose={() => Promise.resolve(null)}
+        onAnswer={() => {}}
+        thumbUrl={(id) => `miniatyr://${id}`}
+      />,
+    );
+    const s = tekster.sjekk;
+    expect(screen.getByText(s.tittel(2))).toBeInTheDocument();
+    expect(screen.getByText(s.lavOpplosning(96))).toBeInTheDocument();
+    expect(screen.getByText(s.forside)).toBeInTheDocument();
+    const side2 = screen.getByRole("group", { name: /Side 2/ });
+    expect(within(side2).getByRole("button", { name: new RegExp(s.merke) })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole("button", { name: s.vis })[0]!);
+    expect(screen.getByRole("note")).toHaveTextContent(s.lavOpplosning(96));
   });
 });

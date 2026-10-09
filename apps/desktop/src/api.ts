@@ -213,6 +213,19 @@ export interface Utkast {
   events: UtkastHendelse[];
   photos: UtkastBilde[];
   learned: Laert;
+  /** Kvalitetssjekk før trykk. */
+  checks: Sjekk[];
+}
+
+/** Et funn i kvalitetssjekken før trykk. */
+export interface Sjekk {
+  photo: string;
+  kind: "lav_opplosning" | "mangler" | "uskarpt_stort";
+  /** Oppløsningen bildet får i albumet (ved lav oppløsning). */
+  ppi: number | null;
+  place: "forside" | "bakside" | "side";
+  event: number | null;
+  page: number | null;
 }
 
 /** Forside og bakside: det som brukes nå (valgt eller foreslått) og forslagene. */

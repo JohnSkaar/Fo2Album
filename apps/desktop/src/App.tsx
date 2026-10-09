@@ -536,6 +536,7 @@ export function App() {
           year={utkast.year}
           text={trykk?.tekst ?? null}
           status={trykk?.status ?? { type: "skriver" }}
+          checks={utkast.checks?.length ?? 0}
           onMake={(t) => void lagTrykk(t)}
           onClose={() => setTrykk(null)}
         />

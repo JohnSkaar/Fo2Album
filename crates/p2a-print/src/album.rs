@@ -138,6 +138,7 @@ fn source(
             height: f.height.unwrap_or(0),
             rotation: chosen.rotation_of(h),
             look: chosen.look_of(h),
+            hash: Some(*h),
         },
         // Ingen lokal fil (bare i skyen): blir et grått felt og står i rapporten.
         None => PhotoSource {
@@ -148,6 +149,7 @@ fn source(
             height: 0,
             rotation: 0,
             look: chosen.look_of(h),
+            hash: Some(*h),
         },
     }
 }
@@ -200,6 +202,118 @@ pub fn from_draft(
         back: back.map(|h| source(&files, &chosen, &h)),
         pages,
     })
+}
+
+/// Hvor i albumet et funn i kvalitetssjekken står.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    Cover,
+    Back,
+    /// Side `page` i historie `event` (indekser i utkastet).
+    Page {
+        event: usize,
+        page: usize,
+    },
+}
+
+/// Hva kvalitetssjekken sier om et bilde.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckKind {
+    LowResolution {
+        ppi: u32,
+    },
+    Missing,
+    /// Uskarpt (sammenlignet med resten av året), og står stort: alene på en side eller på
+    /// omslaget.
+    BlurryBig,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Check {
+    pub photo: ContentHash,
+    pub place: Place,
+    pub kind: CheckKind,
+}
+
+/// Kvalitetssjekk før trykk for utkastet: lav oppløsning og manglende filer (som trykkfilen
+/// ville fått), og uskarpe bilder som står stort. Leser ikke bildene, så den er rask nok til
+/// å kjøres hver gang utkastet lages.
+pub fn checks(
+    store: &Store,
+    year: i32,
+    draft: &Draft,
+    metas: &[PhotoMeta],
+) -> Result<Vec<Check>, StoreError> {
+    let album = from_draft(store, year, draft, metas, AlbumText::default())?;
+    // Sidene i albumet er utkastets sider i rekkefølge (uten tomme).
+    let places: Vec<Place> = draft
+        .events
+        .iter()
+        .enumerate()
+        .flat_map(|(event, e)| {
+            e.layout
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| !p.photos.is_empty())
+                .map(move |(page, _)| Place::Page { event, page })
+        })
+        .collect();
+    let mut out: Vec<Check> = crate::check(&album)
+        .into_iter()
+        .filter_map(|i| {
+            let place = match i.spot {
+                crate::Spot::Cover => Place::Cover,
+                crate::Spot::Back => Place::Back,
+                crate::Spot::Page(k) => *places.get(k)?,
+            };
+            let kind = match i.kind {
+                crate::IssueKind::LowResolution { ppi } => CheckKind::LowResolution { ppi },
+                crate::IssueKind::Missing => CheckKind::Missing,
+            };
+            Some(Check {
+                photo: i.photo.hash?,
+                place,
+                kind,
+            })
+        })
+        .collect();
+    let blurry: HashSet<ContentHash> = draft
+        .photos
+        .iter()
+        .filter(|p| p.blurry)
+        .map(|p| p.hash)
+        .collect();
+    let mut big: Vec<(ContentHash, Place)> = Vec::new();
+    for (event, e) in draft.events.iter().enumerate() {
+        for (page, p) in e.layout.iter().enumerate() {
+            if let [i] = p.photos.as_slice() {
+                big.push((draft.photos[*i].hash, Place::Page { event, page }));
+            }
+        }
+    }
+    big.extend(
+        album
+            .cover
+            .iter()
+            .filter_map(|c| Some((c.hash?, Place::Cover))),
+    );
+    big.extend(
+        album
+            .back
+            .iter()
+            .filter_map(|c| Some((c.hash?, Place::Back))),
+    );
+    for (photo, place) in big {
+        let already = out.iter().any(|c| c.photo == photo && c.place == place);
+        if blurry.contains(&photo) && !already {
+            out.push(Check {
+                photo,
+                place,
+                kind: CheckKind::BlurryBig,
+            });
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

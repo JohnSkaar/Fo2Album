@@ -24,6 +24,7 @@ fn photo(dir: &Path, name: &str, w: u32, h: u32, seed: u8) -> PhotoSource {
         height: h,
         rotation: 0,
         look: Look::default(),
+        hash: None,
     }
 }
 
@@ -132,4 +133,31 @@ fn skriv_eksempel() {
     let (pdf, report) = render(&album(dir.path()), &mut |_, _| {}).unwrap();
     std::fs::write(std::env::var("P2A_TRYKK_UT").unwrap(), pdf).unwrap();
     println!("{report:?}");
+}
+
+#[test]
+fn kvalitetssjekk_uten_aa_lese_bildene() {
+    use p2a_print::{check, IssueKind, Spot};
+    let dir = tempfile::tempdir().unwrap();
+    let a = album(dir.path());
+    let issues = check(&a);
+    let missing: Vec<_> = issues
+        .iter()
+        .filter(|i| i.kind == IssueKind::Missing)
+        .collect();
+    assert_eq!(missing.len(), 1);
+    assert_eq!(missing[0].spot, Spot::Page(3));
+    // Et stående bilde fyller hele siden og beskjæres: 1200 punkter blir 324 mm høyt, rundt
+    // 94 ppi.
+    let helside = issues
+        .iter()
+        .find(|i| i.spot == Spot::Page(0))
+        .expect("helsiden har for lav oppløsning");
+    assert!(matches!(helside.kind, IssueKind::LowResolution { ppi } if (85..105).contains(&ppi)));
+    // Samme bilde i et lite felt i rutenettet er godt nok.
+    let c: Vec<_> = issues
+        .iter()
+        .filter(|i| i.photo.path.ends_with("c.jpg"))
+        .collect();
+    assert!(c.is_empty(), "{c:?}");
 }

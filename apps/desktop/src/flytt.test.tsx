@@ -65,6 +65,7 @@ const utkast: Utkast = {
   ],
   photos: [bilde("a"), bilde("b"), bilde("c"), bilde("d", false)],
   learned: { lessons: [], choices: 0, answers: 0 },
+  checks: [],
 };
 
 function vis(extra: Partial<Parameters<typeof DraftScreen>[0]> = {}) {

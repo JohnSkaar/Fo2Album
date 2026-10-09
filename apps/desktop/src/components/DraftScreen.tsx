@@ -6,6 +6,7 @@ import type {
   Omslag,
   Handling,
   Ramme,
+  Sjekk,
   Laert,
   Side,
   Svar,
@@ -248,6 +249,7 @@ function Sider({
   onPhoto,
   onChange,
   dra,
+  varsel,
   thumbUrl,
 }: {
   sider: Side[];
@@ -261,6 +263,7 @@ function Sider({
   onChange: Endre;
   /** Dra og slipp til denne siden. */
   dra: (s: Side) => Dra;
+  varsel: Set<string>;
   thumbUrl: (id: string) => string;
 }) {
   const { sider: vis, endret } = oppdaterSider(sider, med);
@@ -285,6 +288,7 @@ function Sider({
                 markert={markert}
                 onPhoto={onPhoto}
                 dra={endret ? undefined : dra(s)}
+                varsel={varsel}
               />
               <span className="pg__btns">
                 <button
@@ -447,6 +451,7 @@ function Hendelse({
   onMark,
   onChange,
   dra,
+  varsel,
   thumbUrl,
 }: {
   e: UtkastHendelse;
@@ -460,15 +465,14 @@ function Hendelse({
   onMark: (id: string) => void;
   onChange: Endre;
   dra: { side: (s: Side) => Dra; start: (id: string) => void };
+  varsel: Set<string>;
   thumbUrl: (id: string) => string;
 }) {
   const [visAlle, setVisAlle] = useState(false);
   const med = bilder.filter((b) => b.included);
   const ikkeMed = bilder.filter((b) => !b.included);
   const synlige = visAlle ? ikkeMed : ikkeMed.slice(0, VIS_IKKE_MED);
-  const tittel = e.everyday
-    ? t.hverdager(Number(e.start.slice(5, 7)) - 1)
-    : datoSpenn(e.start, e.end);
+  const tittel = historieTittel(e);
   const id = `hendelse-${index}`;
   return (
     <section className="ev" aria-labelledby={id}>
@@ -505,6 +509,7 @@ function Hendelse({
         }}
         onChange={onChange}
         dra={dra.side}
+        varsel={varsel}
         thumbUrl={thumbUrl}
       />
       <div className="ev__cols">
@@ -610,6 +615,58 @@ function Pris({ draft, onSize }: { draft: Utkast; onSize: (sider: number | null)
       </div>
       <p className="price__help">{tekster.pris.modell}</p>
     </div>
+  );
+}
+
+/** Tittelen på en historie: datoene, eller «Hverdager i mai». */
+function historieTittel(e: UtkastHendelse) {
+  return e.everyday ? t.hverdager(Number(e.start.slice(5, 7)) - 1) : datoSpenn(e.start, e.end);
+}
+
+/** «Før trykk»: det kvalitetssjekken fant, med hvor i albumet bildet står. */
+function FoerTrykk({
+  draft,
+  onShow,
+  thumbUrl,
+}: {
+  draft: Utkast;
+  onShow: (c: Sjekk) => void;
+  thumbUrl: (id: string) => string;
+}) {
+  const s = tekster.sjekk;
+  const hvor = (c: Sjekk) => {
+    if (c.place === "forside") return s.forside;
+    if (c.place === "bakside") return s.bakside;
+    const e = draft.events[c.event ?? -1];
+    return e ? s.side(historieTittel(e), (c.page ?? 0) + 1) : "";
+  };
+  const hva = (c: Sjekk) =>
+    c.kind === "lav_opplosning"
+      ? s.lavOpplosning(c.ppi ?? 0)
+      : c.kind === "mangler"
+        ? s.mangler
+        : s.uskarptStort;
+  return (
+    <details className="cover foer-trykk">
+      <summary>{s.tittel(draft.checks.length)}</summary>
+      <p className="price__help">{draft.checks.length === 0 ? s.ingenting : s.ingress}</p>
+      {draft.checks.length > 0 && (
+        <ul className="check__list">
+          {draft.checks.map((c, i) => (
+            <li key={`${c.photo}-${c.place}-${i}`} className="check__item">
+              <img src={thumbUrl(c.photo)} alt="" loading="lazy" />
+              <span>
+                <b>{hvor(c)}</b>
+                <span>{hva(c)}</span>
+              </span>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => onShow(c)}>
+                {s.vis}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </details>
   );
 }
 
@@ -916,6 +973,19 @@ export function DraftScreen({
   const rotasjon = new Map(draft.photos.filter((b) => b.rotation).map((b) => [b.id, b.rotation]));
   const hendelserMed = draft.events.filter((e) => e.included > 0).length;
   const storBilde = stor ? alleBilder.get(stor.id) : undefined;
+  const checks = draft.checks ?? [];
+  const varsel = new Set(checks.filter((c) => c.place === "side").map((c) => c.photo));
+  const valgtSjekk = valgtBilde ? checks.find((c) => c.photo === valgtBilde.id) : undefined;
+  /** Viser bildet fra kvalitetssjekken: velger det og blar til historien. */
+  const visSjekk = (c: Sjekk) => {
+    const b = alleBilder.get(c.photo);
+    if (b) setValgt({ id: b.id, included: b.included, event: b.event });
+    if (c.event !== null) {
+      document
+        .getElementById(`hendelse-${c.event}`)
+        ?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    }
+  };
 
   return (
     <section className="pick draft" aria-labelledby="utkast-tittel">
@@ -958,6 +1028,7 @@ export function DraftScreen({
       </div>
       <Pris draft={draft} onSize={onSize} />
       <Omslagsvalg o={draft.cover} rotasjon={rotasjon} onChange={onChange} thumbUrl={thumbUrl} />
+      <FoerTrykk draft={draft} onShow={visSjekk} thumbUrl={thumbUrl} />
       <p className="draft__help">{t.hjelp}</p>
       <Laerdommer l={draft.learned} />
 
@@ -1017,6 +1088,7 @@ export function DraftScreen({
               onMark={marker}
               onChange={onChange}
               dra={dra}
+              varsel={varsel}
               thumbUrl={thumbUrl}
             />
           </div>
@@ -1126,6 +1198,16 @@ export function DraftScreen({
                   draft.events[valgtBilde.event]?.photos ?? 0,
                 )}
               </p>
+              {valgtSjekk && (
+                <p className="dock__warn" role="note">
+                  ⚠{" "}
+                  {valgtSjekk.kind === "lav_opplosning"
+                    ? tekster.sjekk.lavOpplosning(valgtSjekk.ppi ?? 0)
+                    : valgtSjekk.kind === "mangler"
+                      ? tekster.sjekk.mangler
+                      : tekster.sjekk.uskarptStort}
+                </p>
+              )}
               {valgtBilde.included && valgtSide && !valgtSide.mal && (
                 <p className="dock__help" role="status">
                   {r.storrelse(valgtBilde.size, alene, valgtSide.kind === "helside")}
