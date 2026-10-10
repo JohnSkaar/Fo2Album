@@ -60,16 +60,17 @@ pub fn save_text(store: &Store, year: i32, text: &AlbumText) -> Result<(), Store
     store.set_setting(&text_key(year), &json)
 }
 
-/// Personene i årets bilder (ansiktene) og hvem som er barna, til utkastet (M4).
+/// Personene i årets bilder (ansiktene), hvem som er barna og rollene, til utkastet (M4).
 pub fn people_hints(store: &Store, year: i32) -> Result<DraftHints, StoreError> {
+    let persons = store.persons()?;
     Ok(DraftHints {
         faces: store.faces_in_year(year)?,
-        children: store
-            .persons()?
-            .into_iter()
+        children: persons
+            .iter()
             .filter(|p| p.role == Role::Barn)
             .map(|p| p.id)
             .collect(),
+        roles: persons.iter().map(|p| (p.id, p.role)).collect(),
         ..DraftHints::default()
     })
 }

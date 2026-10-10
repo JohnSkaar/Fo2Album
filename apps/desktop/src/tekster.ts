@@ -337,7 +337,7 @@ export const tekster = {
       case "fornoyd":
         return "På en side du er fornøyd med";
       case "alle_er_med":
-        return "Med så alle du har gitt navn, er med i albumet";
+        return "Med så alle du har gitt navn, får plass i albumet";
       case "valgt_bort_av_deg":
         return "Du tok det bort";
       case "samme_serie":

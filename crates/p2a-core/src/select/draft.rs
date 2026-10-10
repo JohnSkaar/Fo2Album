@@ -30,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 use crate::events::EVENT_GAP_SECONDS;
 use crate::layout::{self, Page, PageKind, Single};
 use crate::learn::Preferences;
-use crate::{BasicQuality, ContentHash, FaceInfo, PhotoMeta, TakenAt};
+use crate::{BasicQuality, ContentHash, FaceInfo, PhotoMeta, Role, TakenAt};
 
 /// Parametre (SCORING.md §11). Startverdier, kalibreres mot evalueringssettet.
 #[derive(Debug, Clone, PartialEq)]
@@ -79,8 +79,14 @@ pub struct DraftConfig {
     pub child_balance: f32,
     /// Så mange bilder med ansikter må en tur ha før appen selv sier «uten barn».
     pub adult_trip_min_faces: usize,
-    /// Alle personene brukeren har gitt navn, får minst ett bilde i albumet.
+    /// Alle personene brukeren har gitt navn, får minst så mange bilder i albumet som rollen
+    /// tilsier (`min_photos`), hvis det finnes brukbare bilder.
     pub cover_named_persons: bool,
+    /// Minst så mange bilder av barna og kjernefamilien, av besteforeldrene, og av alle andre
+    /// med navn (SCORING.md §5, «Dekning»).
+    pub min_photos_family: usize,
+    pub min_photos_grandparents: usize,
+    pub min_photos_other: usize,
 }
 
 impl Default for DraftConfig {
@@ -112,6 +118,9 @@ impl Default for DraftConfig {
             child_balance: 0.3,
             adult_trip_min_faces: 5,
             cover_named_persons: true,
+            min_photos_family: 6,
+            min_photos_grandparents: 2,
+            min_photos_other: 1,
         }
     }
 }
@@ -251,6 +260,8 @@ pub struct DraftHints {
     pub faces: HashMap<ContentHash, Vec<FaceInfo>>,
     /// Personene (`FaceInfo::person`) som er barna i familien.
     pub children: HashSet<i64>,
+    /// Rollen til personene brukeren har gitt navn (til hvor mange bilder hver bør ha).
+    pub roles: HashMap<i64, Role>,
     /// Brukerens størrelse per bilde: -1 mindre enn de andre på siden, 0 like stort (aldri
     /// alene), 1–2 større på siden, 3 egen side med luft, 4 hele siden. Mangler = appen velger.
     pub sizes: HashMap<ContentHash, i8>,
@@ -537,14 +548,21 @@ pub fn make_draft(
         first_pick[g] = first;
     }
 
-    // Alle personene brukeren har gitt navn, er med minst én gang: mangler noen, tas det
-    // beste bildet av dem med (best ansikt, så best bilde) i historien det hører til.
+    // Alle personene brukeren har gitt navn, er med: minst ett bilde, og flere for barna,
+    // kjernefamilien og besteforeldrene (`min_photos_*`). Mangler noen, tas de beste bildene
+    // av dem med (helst fra historier der de ikke er med ennå, så best ansikt og best bilde) i
+    // historien bildet hører til.
     let mut for_coverage = vec![false; items.len()];
     if cfg.cover_named_persons {
-        let mut covered: HashSet<i64> = (0..items.len())
-            .filter(|&i| included[i])
-            .flat_map(|i| items[i].named.iter().map(|(p, _)| *p))
-            .collect();
+        let group_of: Vec<usize> = {
+            let mut v = vec![0; items.len()];
+            for (g, group) in groups.iter().enumerate() {
+                for &i in &group.members {
+                    v[i] = g;
+                }
+            }
+            v
+        };
         let mut everyone: Vec<i64> = items
             .iter()
             .flat_map(|it| it.named.iter().map(|(p, _)| *p))
@@ -552,27 +570,36 @@ pub fn make_draft(
         everyone.sort_unstable();
         everyone.dedup();
         for p in everyone {
-            if covered.contains(&p) {
-                continue;
-            }
-            let best = (0..items.len())
-                .filter(|&i| !included[i] && usable(&items[i]))
-                .filter_map(|i| {
-                    let (_, face) = items[i].named.iter().find(|(q, _)| *q == p)?;
-                    Some((i, *face))
-                })
-                .max_by(|a, b| {
-                    a.1.total_cmp(&b.1)
-                        .then(items[a.0].q.total_cmp(&items[b.0].q))
-                        .then(b.0.cmp(&a.0))
-                });
-            let Some((i, _)) = best else { continue };
-            included[i] = true;
-            for_coverage[i] = true;
-            covered.extend(items[i].named.iter().map(|(q, _)| *q));
-            // En historie der alle sidene var låst, får en side til for bildet.
-            if let Some(g) = groups.iter().position(|g| g.members.contains(&i)) {
-                left_pages[g] = left_pages[g].max(1);
+            let want = match hints.roles.get(&p) {
+                Some(Role::Barn | Role::Kjernefamilie) => cfg.min_photos_family,
+                Some(Role::Besteforeldre) => cfg.min_photos_grandparents,
+                _ => cfg.min_photos_other,
+            };
+            let has = |i: usize| items[i].named.iter().any(|(q, _)| *q == p);
+            let mut count = (0..items.len()).filter(|&i| included[i] && has(i)).count();
+            while count < want {
+                let shown: HashSet<usize> = (0..items.len())
+                    .filter(|&i| included[i] && has(i))
+                    .map(|i| group_of[i])
+                    .collect();
+                let best = (0..items.len())
+                    .filter(|&i| !included[i] && usable(&items[i]))
+                    .filter_map(|i| {
+                        let (_, face) = items[i].named.iter().find(|(q, _)| *q == p)?;
+                        Some((i, !shown.contains(&group_of[i]), *face))
+                    })
+                    .max_by(|a, b| {
+                        a.1.cmp(&b.1)
+                            .then(a.2.total_cmp(&b.2))
+                            .then(items[a.0].q.total_cmp(&items[b.0].q))
+                            .then(b.0.cmp(&a.0))
+                    });
+                let Some((i, _, _)) = best else { break };
+                included[i] = true;
+                for_coverage[i] = true;
+                count += 1;
+                // En historie der alle sidene var låst, får en side til for bildet.
+                left_pages[group_of[i]] = left_pages[group_of[i]].max(1);
             }
         }
     }
@@ -2309,5 +2336,46 @@ mod tests {
         let got = |h: ContentHash| d.photos.iter().find(|p| p.hash == h).unwrap();
         assert!(!got(out[1]).included);
         assert_eq!(got(out[0]).reason, Reason::AlleErMed);
+    }
+
+    #[test]
+    fn grandparents_get_two_photos_from_different_stories() {
+        let mut photos = day(0, 6, 1, 40);
+        photos.extend(day(100, 6, 20, 40));
+        let auto = draft(&photos, &HashMap::new());
+        // Bestefar (person 50) er på tre bilder appen ikke valgte, to fra første dag.
+        let first: Vec<ContentHash> = auto
+            .photos
+            .iter()
+            .filter(|p| !p.included && p.event == 0)
+            .take(2)
+            .map(|p| p.hash)
+            .collect();
+        let second = auto
+            .photos
+            .iter()
+            .find(|p| !p.included && p.event == 1)
+            .unwrap()
+            .hash;
+        let mut faces: HashMap<ContentHash, Vec<FaceInfo>> =
+            photos.iter().map(|p| (p.hash, vec![face(1)])).collect();
+        for h in first.iter().chain([&second]) {
+            faces.insert(*h, vec![face(50)]);
+        }
+        let hints = DraftHints {
+            faces,
+            roles: HashMap::from([(50, Role::Besteforeldre), (1, Role::Barn)]),
+            ..DraftHints::default()
+        };
+        let d = with(&photos, &hints);
+        let with_him: Vec<&DraftPhoto> = d
+            .photos
+            .iter()
+            .filter(|p| p.included && (first.contains(&p.hash) || p.hash == second))
+            .collect();
+        assert_eq!(with_him.len(), 2, "to bilder av besteforeldre");
+        let events: HashSet<usize> = with_him.iter().map(|p| p.event).collect();
+        assert_eq!(events.len(), 2, "fra hver sin historie");
+        assert!(with_him.iter().all(|p| p.reason == Reason::AlleErMed));
     }
 }
