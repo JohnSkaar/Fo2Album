@@ -428,6 +428,15 @@ export function App() {
     }
   };
 
+  const skillUt = async (group: number, faceIds: number[]) => {
+    try {
+      setPersoner(await api.skillUt(group, faceIds));
+      visMelding(tekster.personer.skiltUt(faceIds.length));
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
   // ---------- Visning ----------
   let innhold: React.ReactNode = null;
   switch (fase.type) {
@@ -471,6 +480,8 @@ export function App() {
             onName={(g, n, r, p) => void navngi(g, n, r, p)}
             onIgnore={(g) => void ignorer(g)}
             onMove={(f) => void flytt(f)}
+            onLoadAll={api.alleAnsikter}
+            onSplit={(g, ids) => void skillUt(g, ids)}
           />
         ) : visning === "utkast" ? (
           <DraftScreen

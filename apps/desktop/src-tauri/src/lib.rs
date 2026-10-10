@@ -88,6 +88,8 @@ pub fn run() {
             people::name_face_group,
             people::ignore_face_group,
             people::move_face,
+            people::group_faces_all,
+            people::split_face_group,
             print::album_text,
             print::export_album,
         ])

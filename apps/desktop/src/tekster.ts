@@ -484,6 +484,16 @@ export const tekster = {
     lagret: (navn: string) => `Lagret. Appen kjenner nå igjen ${navn}.`,
     ignorert: "Gruppen telles ikke lenger i albumet.",
     flyttet: "Ansiktet er tatt ut av gruppen.",
+    seAlle: "Se alle og skill ut",
+    seAlleInfo: "Er noen av ansiktene en annen person, for eksempel et søsken?",
+    skillUtHjelp: (navn: string | null) =>
+      `Marker ansiktene som ikke er ${navn ?? "samme person"}. De blir en egen person du kan gi navn, og appen holder dem fra hverandre etterpå.`,
+    skillUt: (n: number) => `Skill ut som egen person (${fmt(n)})`,
+    skiltUt: (n: number) =>
+      `${antall(n, "ansikt er", "ansikter er")} skilt ut som en egen person. Gi den navn under «Hvem er dette?».`,
+    lukkAlle: "Ferdig",
+    henter: "Henter ansiktene …",
+    marker: (n: number) => `Ansikt ${fmt(n)}`,
     mangler: "Skriv et navn først.",
     roller: {
       barn: "Barn i familien",

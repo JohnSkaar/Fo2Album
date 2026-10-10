@@ -15,6 +15,8 @@ use crate::commands::{AppState, CmdResult, CommandError};
 const MIN_FACES: usize = 2;
 /// Antall ansikter som vises per gruppe.
 const SAMPLES: usize = 6;
+/// Høyst så mange ansikter når brukeren ser alle i en gruppe.
+const ALL_FACES: usize = 400;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,6 +142,43 @@ pub fn name_face_group(
     };
     store.name_face_group(group, id)?;
     group_faces(store)?;
+    people(store)
+}
+
+/// Alle ansiktene i en gruppe, så brukeren kan markere dem som ikke er samme person.
+#[tauri::command]
+pub fn group_faces_all(state: State<'_, AppState>, group: i64) -> CmdResult<Vec<FaceDto>> {
+    let guard = state.store()?;
+    let store = guard.as_ref().expect("sjekket");
+    Ok(store
+        .face_group_faces(group, ALL_FACES)?
+        .into_iter()
+        .map(|s| FaceDto {
+            face_id: s.face_id,
+            id: s.hash.to_hex(),
+            x: s.x,
+            y: s.y,
+            w: s.w,
+            h: s.h,
+        })
+        .collect())
+}
+
+/// «Ikke samme person»: de markerte ansiktene blir en egen person (uten navn ennå), resten
+/// blir der de er. Typisk søsken som er slått sammen. Etterpå grupperes ansiktene på nytt, så
+/// lignende ansikter uten navn finner riktig person.
+#[tauri::command]
+pub fn split_face_group(
+    state: State<'_, AppState>,
+    group: i64,
+    face_ids: Vec<i64>,
+) -> CmdResult<PeopleDto> {
+    let mut guard = state.store()?;
+    let store = guard.as_mut().expect("sjekket");
+    if !face_ids.is_empty() {
+        store.split_face_group(group, &face_ids)?;
+        group_faces(store)?;
+    }
     people(store)
 }
 

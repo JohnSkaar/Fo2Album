@@ -81,3 +81,31 @@ describe("hvem er med?", () => {
     expect(onMove).toHaveBeenCalledWith(3);
   });
 });
+
+describe("skille ut søsken", () => {
+  it("markerer ansikter som ikke er samme person og skiller dem ut", async () => {
+    const onLoadAll = vi.fn(() => Promise.resolve([ansikt(3), ansikt(4), ansikt(5)]));
+    const onSplit = vi.fn();
+    render(
+      <PeopleScreen
+        people={personer}
+        thumbUrl={(id) => id}
+        onName={() => {}}
+        onIgnore={() => {}}
+        onMove={() => {}}
+        onLoadAll={onLoadAll}
+        onSplit={onSplit}
+      />,
+    );
+    const ella = screen.getByRole("heading", { name: /Ella/ }).closest("li.pgroup")!;
+    await userEvent.click(within(ella as HTMLElement).getByRole("button", { name: t.seAlle }));
+    expect(onLoadAll).toHaveBeenCalledWith(7);
+    const skill = await screen.findByRole("button", { name: t.skillUt(0) });
+    expect(skill).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: t.marker(3) }));
+    await userEvent.click(screen.getByRole("button", { name: t.skillUt(1) }));
+    expect(onSplit).toHaveBeenCalledWith(7, [5]);
+    // Panelet lukkes; gruppen står igjen.
+    expect(screen.queryByRole("button", { name: t.skillUt(1) })).toBeNull();
+  });
+});

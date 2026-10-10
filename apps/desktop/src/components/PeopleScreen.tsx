@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Ansikt, Ansiktsgruppe, Person, Personer, Rolle } from "../api";
 import { tekster } from "../tekster";
 
@@ -44,6 +44,82 @@ export function Ansiktsutsnitt({
   );
 }
 
+/** Alle ansiktene i gruppen, der brukeren markerer dem som ikke er samme person. */
+function SkillUt({
+  g,
+  thumbUrl,
+  onLoadAll,
+  onSplit,
+  onClose,
+}: {
+  g: Ansiktsgruppe;
+  thumbUrl: (id: string) => string;
+  onLoadAll: (group: number) => Promise<Ansikt[]>;
+  onSplit: (group: number, faceIds: number[]) => void;
+  onClose: () => void;
+}) {
+  const [alle, setAlle] = useState<Ansikt[] | null>(null);
+  const [valgt, setValgt] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    let aktiv = true;
+    onLoadAll(g.group).then(
+      (a) => aktiv && setAlle(a),
+      () => aktiv && setAlle([]),
+    );
+    return () => {
+      aktiv = false;
+    };
+  }, [g.group, onLoadAll]);
+  const bytt = (id: number) => {
+    const v = new Set(valgt);
+    if (v.has(id)) v.delete(id);
+    else v.add(id);
+    setValgt(v);
+  };
+  return (
+    <div className="split">
+      <p className="people__hint">{t.skillUtHjelp(g.name)}</p>
+      {alle === null ? (
+        <p className="people__hint" role="status">
+          {t.henter}
+        </p>
+      ) : (
+        <ul className="split__faces">
+          {alle.map((a, i) => (
+            <li key={a.faceId}>
+              <button
+                type="button"
+                className="split__face"
+                aria-pressed={valgt.has(a.faceId)}
+                aria-label={t.marker(i + 1)}
+                onClick={() => bytt(a.faceId)}
+              >
+                <Ansiktsutsnitt a={a} thumbUrl={thumbUrl} />
+                <span className="split__mark" aria-hidden="true">
+                  ✓
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="pgroup__actions">
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          disabled={valgt.size === 0 || valgt.size === alle?.length}
+          onClick={() => onSplit(g.group, [...valgt])}
+        >
+          {t.skillUt(valgt.size)}
+        </button>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
+          {t.lukkAlle}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Gruppe({
   g,
   persons,
@@ -51,6 +127,8 @@ function Gruppe({
   onName,
   onIgnore,
   onMove,
+  onLoadAll,
+  onSplit,
 }: {
   g: Ansiktsgruppe;
   persons: Person[];
@@ -58,8 +136,11 @@ function Gruppe({
   onName: (g: Ansiktsgruppe, name: string, role: Rolle, personId: number | null) => void;
   onIgnore: (g: Ansiktsgruppe) => void;
   onMove: (faceId: number) => void;
+  onLoadAll?: (group: number) => Promise<Ansikt[]>;
+  onSplit?: (group: number, faceIds: number[]) => void;
 }) {
   const [endrer, setEndrer] = useState(g.personId === null);
+  const [skiller, setSkiller] = useState(false);
   const [navn, setNavn] = useState(g.name ?? "");
   const [rolle, setRolle] = useState<Rolle>(g.role ?? "kjernefamilie");
   const [finnes, setFinnes] = useState<string>("");
@@ -91,6 +172,16 @@ function Gruppe({
           {g.role && <span className="pgroup__role">{t.roller[g.role]}</span>}
         </h3>
         <span className="count">{t.antall(g.faces, g.photos)}</span>
+        {!skiller && onLoadAll && onSplit && g.faces > 1 && (
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm pgroup__split"
+            title={t.seAlleInfo}
+            onClick={() => setSkiller(true)}
+          >
+            {t.seAlle}
+          </button>
+        )}
         {endrer ? (
           <form
             className="pgroup__form"
@@ -171,6 +262,18 @@ function Gruppe({
             </button>
           </div>
         )}
+        {skiller && onLoadAll && onSplit && (
+          <SkillUt
+            g={g}
+            thumbUrl={thumbUrl}
+            onLoadAll={onLoadAll}
+            onSplit={(grp, ids) => {
+              onSplit(grp, ids);
+              setSkiller(false);
+            }}
+            onClose={() => setSkiller(false)}
+          />
+        )}
       </div>
     </li>
   );
@@ -190,16 +293,30 @@ export function PeopleScreen({
   onName,
   onIgnore,
   onMove,
+  onLoadAll,
+  onSplit,
 }: {
   people: Personer | null;
   thumbUrl: (id: string) => string;
   onName: (g: Ansiktsgruppe, name: string, role: Rolle, personId: number | null) => void;
   onIgnore: (g: Ansiktsgruppe) => void;
   onMove: (faceId: number) => void;
+  /** Alle ansiktene i en gruppe (til «Se alle og skill ut»). */
+  onLoadAll?: (group: number) => Promise<Ansikt[]>;
+  /** De markerte ansiktene blir en egen person. */
+  onSplit?: (group: number, faceIds: number[]) => void;
 }) {
   const named = people?.groups.filter((g) => g.personId !== null) ?? [];
   const unknown = people?.groups.filter((g) => g.personId === null) ?? [];
-  const props = { persons: people?.persons ?? [], thumbUrl, onName, onIgnore, onMove };
+  const props = {
+    persons: people?.persons ?? [],
+    thumbUrl,
+    onName,
+    onIgnore,
+    onMove,
+    onLoadAll,
+    onSplit,
+  };
   return (
     <section className="people" aria-labelledby="personer-tittel">
       <header className="people__head">

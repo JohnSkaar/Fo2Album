@@ -193,3 +193,45 @@ fn navnene_beholdes_naar_ansiktsmodellen_byttes() {
         1
     );
 }
+
+#[test]
+fn soesken_skilles_ut_og_blir_staaende_som_egen_person() {
+    let (_dir, mut store, hashes) = store_with_photos();
+    store
+        .put_faces(
+            &[
+                (hashes[0], vec![face(0.1, 0.3, 1)]),
+                (hashes[1], vec![face(0.1, 0.3, 2)]),
+                (hashes[2], vec![face(0.1, 0.3, 3)]),
+            ],
+            M,
+        )
+        .unwrap();
+    let faces = store.stored_faces(M).unwrap();
+    let g = GROUP_UNNAMED;
+    let all: Vec<(i64, i64)> = faces.iter().map(|f| (f.id, g)).collect();
+    store.set_face_groups(&all).unwrap();
+    let ella = store.add_person("Ella", Role::Barn, false, None).unwrap();
+    store.name_face_group(g, ella).unwrap();
+
+    // Det ene ansiktet er lillebroren, ikke Ella.
+    let alle = store.face_group_faces(ella, 50).unwrap();
+    assert_eq!(alle.len(), 3);
+    let bror = store.split_face_group(ella, &[faces[2].id]).unwrap();
+    assert!(bror >= GROUP_UNNAMED);
+
+    let faces = store.stored_faces(M).unwrap();
+    assert_eq!(faces[0].fixed, Some(ella));
+    assert_eq!(faces[1].fixed, Some(ella));
+    assert_eq!(faces[2].fixed, Some(bror), "låst i sin egen gruppe");
+
+    // Den utskilte gruppen vises, selv med ett ansikt, og uten navn.
+    let groups = store.face_groups(2, 3).unwrap();
+    let skilt = groups.iter().find(|x| x.group == bror).expect("vises");
+    assert_eq!((skilt.person_id, skilt.faces), (None, 1));
+
+    // Og kan få navn som en vanlig gruppe.
+    let jonas = store.add_person("Jonas", Role::Barn, false, None).unwrap();
+    store.name_face_group(bror, jonas).unwrap();
+    assert_eq!(store.stored_faces(M).unwrap()[2].fixed, Some(jonas));
+}

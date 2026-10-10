@@ -211,7 +211,7 @@ impl Store {
     pub fn stored_faces(&self, model: &str) -> Result<Vec<StoredFace>, StoreError> {
         let mut stmt = self.conn.prepare(
             "SELECT f.id, f.embedding, f.h * f.sharpness, f.confirmed, f.ignored, f.person_id,
-                    p.rowid, f.h * COALESCE(p.height, 0)
+                    p.rowid, f.h * COALESCE(p.height, 0), f.grp
              FROM faces f JOIN photos p ON p.content_hash = f.content_hash
              WHERE p.faces_model = ?1 ORDER BY f.id",
         )?;
@@ -219,6 +219,7 @@ impl Store {
             let confirmed: bool = r.get(3)?;
             let ignored: bool = r.get(4)?;
             let person: Option<i64> = r.get(5)?;
+            let grp: Option<i64> = r.get(8)?;
             Ok(StoredFace {
                 id: r.get(0)?,
                 embedding: r.get(1)?,
@@ -226,7 +227,8 @@ impl Store {
                 fixed: if ignored {
                     Some(GROUP_IGNORED)
                 } else if confirmed {
-                    person
+                    // Navngitt person, ellers gruppen brukeren har skilt ut (uten navn ennå).
+                    person.or(grp)
                 } else {
                     None
                 },
@@ -264,7 +266,7 @@ impl Store {
         let mut stmt = self.conn.prepare(
             "SELECT grp, MIN(CASE WHEN grp < ?1 THEN grp END), COUNT(*), COUNT(DISTINCT content_hash)
              FROM faces WHERE grp IS NOT NULL AND grp <> ?2 AND ignored = 0
-             GROUP BY grp HAVING COUNT(*) >= ?3
+             GROUP BY grp HAVING COUNT(*) >= ?3 OR MAX(confirmed) = 1
              ORDER BY COUNT(*) DESC, grp",
         )?;
         let mut groups: Vec<FaceGroup> = stmt
@@ -321,6 +323,55 @@ impl Store {
     }
 
     /// Brukeren flytter ett ansikt til en person (eller ut av alle med `None`).
+    /// Alle ansiktene i en gruppe (høyst `limit`), de beste først, så brukeren kan skille ut
+    /// dem som ikke er samme person.
+    pub fn face_group_faces(
+        &self,
+        group: i64,
+        limit: usize,
+    ) -> Result<Vec<FaceSample>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, content_hash, x, y, w, h FROM faces WHERE grp = ?1 AND ignored = 0
+             ORDER BY h * sharpness * score DESC, id LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(params![group, limit as i64], |r| {
+            Ok(FaceSample {
+                face_id: r.get(0)?,
+                hash: hash_from(r.get(1)?)?,
+                x: r.get(2)?,
+                y: r.get(3)?,
+                w: r.get(4)?,
+                h: r.get(5)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    /// «Ikke samme person»: ansiktene brukeren markerte i gruppen, blir en egen person (uten
+    /// navn ennå), og resten av gruppen låses til den den er. Slik slår ikke grupperingen dem
+    /// sammen igjen (typisk søsken). Returnerer gruppen de markerte ansiktene fikk.
+    pub fn split_face_group(&mut self, group: i64, face_ids: &[i64]) -> Result<i64, StoreError> {
+        let tx = self.conn.transaction()?;
+        let next: i64 = tx.query_row(
+            "SELECT MAX(COALESCE(MAX(grp) + 1, 0), ?1) FROM faces WHERE grp <> ?2",
+            params![GROUP_UNNAMED, GROUP_IGNORED],
+            |r| r.get(0),
+        )?;
+        tx.execute(
+            "UPDATE faces SET confirmed = 1 WHERE grp = ?1 AND ignored = 0",
+            params![group],
+        )?;
+        for id in face_ids {
+            tx.execute(
+                "UPDATE faces SET grp = ?2, person_id = NULL, confirmed = 1, ignored = 0
+                 WHERE id = ?1 AND grp = ?3",
+                params![id, next, group],
+            )?;
+        }
+        tx.commit()?;
+        Ok(next)
+    }
+
     pub fn move_face(&mut self, face_id: i64, person_id: Option<i64>) -> Result<(), StoreError> {
         match person_id {
             Some(p) => self.conn.execute(

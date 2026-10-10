@@ -428,4 +428,9 @@ export const api = {
   /** Tar ett ansikt ut av gruppen (`personId` null) eller flytter det til en person. */
   flyttAnsikt: (faceId: number, personId: number | null) =>
     invoke<Personer>("move_face", { faceId, personId }),
+  /** Alle ansiktene i en gruppe. */
+  alleAnsikter: (group: number) => invoke<Ansikt[]>("group_faces_all", { group }),
+  /** De markerte ansiktene blir en egen person; resten blir der de er. */
+  skillUt: (group: number, faceIds: number[]) =>
+    invoke<Personer>("split_face_group", { group, faceIds }),
 };
