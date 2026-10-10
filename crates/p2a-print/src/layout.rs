@@ -171,8 +171,17 @@ pub const TEMPLATES: &[(&str, usize)] = &[
     ("3-rader", 3),
     ("4-kvadrat", 4),
     ("4-landskap", 4),
+    ("4-topp", 4),
+    ("5-topp", 5),
+    ("5-midt", 5),
     ("6", 6),
+    ("6-topp", 6),
+    ("7-topp", 7),
+    ("8", 8),
+    ("8-topp", 8),
     ("9", 9),
+    ("10-topp", 10),
+    ("11-topp", 11),
     ("12", 12),
 ];
 
@@ -208,6 +217,27 @@ fn grid(cols: usize, rows: usize, ca: Option<f32>) -> Vec<Box_> {
             h: ch,
         })
         .collect()
+}
+
+/// Rader over hele bredden innenfor margen: hver rad har `n` like felt og en vekt for høyden.
+fn rows(spec: &[(usize, f32)]) -> Vec<Box_> {
+    let b = inner();
+    let sum: f32 = spec.iter().map(|(_, w)| w).sum();
+    let free = b.h - GAP * (spec.len() - 1) as f32;
+    let mut y = b.y;
+    let mut out = Vec::new();
+    for &(n, weight) in spec {
+        let h = free * weight / sum;
+        let w = (b.w - GAP * (n - 1) as f32) / n as f32;
+        out.extend((0..n).map(|i| Box_ {
+            x: b.x + i as f32 * (w + GAP),
+            y,
+            w,
+            h,
+        }));
+        y += h + GAP;
+    }
+    out
 }
 
 /// Feltene i en fast ramme.
@@ -268,8 +298,17 @@ fn template(id: &str) -> Option<Vec<Box_>> {
         "3-rader" => grid(1, 3, Some(4.0 / 3.0)),
         "4-kvadrat" => grid(2, 2, Some(1.0)),
         "4-landskap" => grid(2, 2, Some(4.0 / 3.0)),
+        "4-topp" => rows(&[(1, 1.3), (3, 0.7)]),
+        "5-topp" => rows(&[(1, 1.2), (2, 0.6), (2, 0.6)]),
+        "5-midt" => rows(&[(2, 1.0), (1, 1.2), (2, 1.0)]),
         "6" => grid(2, 3, Some(1.0)),
+        "6-topp" => rows(&[(1, 1.2), (2, 0.8), (3, 0.7)]),
+        "7-topp" => rows(&[(1, 1.2), (3, 0.7), (3, 0.7)]),
+        "8" => grid(2, 4, Some(4.0 / 3.0)),
+        "8-topp" => rows(&[(1, 1.2), (3, 0.7), (4, 0.6)]),
         "9" => grid(3, 3, Some(1.0)),
+        "10-topp" => rows(&[(1, 1.2), (3, 0.6), (3, 0.6), (3, 0.6)]),
+        "11-topp" => rows(&[(2, 1.0), (3, 0.7), (3, 0.7), (3, 0.7)]),
         "12" => grid(3, 4, Some(1.0)),
         _ => return None,
     })
@@ -519,6 +558,27 @@ mod tests {
         assert!(area(&small[0]) < area(&small[1]) * 0.6);
         for f in big.iter().chain(&bigger).chain(&small) {
             assert!(inside(f), "{f:?}");
+        }
+    }
+
+    #[test]
+    fn rammer_for_alt_fra_ett_til_tolv_bilder_uten_overlapp() {
+        for n in 1..=12 {
+            assert!(
+                TEMPLATES.iter().any(|(_, k)| *k == n),
+                "ingen ramme for {n}"
+            );
+        }
+        for (id, _) in TEMPLATES.iter().filter(|(id, _)| *id != "1-full") {
+            let fs = template_frames(id).unwrap();
+            for (i, a) in fs.iter().enumerate() {
+                assert!(inside(a) && a.w > 30.0 && a.h > 30.0, "{id}: {a:?}");
+                for b in &fs[i + 1..] {
+                    let x = a.x + a.w <= b.x + 0.01 || b.x + b.w <= a.x + 0.01;
+                    let y = a.y + a.h <= b.y + 0.01 || b.y + b.h <= a.y + 0.01;
+                    assert!(x || y, "{id}: {a:?} {b:?}");
+                }
+            }
         }
     }
 

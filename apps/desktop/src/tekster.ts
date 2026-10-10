@@ -246,13 +246,55 @@ export const tekster = {
       "3-rader": "Tre liggende",
       "4-kvadrat": "Fire kvadratiske",
       "4-landskap": "Fire liggende",
+      "4-topp": "Ett stort og tre små",
+      "5-topp": "Ett stort og fire små",
+      "5-midt": "Ett stort i midten og fire rundt",
       "6": "Seks kvadratiske",
+      "6-topp": "Ett stort og fem små",
+      "7-topp": "Ett stort og seks små",
+      "8": "Åtte liggende",
+      "8-topp": "Ett stort og sju små",
       "9": "Ni kvadratiske",
+      "10-topp": "Ett stort og ni små",
+      "11-topp": "To store og ni små",
       "12": "Tolv kvadratiske",
     } as Record<string, string>,
+    antallFelt: "Antall bilder på siden",
+    antallValg: (n: number) => antall(n, "bilde", "bilder"),
     ingenMaler: "Det finnes ingen faste rammer for så mange bilder. Siden er automatisk.",
+    flereEllerFaerre: (n: number, har: number) =>
+      n > har
+        ? `Rammen har plass til ${antall(n - har, "bilde", "bilder")} til. Du velger hvilke.`
+        : n < har
+          ? `Rammen har plass til ${antall(n, "bilde", "bilder")}. Du velger hvilke som skal stå der.`
+          : "",
+    plasser: "Plasser bildene",
+    denneSiden: "Denne siden",
+    plasserHjelp: "Velg hvilke bilder som står i hvert felt",
+    rammeFylt: "Rammen er fylt, og siden er merket «Fornøyd»",
     malValgt: "Rammene er valgt, og siden er merket «Fornøyd»",
     bildePaaSiden: (dato: string) => `Bilde fra ${dato} på siden`,
+  },
+  fyll: {
+    tittel: (n: number) => `Fyll rammen med ${antall(n, "bilde", "bilder")}`,
+    hjelp:
+      "Trykk på et bilde til høyre for å sette det i neste ledige felt, eller dra det dit du vil ha det. Trykk på et felt og så et annet for å bytte plass.",
+    feltValgt: (n: number) =>
+      `Felt ${fmt(n)} er valgt. Trykk på et bilde for å sette det der, eller på et annet felt for å bytte plass.`,
+    fullt: "Alle feltene er fylt. Trykk på et felt først, så byttes bildet ut.",
+    felt: (i: number, n: number, dato: string | null) =>
+      `Felt ${fmt(i)} av ${fmt(n)}: ${dato ? `bilde fra ${dato}` : "tomt"}`,
+    fylt: (k: number, n: number) => `${fmt(k)} av ${fmt(n)} felt er fylt`,
+    bildene: "Bilder fra denne historien",
+    iFelt: (n: number) => `i felt ${fmt(n)}`,
+    taUt: "Ta bildet ut av feltet",
+    restTittel: (n: number) =>
+      n === 1 ? "Ett bilde fra siden får ikke plass" : `${fmt(n)} bilder fra siden får ikke plass`,
+    restMed: "Behold dem i albumet, på en annen side i historien",
+    restBort: "Ta dem ut av albumet",
+    bruk: "Bruk rammen",
+    mangler: (n: number) => `Velg ${antall(n, "bilde", "bilder")} til.`,
+    ikkeMed: "Ikke med",
   },
   redigering: {
     storre: "Større",

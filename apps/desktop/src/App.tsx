@@ -235,6 +235,21 @@ export function App() {
     }
   };
 
+  /**
+   * Fyller en ramme: bildene som ikke fikk plass, beholdes i albumet eller tas ut først, så
+   * lagres sidene og utkastet lages på nytt.
+   */
+  const fyllRamme = async (c: Albumvalg[], ute: string[], rest: "ta_med" | "ta_bort") => {
+    if (!utkast) return;
+    try {
+      if (ute.length > 0) await api.velgFlere(utkast.year, rest, ute);
+    } catch (e) {
+      visMelding(feiltekst(e));
+      return;
+    }
+    await endreAlbum(c, tekster.sider.rammeFylt);
+  };
+
   /** Tar med eller tar bort mange markerte bilder på en gang. */
   const velgFlere = async (action: "ta_med" | "ta_bort", ids: string[]) => {
     if (!utkast || ids.length === 0) return;
@@ -499,6 +514,7 @@ export function App() {
             canUndo={kanAngre > 0}
             onUndo={() => void angre()}
             onSaveText={(x) => void lagreTekst(x)}
+            onFillFrame={(c, ute, rest) => void fyllRamme(c, ute, rest)}
             onAnswer={(id, r) => void svarHvorfor(id, r)}
             thumbUrl={api.miniatyrUrl}
             stortUrl={api.stortUrl}

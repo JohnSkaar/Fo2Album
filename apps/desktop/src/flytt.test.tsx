@@ -104,11 +104,19 @@ describe("flytte bilder mellom sider", () => {
     ]);
   });
 
-  it("bytter rekkefølge på samme side og beholder rammene", () => {
-    const [c] = flytt(s1, s1, h("b"), h("a"));
-    expect(c).toMatchObject({ page: { photos: [h("b"), h("a")] } });
+  it("bytter plass på samme side og beholder rammene", () => {
+    const tre: Side = { ...s1, photos: [h("a"), h("b"), h("c")], frames: felt(3), mal: "3-topp" };
+    expect(flytt(tre, tre, h("c"), h("a"))).toEqual([
+      {
+        type: "fornoyd",
+        page: { kind: "rutenett", kolonner: 2, photos: [h("c"), h("b"), h("a")], mal: "3-topp" },
+        on: true,
+      },
+    ]);
     expect(flytt(s1, s1, h("a"), h("a"))).toEqual([]);
-    expect(flytt(s1, s1, h("a"), h("b"))).toEqual([]);
+    expect(flytt(tre, tre, h("a"), null)).toMatchObject([
+      { page: { photos: [h("b"), h("c"), h("a")] } },
+    ]);
   });
 
   it("et bilde som ikke er med, kan dras inn på en side", () => {

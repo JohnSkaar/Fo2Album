@@ -20,6 +20,7 @@ import { datoTekst, fmt, tekster } from "../tekster";
 import { datoSpenn, HVORFOR_VALG, oppdaterSider, spoerOmHvorfor } from "../utkast";
 import { Bla } from "./Bla";
 import { type Dra, RammeIkon, Sidebilde } from "./Side";
+import { FyllRamme, type Kandidat, type Rest } from "./FyllRamme";
 import { StorVisning } from "./StorVisning";
 
 const t = tekster.utkast;
@@ -48,8 +49,8 @@ function somValgt(s: Side, photos: string[]): Albumvalg {
 }
 
 /**
- * Flytter et bilde til en side, foran bildet `foran` (ellers sist), eller til et annet sted
- * på samme side. Sidene brukeren har ordnet, merkes «Fornøyd» så de beholdes. `fra` er siden
+ * Flytter et bilde til en side, foran bildet `foran` (ellers sist). På samme side bytter
+ * bildet plass med `foran`. Sidene brukeren har ordnet, merkes «Fornøyd» så de beholdes. `fra` er siden
  * bildet står på nå (mangler for et bilde som ikke er med).
  */
 export function flytt(
@@ -59,6 +60,11 @@ export function flytt(
   foran: string | null,
 ): Albumvalg[] {
   if (foran === id) return [];
+  // På samme side bytter de to bildene plass, så bildet havner i feltet det slippes på.
+  if (fra && fra.photos[0] === til.photos[0] && foran) {
+    const nye = til.photos.map((x) => (x === id ? foran : x === foran ? id : x));
+    return [somValgt(til, nye)];
+  }
   const uten = til.photos.filter((x) => x !== id);
   const k = foran ? uten.indexOf(foran) : -1;
   const nye = k < 0 ? [...uten, id] : [...uten.slice(0, k), id, ...uten.slice(k)];
@@ -240,40 +246,75 @@ function Kort({
 }
 
 /** «Rammer for siden»: automatisk eller faste rammer med like mange felt som bilder. */
-function Rammevalg({ s, rammer, onChange }: { s: Side; rammer: Ramme[]; onChange: Endre }) {
-  const passer = rammer.filter((r) => r.photos === s.photos.length);
-  const velg = (mal: string | null) =>
+/** Rammer for siden: velg antall bilder, så en ramme. Et annet antall åpner «Fyll rammen». */
+function Rammevalg({
+  s,
+  rammer,
+  onChange,
+  onFyll,
+}: {
+  s: Side;
+  rammer: Ramme[];
+  onChange: Endre;
+  onFyll: (r: Ramme) => void;
+}) {
+  const [antall, setAntall] = useState(Math.min(12, Math.max(1, s.photos.length)));
+  const finnes = [...new Set(rammer.map((r) => r.photos))].sort((a, b) => a - b);
+  const passer = rammer.filter((r) => r.photos === antall);
+  const velg = (r: Ramme | null) => {
+    if (r && r.photos !== s.photos.length) {
+      onFyll(r);
+      return;
+    }
     onChange(
       {
         type: "fornoyd",
-        page: { kind: s.kind, kolonner: s.kolonner ?? null, photos: s.photos, mal },
+        page: { kind: s.kind, kolonner: s.kolonner ?? null, photos: s.photos, mal: r?.id ?? null },
         on: true,
       },
-      mal ? tekster.sider.malValgt : t.fornoydMelding,
+      r ? tekster.sider.malValgt : t.fornoydMelding,
     );
+  };
+  const valgtRamme = rammer.find((r) => r.id === s.mal);
   return (
     <div className="tplbar" role="group" aria-label={tekster.sider.rammerTittel}>
       <p className="dock__help">{tekster.sider.rammerIngress}</p>
+      <div className="tplcount" role="group" aria-label={tekster.sider.antallFelt}>
+        {finnes.map((k) => (
+          <button
+            key={k}
+            type="button"
+            className="chip"
+            aria-pressed={k === antall}
+            aria-label={tekster.sider.antallValg(k)}
+            onClick={() => setAntall(k)}
+          >
+            {k}
+          </button>
+        ))}
+      </div>
       <div className="tpls">
-        <button
-          type="button"
-          className="tpl"
-          aria-pressed={!s.mal}
-          title={tekster.sider.autoHjelp}
-          onClick={() => velg(null)}
-        >
-          <span className="tpl__auto" aria-hidden="true">
-            A
-          </span>
-          <span>{tekster.sider.auto}</span>
-        </button>
+        {antall === s.photos.length && (
+          <button
+            type="button"
+            className="tpl"
+            aria-pressed={!s.mal}
+            title={tekster.sider.autoHjelp}
+            onClick={() => velg(null)}
+          >
+            <span className="tpl__auto" aria-hidden="true">
+              A
+            </span>
+            <span>{tekster.sider.auto}</span>
+          </button>
+        )}
         {passer.map((r) => (
           <button
             key={r.id}
             type="button"
             className="tpl"
             aria-pressed={s.mal === r.id}
-            onClick={() => velg(r.id)}
+            onClick={() => velg(r)}
           >
             <RammeIkon felt={r.frames} />
             <span>{tekster.sider.mal[r.id] ?? r.id}</span>
@@ -281,8 +322,47 @@ function Rammevalg({ s, rammer, onChange }: { s: Side; rammer: Ramme[]; onChange
         ))}
       </div>
       {passer.length === 0 && <p className="ev__none">{tekster.sider.ingenMaler}</p>}
+      {antall !== s.photos.length && passer.length > 0 && (
+        <p className="dock__help">{tekster.sider.flereEllerFaerre(antall, s.photos.length)}</p>
+      )}
+      {valgtRamme && (
+        <button
+          type="button"
+          className="btn btn--secondary btn--sm"
+          title={tekster.sider.plasserHjelp}
+          onClick={() => onFyll(valgtRamme)}
+        >
+          {tekster.sider.plasser}
+        </button>
+      )}
     </div>
   );
+}
+
+/**
+ * Valgene når brukeren har fylt en ramme: siden med de nye bildene, og så de andre fornøyde
+ * sidene i historien som mistet bilder til den, med bildene de har igjen. (Å låse en side tar
+ * bort andre fornøyde sider med noen av de samme bildene, så de må låses på nytt etterpå.)
+ */
+export function fyltSide(s: Side, r: Ramme, photos: string[], sider: Side[]): Albumvalg[] {
+  const ut: Albumvalg[] = [
+    {
+      type: "fornoyd",
+      page: {
+        kind: photos.length > 1 ? "rutenett" : s.kind === "rutenett" ? "luft" : s.kind,
+        kolonner: photos.length > 1 ? (s.kolonner ?? (photos.length > 4 ? 3 : 2)) : null,
+        photos,
+        mal: r.id,
+      },
+      on: true,
+    },
+  ];
+  for (const andre of sider) {
+    if (andre.photos[0] === s.photos[0] || !andre.locked) continue;
+    const igjen = andre.photos.filter((x) => !photos.includes(x));
+    if (igjen.length > 0 && igjen.length < andre.photos.length) ut.push(somValgt(andre, igjen));
+  }
+  return ut;
 }
 
 function Sider({
@@ -297,10 +377,16 @@ function Sider({
   dra,
   varsel,
   thumbUrl,
+  historie,
+  onFyll,
 }: {
   sider: Side[];
   /** Bildene som er med nå, i tidsrekkefølge. */
   med: string[];
+  /** Alle bildene i historien (også de som ikke er med), til «Fyll rammen». */
+  historie: UtkastBilde[];
+  /** Brukeren har fylt en ramme: valgene, bildene som ikke fikk plass og hva som skjer med dem. */
+  onFyll: (c: Albumvalg[], ute: string[], rest: Rest) => void;
   bilder: Map<string, UtkastBilde>;
   valgt: string | null;
   markert: Set<string>;
@@ -314,8 +400,40 @@ function Sider({
 }) {
   const { sider: vis, endret } = oppdaterSider(sider, med);
   const [aapen, setAapen] = useState<string | null>(null);
+  const [fyll, setFyll] = useState<{ s: Side; r: Ramme } | null>(null);
+  const kandidater = (s: Side): Kandidat[] => {
+    const hvor = new Map<string, string>();
+    vis.forEach((p, k) =>
+      p.photos.forEach((id) =>
+        hvor.set(id, p === s ? tekster.sider.denneSiden : tekster.sider.side(k + 1)),
+      ),
+    );
+    const forst = s.photos.map((id) => ({ id, hvor: tekster.sider.denneSiden }));
+    const andre = historie
+      .filter((b) => !s.photos.includes(b.id))
+      .map((b) => ({ id: b.id, hvor: hvor.get(b.id) ?? tekster.fyll.ikkeMed }))
+      .sort(
+        (a, b) => Number(a.hvor === tekster.fyll.ikkeMed) - Number(b.hvor === tekster.fyll.ikkeMed),
+      );
+    return [...forst, ...andre];
+  };
   return (
     <div className="pages">
+      {fyll && (
+        <FyllRamme
+          ramme={fyll.r}
+          start={fyll.s.photos}
+          kandidater={kandidater(fyll.s)}
+          bilder={bilder}
+          thumbUrl={thumbUrl}
+          onClose={() => setFyll(null)}
+          onDone={(photos, ute, rest) => {
+            onFyll(fyltSide(fyll.s, fyll.r, photos, vis), ute, rest);
+            setFyll(null);
+            setAapen(null);
+          }}
+        />
+      )}
       <h4 className="ev__colh">{tekster.sider.tittel}</h4>
       <ol className="pages__list">
         {vis.map((s, i) => {
@@ -372,7 +490,14 @@ function Sider({
                   {tekster.sider.rammer}
                 </button>
               </span>
-              {aapen === nokkel && <Rammevalg s={s} rammer={rammer} onChange={onChange} />}
+              {aapen === nokkel && (
+                <Rammevalg
+                  s={s}
+                  rammer={rammer}
+                  onChange={onChange}
+                  onFyll={(r) => setFyll({ s, r })}
+                />
+              )}
             </li>
           );
         })}
@@ -499,6 +624,7 @@ function Hendelse({
   dra,
   varsel,
   thumbUrl,
+  onFyll,
 }: {
   e: UtkastHendelse;
   index: number;
@@ -513,6 +639,7 @@ function Hendelse({
   dra: { side: (s: Side) => Dra; start: (id: string) => void };
   varsel: Set<string>;
   thumbUrl: (id: string) => string;
+  onFyll: (c: Albumvalg[], ute: string[], rest: Rest) => void;
 }) {
   const [visAlle, setVisAlle] = useState(false);
   const med = bilder.filter((b) => b.included);
@@ -557,6 +684,8 @@ function Hendelse({
         dra={dra.side}
         varsel={varsel}
         thumbUrl={thumbUrl}
+        historie={bilder}
+        onFyll={onFyll}
       />
       <div className="ev__cols">
         <div className="ev__col">
@@ -829,6 +958,7 @@ export function DraftScreen({
   canUndo = false,
   onUndo,
   onSaveText,
+  onFillFrame,
   thumbUrl,
   stortUrl = thumbUrl,
   hentTekst,
@@ -861,6 +991,11 @@ export function DraftScreen({
   onUndo?: () => void;
   /** Lagrer tekstene skrevet i «Bla i albumet». */
   onSaveText?: (tekst: Albumtekst) => void;
+  /**
+   * Brukeren har fylt en ramme: valgene for sidene, og bildene fra siden som ikke fikk plass,
+   * som enten beholdes i albumet eller tas ut.
+   */
+  onFillFrame?: (c: Albumvalg[], ute: string[], rest: Rest) => void;
   thumbUrl: (id: string) => string;
   /** Stor visning fra originalfilen (faller tilbake til miniatyren). */
   stortUrl?: (id: string) => string;
@@ -1142,6 +1277,9 @@ export function DraftScreen({
               dra={dra}
               varsel={varsel}
               thumbUrl={thumbUrl}
+              onFyll={(c, ute, rest) =>
+                onFillFrame ? onFillFrame(c, ute, rest) : onChange(c, tekster.sider.rammeFylt)
+              }
             />
           </div>
         );

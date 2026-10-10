@@ -4,6 +4,7 @@ import type { Ramme, Side, Utkast, UtkastBilde, UtkastHendelse } from "./api";
 import { oppslag } from "./components/Bla";
 import { DraftScreen, nyStorrelse } from "./components/DraftScreen";
 import { bildeStil, utsnittFoerRotering } from "./components/Side";
+import { bytt, plasser } from "./components/FyllRamme";
 import { nyttUtsnitt } from "./components/StorVisning";
 import { tekster } from "./tekster";
 
@@ -81,13 +82,20 @@ const utkast: Utkast = {
   checks: [],
 };
 
+const felt3 = [
+  { x: 8, y: 6, w: 84, h: 50, fill: true },
+  { x: 8, y: 60, w: 40, h: 34, fill: true },
+  { x: 52, y: 60, w: 40, h: 34, fill: true },
+];
 const rammer: Ramme[] = [
   { id: "2-over", photos: 2, frames: [] },
-  { id: "1-full", photos: 1, frames: [] },
+  { id: "1-full", photos: 1, frames: [{ x: -1, y: -1, w: 102, h: 102, fill: true }] },
+  { id: "3-topp", photos: 3, frames: felt3 },
 ];
 
 function vis(onChoose = vi.fn(() => Promise.resolve(null))) {
   const onChange = vi.fn();
+  const onFillFrame = vi.fn();
   render(
     <DraftScreen
       year={2011}
@@ -100,10 +108,11 @@ function vis(onChoose = vi.fn(() => Promise.resolve(null))) {
       onSize={() => {}}
       onChoose={onChoose}
       onAnswer={() => {}}
+      onFillFrame={onFillFrame}
       thumbUrl={(id) => `miniatyr://${id}`}
     />,
   );
-  return { onChange, onChoose };
+  return { onChange, onChoose, onFillFrame };
 }
 
 describe("størrelse", () => {
@@ -153,6 +162,88 @@ describe("rammer for siden", () => {
         on: true,
       },
       tekster.sider.malValgt,
+    );
+  });
+});
+
+describe("fyll en ramme med et annet antall bilder", () => {
+  it("plasser og bytt", () => {
+    expect(plasser(["a", null, "c"], 1, "d")).toEqual(["a", "d", "c"]);
+    expect(plasser(["a", null, "c"], 0, "c")).toEqual(["c", null, "a"]);
+    expect(bytt(["a", "b", null], 0, 2)).toEqual([null, "b", "a"]);
+  });
+
+  it("velger en ramme for tre bilder, henter et bilde som ikke er med og bytter plass", async () => {
+    const { onFillFrame, onChange } = vis();
+    await userEvent.click(screen.getByRole("button", { name: `Side 1: ${tekster.sider.rammer}` }));
+    const valg = screen.getByRole("group", { name: tekster.sider.rammerTittel });
+    await userEvent.click(within(valg).getByRole("button", { name: tekster.sider.antallValg(3) }));
+    await userEvent.click(within(valg).getByRole("button", { name: /Ett stort og to små/ }));
+    expect(onChange).not.toHaveBeenCalled();
+
+    const d = screen.getByRole("dialog", { name: tekster.fyll.tittel(3) });
+    const bruk = within(d).getByRole("button", { name: tekster.fyll.bruk });
+    expect(bruk).toBeDisabled();
+    expect(within(d).getByText(tekster.fyll.fylt(2, 3))).toBeInTheDocument();
+    // Bildet som ikke er med, settes i det ledige feltet.
+    await userEvent.click(
+      within(d).getByRole("button", { name: new RegExp(tekster.fyll.ikkeMed) }),
+    );
+    expect(bruk).toBeEnabled();
+    // Felt 3 og felt 1 bytter plass.
+    const felt = within(d).getAllByRole("button", { name: /^Felt / });
+    await userEvent.click(felt[2]!);
+    await userEvent.click(felt[0]!);
+    await userEvent.click(bruk);
+    expect(onFillFrame).toHaveBeenCalledWith(
+      [
+        {
+          type: "fornoyd",
+          page: { kind: "rutenett", kolonner: 2, photos: [h("d"), h("b"), h("a")], mal: "3-topp" },
+          on: true,
+        },
+      ],
+      [],
+      "ta_med",
+    );
+  });
+
+  it("henter bilder fra en annen side i historien", async () => {
+    const { onFillFrame } = vis();
+    await userEvent.click(screen.getByRole("button", { name: `Side 2: ${tekster.sider.rammer}` }));
+    const valg = screen.getByRole("group", { name: tekster.sider.rammerTittel });
+    await userEvent.click(within(valg).getByRole("button", { name: tekster.sider.antallValg(3) }));
+    await userEvent.click(within(valg).getByRole("button", { name: /Ett stort og to små/ }));
+    const d = screen.getByRole("dialog", { name: tekster.fyll.tittel(3) });
+    // Siden har ett bilde (c); a og b hentes fra side 1.
+    await userEvent.click(within(d).getAllByRole("button", { name: /Side 1/, pressed: false })[0]!);
+    await userEvent.click(within(d).getAllByRole("button", { name: /Side 1/, pressed: false })[0]!);
+    await userEvent.click(within(d).getByRole("button", { name: tekster.fyll.bruk }));
+    expect(onFillFrame.mock.calls[0]![0][0]).toMatchObject({
+      page: { photos: [h("c"), h("a"), h("b")], mal: "3-topp" },
+    });
+  });
+
+  it("færre felt enn bilder: brukeren velger hva som skjer med resten", async () => {
+    const { onFillFrame } = vis();
+    await userEvent.click(screen.getByRole("button", { name: `Side 1: ${tekster.sider.rammer}` }));
+    const valg = screen.getByRole("group", { name: tekster.sider.rammerTittel });
+    await userEvent.click(within(valg).getByRole("button", { name: tekster.sider.antallValg(1) }));
+    await userEvent.click(within(valg).getByRole("button", { name: /Hele siden/ }));
+    const d = screen.getByRole("dialog", { name: tekster.fyll.tittel(1) });
+    expect(within(d).getByText(tekster.fyll.restTittel(1))).toBeInTheDocument();
+    await userEvent.click(within(d).getByLabelText(tekster.fyll.restBort));
+    await userEvent.click(within(d).getByRole("button", { name: tekster.fyll.bruk }));
+    expect(onFillFrame).toHaveBeenCalledWith(
+      [
+        {
+          type: "fornoyd",
+          page: { kind: "luft", kolonner: null, photos: [h("a")], mal: "1-full" },
+          on: true,
+        },
+      ],
+      [h("b")],
+      "ta_bort",
     );
   });
 });
