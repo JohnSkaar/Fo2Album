@@ -28,6 +28,8 @@ pub struct AppState {
     pub ingest_cancel: Mutex<Option<Arc<AtomicBool>>>,
     /// Endringer i utkastet som kan angres.
     pub undo: crate::undo::History,
+    /// Brukeren vil lage utkastet med bildene som er klare, uten å vente på innlesingen.
+    pub skip_wait: AtomicBool,
 }
 
 impl AppState {
@@ -39,6 +41,7 @@ impl AppState {
             store: Mutex::new(None),
             ingest_cancel: Mutex::new(None),
             undo: Default::default(),
+            skip_wait: AtomicBool::new(false),
         }
     }
 
@@ -277,20 +280,32 @@ pub fn start_ingest(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()>
     let keys = state.keys.clone();
     std::thread::spawn(move || {
         use tauri::Manager;
-        // Egen tilkobling, så grensesnittet kan lese mens innlesingen skriver.
-        let result = Store::open(&data_dir, keys.as_ref())
-            .map_err(|e| e.to_string())
-            .and_then(|mut store| {
-                ingest_all(
-                    &mut store,
-                    &DedupConfig::default(),
-                    &cancel,
-                    &mut |p: Progress| {
-                        let _ = app.emit("innlesing", p);
-                    },
-                )
+        // Egen tilkobling, så grensesnittet kan lese mens innlesingen skriver. Stopper
+        // innlesingen uventet (en fil den ikke tåler), meldes det som en feil, og den regnes
+        // som ferdig, så utkastet ikke venter for alltid.
+        let work = std::panic::AssertUnwindSafe(|| {
+            Store::open(&data_dir, keys.as_ref())
                 .map_err(|e| e.to_string())
-            });
+                .and_then(|mut store| {
+                    ingest_all(
+                        &mut store,
+                        &DedupConfig::default(),
+                        &cancel,
+                        &mut |p: Progress| {
+                            let _ = app.emit("innlesing", p);
+                        },
+                    )
+                    .map_err(|e| e.to_string())
+                })
+        });
+        let result = std::panic::catch_unwind(work).unwrap_or_else(|panic| {
+            let why = panic
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| panic.downcast_ref::<&str>().map(|s| s.to_string()))
+                .unwrap_or_default();
+            Err(format!("innlesingen stoppet uventet: {why}"))
+        });
         let done = match result {
             Ok(report) => IngestDoneDto {
                 report: Some(report),
@@ -886,9 +901,15 @@ pub async fn make_album_draft(
     };
     tauri::async_runtime::spawn_blocking(move || {
         let mut emit = emit;
-        // Utkastet skal bygge på alle bildene, så det venter på innlesingen.
+        // Utkastet skal bygge på alle bildene, så det venter på innlesingen (med mindre
+        // brukeren ber om å lage det med bildene som er klare).
         let mut waited = false;
-        while app.state::<AppState>().ingest_running() {
+        app.state::<AppState>()
+            .skip_wait
+            .store(false, Ordering::Relaxed);
+        while app.state::<AppState>().ingest_running()
+            && !app.state::<AppState>().skip_wait.load(Ordering::Relaxed)
+        {
             if !waited {
                 emit("venter");
                 waited = true;
@@ -903,6 +924,12 @@ pub async fn make_album_draft(
     })
     .await
     .map_err(|e| CommandError::new("ukjent", e.to_string()))?
+}
+
+/// «Lag utkastet med bildene som er klare»: slutter å vente på innlesingen.
+#[tauri::command]
+pub fn draft_without_waiting(state: State<'_, AppState>) {
+    state.skip_wait.store(true, Ordering::Relaxed);
 }
 
 fn parse_id(id: &str) -> CmdResult<ContentHash> {

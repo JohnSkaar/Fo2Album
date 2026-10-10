@@ -392,6 +392,8 @@ export const api = {
   lagUtkast: (year: number, pageCap: number | null = null, quiet = false) =>
     invoke<Utkast>("make_album_draft", { year, pageCap, quiet }),
   /** Ett eller flere valg; flere lagres samlet og angres samlet. */
+  /** Slutt å vente på innlesingen: lag utkastet med bildene som er klare. */
+  utkastUtenVenting: () => invoke<void>("draft_without_waiting"),
   albumvalg: (year: number, change: Albumvalg | Albumvalg[]) =>
     invoke<void>("album_choice", { year, changes: Array.isArray(change) ? change : [change] }),
   /** Tar med eller tar bort mange bilder på en gang (angres samlet). */

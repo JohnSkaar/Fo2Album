@@ -2,7 +2,7 @@
  * All tekst i grensesnittet, på norsk bokmål (CLAUDE.md, «Språk og tekst»).
  * Du-form, varm og konkret, setningsstor bokstav. Si aldri «last opp bildene».
  */
-import type { Analysefase, Begrunnelse, KildeType, Laerdom, Rolle, Svar } from "./api";
+import type { Analysefase, Begrunnelse, Fremdrift, KildeType, Laerdom, Rolle, Svar } from "./api";
 import { GRUNNPRIS, KR_PER_SIDE, SIDETRINN } from "./pris";
 
 const tall = new Intl.NumberFormat("nb-NO");
@@ -128,8 +128,15 @@ export const tekster = {
       "Appen henter fortsatt bilder fra maskinen. Utkastet tar med alle bildene når den er ferdig.",
     ingenBilder: "Ingen bilder fra dette året ennå.",
     analyseTittel: "Lager utkastet …",
+    jobber: (sek: number) =>
+      sek < 60
+        ? `Maskinen jobber … ${fmt(sek)} s`
+        : `Maskinen jobber … ${fmt(Math.floor(sek / 60))} min ${fmt(sek % 60)} s`,
+    venterHjelp:
+      "Utkastet tar med alle bildene når de er hentet. Store bildesamlinger tar tid første gang, særlig når ansiktene skal finnes. Du kan også lage utkastet nå med bildene som er klare, og lage det på nytt senere.",
+    ikkeVent: "Lag utkastet med bildene som er klare nå",
     faser: {
-      venter: "Henter miniatyrbilder og måler kvalitet",
+      venter: "Venter på at bildene er hentet fra maskinen",
       henter: "Henter årets bilder",
       hendelser: "Finner hendelsene i året",
       serier: "Finner serier og bilder som ligner hverandre",
@@ -499,6 +506,17 @@ export const tekster = {
     ferdig: (nye: number) =>
       nye === 0 ? "Alt er oppdatert" : `Fant ${antall(nye, "nytt bilde", "nye bilder")}`,
     stoppet: "Innlesingen er stoppet. Den fortsetter der den slapp neste gang.",
+    /** Det innlesingen holder på med nå. */
+    tekst: (p: Fremdrift): string =>
+      p.phase === "skanner"
+        ? tekster.innlesing.skanner
+        : p.phase === "leser"
+          ? tekster.innlesing.leser(p.done, p.total)
+          : p.phase === "ansikter"
+            ? tekster.innlesing.ansikter(p.done, p.total)
+            : p.phase === "personer"
+              ? tekster.innlesing.personer
+              : tekster.innlesing.dubletter,
   },
   merknader: {
     dubletter: (n: number) =>

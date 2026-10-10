@@ -477,6 +477,8 @@ export function App() {
             year={valgtAar}
             draft={utkast}
             phase={analyse}
+            ingest={fremdrift}
+            onSkipWait={() => void api.utkastUtenVenting()}
             onMake={() => void lagUtkast()}
             onPrint={() => void visTrykk()}
             onChange={(c, m) => void endreAlbum(c, m)}

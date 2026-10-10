@@ -39,16 +39,7 @@ function Merknader({ s, report }: { s: Sammendrag; report: Innlesingsrapport | n
 }
 
 function Progress({ p, onCancel }: { p: Fremdrift; onCancel: () => void }) {
-  const text =
-    p.phase === "skanner"
-      ? tekster.innlesing.skanner
-      : p.phase === "leser"
-        ? tekster.innlesing.leser(p.done, p.total)
-        : p.phase === "ansikter"
-          ? tekster.innlesing.ansikter(p.done, p.total)
-          : p.phase === "personer"
-            ? tekster.innlesing.personer
-            : tekster.innlesing.dubletter;
+  const text = tekster.innlesing.tekst(p);
   const pct = p.total > 0 ? Math.round((p.done / p.total) * 100) : 0;
   return (
     <div className="loadbox">

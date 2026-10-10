@@ -3,6 +3,7 @@ import type {
   Albumtekst,
   Albumvalg,
   Analysefase,
+  Fremdrift,
   Omslag,
   Handling,
   Ramme,
@@ -90,9 +91,37 @@ const rotert = (deg: number | undefined): React.CSSProperties | undefined =>
   deg ? { transform: `rotate(${deg}deg)${deg % 180 ? " scale(0.75)" : ""}` } : undefined;
 type Spørsmål = { feedbackId: number; action: Handling };
 
-function Analyse({ fase }: { fase: Analysefase }) {
+/** Sekunder siden komponenten ble vist, oppdatert hvert sekund. */
+function useSekunder() {
+  const [start] = useState(() => Date.now());
+  const [naa, setNaa] = useState(start);
+  useEffect(() => {
+    const id = setInterval(() => setNaa(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return Math.floor((naa - start) / 1000);
+}
+
+function Analyse({
+  fase,
+  ingest,
+  onSkip,
+}: {
+  fase: Analysefase;
+  /** Innlesingen som utkastet venter på. */
+  ingest?: Fremdrift | null;
+  onSkip?: () => void;
+}) {
+  const sek = useSekunder();
   const naa = fase === "venter" ? -1 : FASER.indexOf(fase);
-  const pct = fase === "ferdig" ? 100 : Math.round((Math.max(0, naa) / FASER.length) * 100);
+  const ingestPct =
+    ingest && ingest.total > 0 ? Math.round((ingest.done / ingest.total) * 100) : null;
+  const pct =
+    fase === "ferdig"
+      ? 100
+      : fase === "venter"
+        ? (ingestPct ?? 0)
+        : Math.round((Math.max(0, naa) / FASER.length) * 100);
   return (
     <div className="analyse">
       <h2 className="analyse__title" role="status">
@@ -107,8 +136,17 @@ function Analyse({ fase }: { fase: Analysefase }) {
       >
         <i style={{ width: `${pct}%` }} />
       </div>
+      <p className="analyse__busy">
+        <span className="spinner" aria-hidden="true" />
+        {t.jobber(sek)}
+      </p>
       <ol className="analyse__steps">
-        {fase === "venter" && <li aria-current="step">{t.faser.venter}</li>}
+        {fase === "venter" && (
+          <li aria-current="step">
+            {t.faser.venter}
+            {ingest && <span className="analyse__detail">{tekster.innlesing.tekst(ingest)}</span>}
+          </li>
+        )}
         {FASER.map((f, i) => (
           <li
             key={f}
@@ -119,6 +157,14 @@ function Analyse({ fase }: { fase: Analysefase }) {
           </li>
         ))}
       </ol>
+      {fase === "venter" && onSkip && (
+        <div className="analyse__skip">
+          <p className="price__help">{t.venterHjelp}</p>
+          <button type="button" className="btn btn--secondary" onClick={onSkip}>
+            {t.ikkeVent}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -770,6 +816,8 @@ export function DraftScreen({
   year,
   draft,
   phase,
+  ingest = null,
+  onSkipWait,
   rammer = [],
   onMake,
   onPrint,
@@ -789,6 +837,10 @@ export function DraftScreen({
   year: number | null;
   draft: Utkast | null;
   phase: Analysefase | null;
+  /** Innlesingen som pågår (utkastet venter på den). */
+  ingest?: Fremdrift | null;
+  /** Lag utkastet med bildene som er klare, uten å vente på innlesingen. */
+  onSkipWait?: () => void;
   /** Faste rammer brukeren kan velge for en side. */
   rammer?: Ramme[];
   onMake: () => void;
@@ -863,7 +915,7 @@ export function DraftScreen({
         <h1 id="utkast-tittel" className="head__title">
           {year ? t.tittel(year) : t.lag}
         </h1>
-        <Analyse fase={phase} />
+        <Analyse fase={phase} ingest={ingest} onSkip={onSkipWait} />
       </section>
     );
   }

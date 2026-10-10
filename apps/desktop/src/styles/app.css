@@ -755,6 +755,46 @@ h3 {
   color: var(--color-text-primary);
   font-weight: 700;
 }
+.analyse__detail {
+  display: block;
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.analyse__busy {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+.analyse__skip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+/* Viser at maskinen jobber. */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border-default);
+  border-top-color: var(--color-border-brand);
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
 .draft {
   padding-bottom: 160px;
 }

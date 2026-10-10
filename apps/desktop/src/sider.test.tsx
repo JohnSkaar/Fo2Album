@@ -273,3 +273,30 @@ describe("kvalitetssjekk før trykk", () => {
     expect(screen.getByRole("note")).toHaveTextContent(s.lavOpplosning(96));
   });
 });
+
+describe("utkastet venter på innlesingen", () => {
+  it("viser hva maskinen gjør, og kan lage utkastet uten å vente", async () => {
+    const onSkipWait = vi.fn();
+    render(
+      <DraftScreen
+        year={2011}
+        draft={null}
+        phase="venter"
+        ingest={{ phase: "ansikter", done: 340, total: 2100 }}
+        onSkipWait={onSkipWait}
+        onMake={() => {}}
+        onPrint={() => {}}
+        onChange={() => {}}
+        onSize={() => {}}
+        onChoose={() => Promise.resolve(null)}
+        onAnswer={() => {}}
+        thumbUrl={(id) => id}
+      />,
+    );
+    expect(document.body.textContent).toContain(tekster.innlesing.ansikter(340, 2100));
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "16");
+    expect(screen.getByText(tekster.utkast.jobber(0))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: tekster.utkast.ikkeVent }));
+    expect(onSkipWait).toHaveBeenCalled();
+  });
+});
