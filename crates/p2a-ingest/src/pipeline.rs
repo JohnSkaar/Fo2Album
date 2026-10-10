@@ -94,14 +94,31 @@ pub fn face_model() -> &'static str {
     engine().map_or(p2a_faces::DEFAULT_MODEL, |e| e.model())
 }
 
-/// Ansiktene i et dekodet bilde, med boks og landemerker som andeler av bildet.
-fn find_faces(image: &image::DynamicImage) -> Option<Vec<NewFace>> {
+/// Ansiktene i et dekodet bilde, med boks og landemerker som andeler av bildet. Ser det ut
+/// til å ha personer langt unna (små ansikter), leses bildet på nytt i høyere oppløsning med
+/// `more` (filen, når den er kjent) og analyseres igjen.
+fn find_faces(
+    image: &image::DynamicImage,
+    more: Option<&dyn Fn() -> Option<image::DynamicImage>>,
+) -> Option<Vec<NewFace>> {
     let engine = engine()?;
     let rgb = image.to_rgb8();
-    let (w, h) = (rgb.width().max(1) as f32, rgb.height().max(1) as f32);
-    let faces = engine.faces(&rgb).ok()?;
+    let mut scan = engine.scan(&rgb).ok()?;
+    let mut size = rgb.dimensions();
+    if scan.more_pixels {
+        if let Some(big) = more.and_then(|f| f()) {
+            let big = big.to_rgb8();
+            if big.width().max(big.height()) > size.0.max(size.1) {
+                if let Ok(s) = engine.scan(&big) {
+                    scan = s;
+                    size = big.dimensions();
+                }
+            }
+        }
+    }
+    let (w, h) = (size.0.max(1) as f32, size.1.max(1) as f32);
     Some(
-        faces
+        scan.faces
             .into_iter()
             .map(|f| {
                 let d = &f.detection;
@@ -344,7 +361,8 @@ pub fn ingest_all(
                 .filter_map(|(h, root, rel, format, orientation)| {
                     let path = scan::full_path(root, rel);
                     let d = decode::decode_file(&path, format.as_deref(), *orientation).ok()?;
-                    Some((*h, find_faces(&d.image)?))
+                    let more = || larger(&path, format.as_deref(), *orientation);
+                    Some((*h, find_faces(&d.image, Some(&more))?))
                 })
                 .collect();
             store.put_faces(&found, face_model())?;
@@ -368,6 +386,17 @@ pub fn ingest_all(
 
     report.summary = store.summary()?;
     Ok(report)
+}
+
+/// Bildet i høyere oppløsning, til små ansikter (personer langt unna).
+fn larger(
+    path: &Path,
+    format: Option<&str>,
+    orientation: Option<u16>,
+) -> Option<image::DynamicImage> {
+    decode::decode_file_at(path, format, orientation, p2a_faces::MORE_PIXELS)
+        .ok()
+        .map(|d| d.image)
 }
 
 /// Leser metadata, dekoder, lager miniatyr og pHash. `None` hvis filen er skadet.
@@ -395,7 +424,8 @@ fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
             meta.height = Some(decoded.height);
             meta.phash = Some(phash::phash(&decoded.image));
             meta.quality = Some(features::basic_quality(&decoded.image));
-            faces = find_faces(&decoded.image);
+            let more = || larger(path, meta.format.as_deref(), meta.orientation);
+            faces = find_faces(&decoded.image, Some(&more));
             Some(decode::thumbnail_jpeg(&decoded))
         }
         Err(DecodeError::Unsupported) => None,

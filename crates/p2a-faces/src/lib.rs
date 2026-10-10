@@ -98,9 +98,25 @@ impl Face {
 
 /// Modellene, lastet og optimalisert. Lag én og bruk den til alle bildene; den kan deles
 /// mellom tråder.
-/// Navn og versjon på modellene i [`FaceEngine`]. Lagres med ansiktene, så appen vet hvilke
-/// bilder som må analyseres på nytt når modellen byttes.
-pub const DEFAULT_MODEL: &str = "yunet-2023mar+sface-2021dec";
+/// Funn med poeng mellom dette og `min_score` er trolig ansikter som er for små eller uskarpe
+/// i ett pass over hele bildet: da letes det i utsnitt.
+const WEAK_SCORE: f32 = 0.5;
+/// Under denne lengste siden (punkter) kan små ansikter bli funnet bedre i høyere oppløsning.
+pub const MORE_PIXELS: u32 = 2000;
+
+/// Det en ansiktsmodell fant i et bilde.
+#[derive(Debug, Clone)]
+pub struct Scan {
+    pub faces: Vec<Face>,
+    /// Bildet ser ut til å ha personer som er for små for oppløsningen det fikk: les det på
+    /// nytt med lengste side minst [`MORE_PIXELS`] og analyser igjen.
+    pub more_pixels: bool,
+}
+
+/// Navn og versjon på modellene i [`FaceEngine`], og på måten de brukes. Lagres med
+/// ansiktene, så appen vet hvilke bilder som må analyseres på nytt når noe endres.
+/// `+utsnitt` (oktober 2026): små ansikter letes også i utsnitt og høyere oppløsning.
+pub const DEFAULT_MODEL: &str = "yunet-2023mar+sface-2021dec+utsnitt";
 
 /// Det appen trenger fra en ansiktsmodell. Byttbart (beslutning 6. oktober 2026): en annen
 /// motor (ONNX Runtime) eller leverandør (f.eks. Luxand) kan settes inn uten at resten av appen
@@ -109,8 +125,9 @@ pub const DEFAULT_MODEL: &str = "yunet-2023mar+sface-2021dec";
 pub trait FaceAnalyzer: Send + Sync {
     /// Navn og versjon, f.eks. [`DEFAULT_MODEL`].
     fn model(&self) -> &str;
-    /// Ansiktene i bildet med kjennetegn og skarphet, største først.
-    fn faces(&self, img: &RgbImage) -> Result<Vec<Face>, FaceError>;
+    /// Ansiktene i bildet med kjennetegn og skarphet, største først, og om bildet bør leses i
+    /// høyere oppløsning.
+    fn scan(&self, img: &RgbImage) -> Result<Scan, FaceError>;
     /// Likhet (cosinus) over denne er trolig samme person.
     fn same_person(&self) -> f32;
 }
@@ -153,8 +170,59 @@ impl FaceEngine {
         })
     }
 
-    /// Finner ansiktene i bildet, sortert etter størrelse (største først).
+    /// Finner ansiktene i bildet, sortert etter størrelse (største først). Ser det ut som et
+    /// gruppebilde (mange eller små ansikter), letes det også i overlappende utsnitt i full
+    /// oppløsning, så små ansikter lenger bak blir funnet.
     pub fn detect(&self, img: &RgbImage) -> Result<Vec<Detection>, FaceError> {
+        Ok(self.detect_scan(img)?.0)
+    }
+
+    /// Som [`detect`](Self::detect), og sier i tillegg om bildet trolig har personer som er
+    /// for små for oppløsningen det fikk (da bør det leses i høyere oppløsning).
+    fn detect_scan(&self, img: &RgbImage) -> Result<(Vec<Detection>, bool), FaceError> {
+        let (w, h) = img.dimensions();
+        let all = self.detect_once_min(img, WEAK_SCORE)?;
+        let weak = all.iter().any(|d| d.score < self.min_score);
+        let found: Vec<Detection> = all
+            .into_iter()
+            .filter(|d| d.score >= self.min_score)
+            .collect();
+        let tiles = detect::wants_tiles(&found, w, h) || (weak && w.max(h) > detect::SIZE);
+        let mut found = if tiles {
+            self.detect_tiled(img, found)?
+        } else {
+            found
+        };
+        found.sort_by(|a, b| (b.w * b.h).total_cmp(&(a.w * a.h)));
+        let small = weak || detect::has_small(&found, h);
+        Ok((found, small && w.max(h) < MORE_PIXELS))
+    }
+
+    /// Leter også i overlappende utsnitt i full oppløsning; `found` er funnene fra hele bildet.
+    pub fn detect_tiled(
+        &self,
+        img: &RgbImage,
+        found: Vec<Detection>,
+    ) -> Result<Vec<Detection>, FaceError> {
+        let (w, h) = img.dimensions();
+        let mut all = found;
+        for (x, y, tw, th) in detect::tiles(w, h) {
+            let tile = image::imageops::crop_imm(img, x, y, tw, th).to_image();
+            for d in self.detect_once(&tile)? {
+                all.extend(detect::from_tile(d, (x, y, tw, th), w, h));
+            }
+        }
+        let mut found = detect::merge(all);
+        found.sort_by(|a, b| (b.w * b.h).total_cmp(&(a.w * a.h)));
+        Ok(found)
+    }
+
+    /// Ett pass over hele bildet, skalert til modellens størrelse (uten utsnitt; til måling).
+    pub fn detect_once(&self, img: &RgbImage) -> Result<Vec<Detection>, FaceError> {
+        self.detect_once_min(img, self.min_score)
+    }
+
+    fn detect_once_min(&self, img: &RgbImage, min_score: f32) -> Result<Vec<Detection>, FaceError> {
         let (input, scale) = detect::prepare(img);
         let out = self.detector.run(tvec!(input.into()))?;
         let views: Vec<_> = out
@@ -164,9 +232,13 @@ impl FaceEngine {
                     .map(|v| v.iter().copied().collect::<Vec<_>>())
             })
             .collect::<Result<_, _>>()?;
-        let mut found = detect::decode(&views, self.min_score, scale, img.width(), img.height());
-        found.sort_by(|a, b| (b.w * b.h).total_cmp(&(a.w * a.h)));
-        Ok(found)
+        Ok(detect::decode(
+            &views,
+            min_score,
+            scale,
+            img.width(),
+            img.height(),
+        ))
     }
 
     /// Kjennetegnet for ett ansikt.
@@ -191,7 +263,13 @@ impl FaceEngine {
 
     /// Alle ansiktene i bildet, med kjennetegn og skarphet.
     pub fn faces(&self, img: &RgbImage) -> Result<Vec<Face>, FaceError> {
-        self.detect(img)?
+        let found = self.detect(img)?;
+        self.describe(img, found)
+    }
+
+    /// Kjennetegn og skarphet for ansiktene som er funnet.
+    fn describe(&self, img: &RgbImage, found: Vec<Detection>) -> Result<Vec<Face>, FaceError> {
+        found
             .into_iter()
             .map(|d| {
                 let aligned = align_face(img, &d.landmarks);
@@ -210,8 +288,12 @@ impl FaceAnalyzer for FaceEngine {
         DEFAULT_MODEL
     }
 
-    fn faces(&self, img: &RgbImage) -> Result<Vec<Face>, FaceError> {
-        FaceEngine::faces(self, img)
+    fn scan(&self, img: &RgbImage) -> Result<Scan, FaceError> {
+        let (found, more_pixels) = self.detect_scan(img)?;
+        Ok(Scan {
+            faces: self.describe(img, found)?,
+            more_pixels,
+        })
     }
 
     fn same_person(&self) -> f32 {

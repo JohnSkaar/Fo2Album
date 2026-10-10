@@ -116,6 +116,86 @@ fn nms(mut v: Vec<Detection>) -> Vec<Detection> {
     keep
 }
 
+/// Utsnittene overlapper med en fjerdedel, så et ansikt alltid ligger helt inne i minst ett.
+const TILE_OVERLAP: f32 = 0.25;
+/// Høyst så mange utsnitt per bilde (ellers blir utsnittene større).
+const MAX_TILES: usize = 9;
+
+/// Et ansikt lavere enn denne andelen av bildet regnes som lite (personer lenger unna).
+pub(crate) const SMALL_FACE: f32 = 0.06;
+
+/// Om bildet bør gjennomsøkes i utsnitt: større enn det modellen ser i ett pass, og enten en
+/// stor gruppe eller et lite ansikt (folk lenger unna). Vanlige familiebilder med noen få
+/// personer på nært hold får ett pass, så innlesingen ikke blir tregere.
+pub(crate) fn wants_tiles(found: &[Detection], w: u32, h: u32) -> bool {
+    if w.max(h) as f32 <= SIZE as f32 * 1.2 {
+        return false;
+    }
+    found.len() >= 8 || has_small(found, h)
+}
+
+pub(crate) fn has_small(found: &[Detection], h: u32) -> bool {
+    found.iter().any(|d| d.h < h as f32 * SMALL_FACE)
+}
+
+/// Kvadratiske utsnitt (x, y, bredde, høyde) som dekker bildet med overlapp. Så små som mulig
+/// (modellens størrelse, altså full oppløsning), men høyst [`MAX_TILES`].
+pub(crate) fn tiles(w: u32, h: u32) -> Vec<(u32, u32, u32, u32)> {
+    let axis = |len: u32, t: u32| -> Vec<u32> {
+        if len <= t {
+            return vec![0];
+        }
+        let step = (t as f32 * (1.0 - TILE_OVERLAP)) as u32;
+        let n = (len - t).div_ceil(step) + 1;
+        // Jevnt fordelt, siste slutter i kanten.
+        (0..n)
+            .map(|k| ((len - t) as u64 * k as u64 / (n - 1) as u64) as u32)
+            .collect()
+    };
+    let mut t = SIZE;
+    loop {
+        let (xs, ys) = (axis(w, t), axis(h, t));
+        if xs.len() * ys.len() <= MAX_TILES || t >= w.max(h) {
+            return ys
+                .iter()
+                .flat_map(|&y| xs.iter().map(move |&x| (x, y, t.min(w), t.min(h))))
+                .collect();
+        }
+        t = (t as f32 * 1.15) as u32;
+    }
+}
+
+/// Et funn i et utsnitt, flyttet til hele bildet. Funn som berører kanten av utsnittet (der
+/// den ikke er bildets kant), er trolig et halvt ansikt og forkastes; nabo-utsnittet har det.
+pub(crate) fn from_tile(
+    mut d: Detection,
+    (x, y, tw, th): (u32, u32, u32, u32),
+    w: u32,
+    h: u32,
+) -> Option<Detection> {
+    const EDGE: f32 = 2.0;
+    let cut_left = x > 0 && d.x <= EDGE;
+    let cut_top = y > 0 && d.y <= EDGE;
+    let cut_right = x + tw < w && d.x + d.w >= tw as f32 - EDGE;
+    let cut_bottom = y + th < h && d.y + d.h >= th as f32 - EDGE;
+    if cut_left || cut_top || cut_right || cut_bottom {
+        return None;
+    }
+    let (fx, fy) = (x as f32, y as f32);
+    d.x += fx;
+    d.y += fy;
+    for lm in &mut d.landmarks {
+        lm[0] += fx;
+        lm[1] += fy;
+    }
+    Some(d)
+}
+
+/// Funn fra hele bildet og utsnittene, uten dobbelttelling.
+pub(crate) fn merge(all: Vec<Detection>) -> Vec<Detection> {
+    nms(all)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,5 +231,62 @@ mod tests {
             [30.0, 20.0, 10.0]
         );
         assert_eq!(a[[0, 0, 400, 0]], 0.0);
+    }
+
+    #[test]
+    fn utsnitt_dekker_bildet_med_overlapp() {
+        let t = tiles(1008, 756);
+        assert_eq!(t.len(), 4);
+        assert_eq!(t[0], (0, 0, 640, 640));
+        assert_eq!(t[3], (368, 116, 640, 640));
+        // Store bilder: høyst ni utsnitt, som dekker hele bildet.
+        let t = tiles(4032, 3024);
+        assert!(t.len() <= MAX_TILES, "{}", t.len());
+        let (x, y, tw, th) = *t.last().unwrap();
+        assert_eq!((x + tw, y + th), (4032, 3024));
+        // Små bilder: ett utsnitt.
+        assert_eq!(tiles(600, 400), vec![(0, 0, 600, 400)]);
+    }
+
+    #[test]
+    fn halve_ansikter_i_kanten_av_et_utsnitt_forkastes() {
+        let d = |x: f32| Detection {
+            x,
+            y: 100.0,
+            w: 30.0,
+            h: 30.0,
+            landmarks: [[x + 10.0, 110.0]; 5],
+            score: 0.9,
+        };
+        // Utsnitt nr. 2 fra venstre: venstre kant er inne i bildet.
+        assert!(from_tile(d(0.0), (480, 0, 640, 640), 2000, 640).is_none());
+        let moved = from_tile(d(100.0), (480, 0, 640, 640), 2000, 640).unwrap();
+        assert_eq!((moved.x, moved.landmarks[0][0]), (580.0, 590.0));
+        // Bildets egen kant er ikke en kuttkant.
+        assert!(from_tile(d(0.0), (0, 0, 640, 640), 2000, 640).is_some());
+        assert!(from_tile(d(611.0), (480, 0, 640, 640), 2000, 640).is_none());
+    }
+
+    #[test]
+    fn gruppebilder_og_smaa_ansikter_gir_utsnitt() {
+        let face = |h: f32| Detection {
+            x: 0.0,
+            y: 0.0,
+            w: h,
+            h,
+            landmarks: [[0.0; 2]; 5],
+            score: 0.9,
+        };
+        assert!(!wants_tiles(&[face(300.0)], 1008, 756));
+        assert!(wants_tiles(&[face(30.0)], 1008, 756));
+        assert!(
+            !wants_tiles(&vec![face(200.0); 4], 1008, 756),
+            "familiebilde"
+        );
+        assert!(wants_tiles(&vec![face(200.0); 8], 1008, 756), "stor gruppe");
+        assert!(
+            !wants_tiles(&[face(30.0)], 700, 500),
+            "liten nok til ett pass"
+        );
     }
 }
