@@ -96,3 +96,44 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.bin }}
+
+  testversjon:
+    name: Testversjon av appen (${{ matrix.navn }})
+    # Bare når noen trykker «Run workflow»: installerbar app for Mac og Windows, til eieren
+    # og testfamilier. Ikke signert ennå (se docs/TESTVERSJON.md for hvordan den åpnes).
+    if: github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            navn: Mac
+            artifact: Fo2Album-Mac
+            args: --target universal-apple-darwin --bundles dmg
+            path: target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          - os: windows-latest
+            navn: Windows
+            artifact: Fo2Album-Windows
+            args: --bundles nsis
+            path: target/release/bundle/nsis/*.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ runner.os == 'macOS' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Bygg installasjonsfilen
+        working-directory: apps/desktop
+        run: pnpm tauri build ${{ matrix.args }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.path }}
+          if-no-files-found: error
