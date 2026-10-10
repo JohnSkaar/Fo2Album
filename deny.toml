@@ -14,6 +14,11 @@ all-features = false
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+  # ttf-parser er uvedlikeholdt (oktober 2026). Den leser bare fontene som ligger inne i
+  # programmet (crates/p2a-print/fonts), aldri filer utenfra. Byttes til `skrifa` senere.
+  { id = "RUSTSEC-2026-0192", reason = "leser bare egne, innebygde fonter; byttes til skrifa" },
+]
 
 [licenses]
 version = 2
