@@ -79,6 +79,8 @@ pub struct DraftConfig {
     pub child_balance: f32,
     /// Så mange bilder med ansikter må en tur ha før appen selv sier «uten barn».
     pub adult_trip_min_faces: usize,
+    /// Alle personene brukeren har gitt navn, får minst ett bilde i albumet.
+    pub cover_named_persons: bool,
 }
 
 impl Default for DraftConfig {
@@ -109,6 +111,7 @@ impl Default for DraftConfig {
             nature_people_share: 0.25,
             child_balance: 0.3,
             adult_trip_min_faces: 5,
+            cover_named_persons: true,
         }
     }
 }
@@ -150,6 +153,9 @@ pub enum Reason {
     Stemningsbilde,
     /// På en side brukeren er fornøyd med.
     Fornoyd,
+    /// Det beste bildet av en person brukeren har gitt navn, som ellers ikke var med:
+    /// alle i familien skal være med i albumet.
+    AlleErMed,
     // Ikke med
     ValgtBortAvDeg,
     SammeSerie {
@@ -287,6 +293,8 @@ struct Item<'a> {
     /// Personene i bildet (person i profilen, ellers appens gruppe), med hvor godt ansiktet
     /// er (høyde × skarphet).
     persons: Vec<(i64, f32)>,
+    /// Personene brukeren har gitt navn (person i profilen), med hvor godt ansiktet er.
+    named: Vec<(i64, f32)>,
     mood: bool,
     /// Blant årets aller flotteste bilder (estetikk).
     exceptional: bool,
@@ -342,6 +350,12 @@ pub fn make_draft(
                 .filter(|f| f.counts())
                 .filter_map(|f| Some((f.person.or(f.group)?, f.h * f.sharpness)))
                 .collect();
+            let named: Vec<(i64, f32)> = faces
+                .into_iter()
+                .flatten()
+                .filter(|f| f.counts())
+                .filter_map(|f| Some((f.person?, f.h * f.sharpness)))
+                .collect();
             // Ansiktene avgjør. Mye hudtoner uten ansikt (profil, bakfra, små ansikter som
             // ikke ble funnet) teller også som personer.
             let people = match faces {
@@ -370,6 +384,7 @@ pub fn make_draft(
                 decision,
                 people,
                 persons,
+                named,
                 mood: false,
                 exceptional: false,
                 blurry: raw
@@ -522,6 +537,46 @@ pub fn make_draft(
         first_pick[g] = first;
     }
 
+    // Alle personene brukeren har gitt navn, er med minst én gang: mangler noen, tas det
+    // beste bildet av dem med (best ansikt, så best bilde) i historien det hører til.
+    let mut for_coverage = vec![false; items.len()];
+    if cfg.cover_named_persons {
+        let mut covered: HashSet<i64> = (0..items.len())
+            .filter(|&i| included[i])
+            .flat_map(|i| items[i].named.iter().map(|(p, _)| *p))
+            .collect();
+        let mut everyone: Vec<i64> = items
+            .iter()
+            .flat_map(|it| it.named.iter().map(|(p, _)| *p))
+            .collect();
+        everyone.sort_unstable();
+        everyone.dedup();
+        for p in everyone {
+            if covered.contains(&p) {
+                continue;
+            }
+            let best = (0..items.len())
+                .filter(|&i| !included[i] && usable(&items[i]))
+                .filter_map(|i| {
+                    let (_, face) = items[i].named.iter().find(|(q, _)| *q == p)?;
+                    Some((i, *face))
+                })
+                .max_by(|a, b| {
+                    a.1.total_cmp(&b.1)
+                        .then(items[a.0].q.total_cmp(&items[b.0].q))
+                        .then(b.0.cmp(&a.0))
+                });
+            let Some((i, _)) = best else { continue };
+            included[i] = true;
+            for_coverage[i] = true;
+            covered.extend(items[i].named.iter().map(|(q, _)| *q));
+            // En historie der alle sidene var låst, får en side til for bildet.
+            if let Some(g) = groups.iter().position(|g| g.members.contains(&i)) {
+                left_pages[g] = left_pages[g].max(1);
+            }
+        }
+    }
+
     progress(Phase::Begrunnelser);
     let mut event_of = vec![0; items.len()];
     let mut chosen_in: Vec<Vec<usize>> = Vec::with_capacity(groups.len());
@@ -610,6 +665,8 @@ pub fn make_draft(
             let chosen = &chosen_in[g];
             let (reason, related) = if fixed[i] {
                 (Reason::Fornoyd, None)
+            } else if for_coverage[i] {
+                (Reason::AlleErMed, None)
             } else if included[i] {
                 let first = first_pick[g] == Some(i);
                 let r = reason_in(it, chosen.len(), &burst_size, first, out_of_order[i]);
@@ -1906,7 +1963,22 @@ mod tests {
             children: [1, 2].into(),
             ..DraftHints::default()
         };
-        let (a, b) = (with(&photos, &plain), with(&photos, &kids));
+        // Uten «alle er med», så bare balansen mellom barna måles.
+        let cfg = DraftConfig {
+            cover_named_persons: false,
+            ..DraftConfig::default()
+        };
+        let run = |h: &DraftHints| {
+            make_draft(
+                &photos,
+                &HashMap::new(),
+                &Preferences::default(),
+                &cfg,
+                h,
+                &mut |_| {},
+            )
+        };
+        let (a, b) = (run(&plain), run(&kids));
         let (a1, a2, b1, b2) = (count(&a, 1), count(&a, 2), count(&b, 1), count(&b, 2));
         assert!(b2 > a2, "barn 2 får flere bilder: {a2} → {b2}");
         assert!(
@@ -2191,5 +2263,51 @@ mod tests {
             .collect();
         assert_eq!(got, page.photos);
         assert_eq!(d.events[1].photos, 38);
+    }
+
+    #[test]
+    fn everyone_named_is_in_the_album_at_least_once() {
+        let photos = day(0, 8, 8, 60);
+        let auto = draft(&photos, &HashMap::new());
+        // Mormor (person 42) er bare på to bilder appen ikke valgte.
+        let out: Vec<ContentHash> = auto
+            .photos
+            .iter()
+            .filter(|p| !p.included)
+            .take(2)
+            .map(|p| p.hash)
+            .collect();
+        let mut faces: HashMap<ContentHash, Vec<FaceInfo>> =
+            photos.iter().map(|p| (p.hash, vec![face(1)])).collect();
+        faces.insert(out[0], vec![face(42)]);
+        let mut sharper = face(42);
+        sharper.sharpness = 0.9;
+        faces.insert(out[1], vec![face(1), sharper]);
+        let hints = DraftHints {
+            faces,
+            ..DraftHints::default()
+        };
+        let d = with(&photos, &hints);
+        let got = |h: ContentHash| d.photos.iter().find(|p| p.hash == h).unwrap();
+        assert!(got(out[1]).included, "det skarpeste ansiktet av mormor");
+        assert_eq!(got(out[1]).reason, Reason::AlleErMed);
+        assert!(!got(out[0]).included, "ett bilde er nok");
+        assert!(d.events[0].layout.iter().any(|p| p
+            .photos
+            .contains(&d.photos.iter().position(|p| p.hash == out[1]).unwrap())));
+
+        // Valgt bort av brukeren: da blir det ikke tatt med likevel.
+        let decisions = HashMap::from([(out[1], Decision::IkkeMed)]);
+        let d = make_draft(
+            &photos,
+            &decisions,
+            &Preferences::default(),
+            &DraftConfig::default(),
+            &hints,
+            &mut |_| {},
+        );
+        let got = |h: ContentHash| d.photos.iter().find(|p| p.hash == h).unwrap();
+        assert!(!got(out[1]).included);
+        assert_eq!(got(out[0]).reason, Reason::AlleErMed);
     }
 }

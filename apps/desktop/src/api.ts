@@ -85,6 +85,7 @@ export type Begrunnelseskode =
   | "god_kvalitet"
   | "stemningsbilde"
   | "fornoyd"
+  | "alle_er_med"
   | "valgt_bort_av_deg"
   | "samme_serie"
   | "nesten_likt"

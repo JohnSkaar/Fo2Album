@@ -420,6 +420,7 @@ impl From<Reason> for ReasonDto {
             Reason::GodKvalitet => ("god_kvalitet", None),
             Reason::Stemningsbilde => ("stemningsbilde", None),
             Reason::Fornoyd => ("fornoyd", None),
+            Reason::AlleErMed => ("alle_er_med", None),
             Reason::Gjenstand => ("gjenstand", None),
             Reason::EnStemningHolder => ("en_stemning_holder", None),
             Reason::ValgtBortAvDeg => ("valgt_bort_av_deg", None),
