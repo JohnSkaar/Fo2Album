@@ -2,6 +2,7 @@
 //! `p2a-*`-pakkene, som gjør selve arbeidet.
 
 mod commands;
+mod feedback;
 mod keys;
 mod people;
 mod print;
@@ -23,6 +24,9 @@ const DATA_DIR_ENV: &str = "P2A_DATA_DIR";
 struct AppInfo {
     version: &'static str,
     core_version: &'static str,
+    /// Operativsystem og prosessor (til tilbakemeldinger kunden selv sender).
+    os: String,
+    feedback_email: &'static str,
 }
 
 #[tauri::command]
@@ -30,6 +34,8 @@ fn app_info() -> AppInfo {
     AppInfo {
         version: env!("CARGO_PKG_VERSION"),
         core_version: p2a_core::VERSION,
+        os: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
+        feedback_email: feedback::FEEDBACK_EMAIL,
     }
 }
 
@@ -77,6 +83,7 @@ pub fn run() {
             commands::make_album_draft,
             commands::draft_without_waiting,
             commands::open_original,
+            feedback::open_feedback_mail,
             commands::cloud_years,
             commands::fetch_cloud,
             commands::cancel_cloud,

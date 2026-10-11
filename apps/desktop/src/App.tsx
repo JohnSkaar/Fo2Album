@@ -13,6 +13,7 @@ import {
   type Handling,
   type Albumtekst,
   type Albumvalg,
+  type AppInfo,
   type Ansiktsgruppe,
   type Personer,
   type Ramme,
@@ -30,6 +31,7 @@ import { RecoverScreen } from "./components/RecoverScreen";
 import { RecoveryKeyScreen } from "./components/RecoveryKeyScreen";
 import { Sidebar, type Visning } from "./components/Sidebar";
 import { type Skyfremdrift, Skyhenting } from "./components/Skyhenting";
+import { Tilbakemelding } from "./components/Tilbakemelding";
 import { StartScreen } from "./components/StartScreen";
 import { Toast } from "./components/Toast";
 import { Welcome } from "./components/Welcome";
@@ -71,6 +73,7 @@ export function App() {
   // Bilder som bare ligger i skyen, per år, og fremdriften mens de hentes.
   const [skyAar, setSkyAar] = useState<{ year: number; count: number }[]>([]);
   const [skyhenting, setSkyhenting] = useState<Skyfremdrift | null>(null);
+  const [tilbakemelding, setTilbakemelding] = useState<AppInfo | null | false>(false);
   const [fremdrift, setFremdrift] = useState<Fremdrift | null>(null);
   const [rapport, setRapport] = useState<Innlesingsrapport | null>(null);
   const [bekreftSlett, setBekreftSlett] = useState(false);
@@ -602,7 +605,26 @@ export function App() {
         onAddFolder={() => void velgMappe()}
         onRemoveSource={(k) => void fjernKilde(k)}
         onDeleteAll={() => setBekreftSlett(true)}
+        onFeedback={() => {
+          setTilbakemelding(null);
+          api.appInfo().then(setTilbakemelding, () => undefined);
+        }}
       />
+      {tilbakemelding !== false && (
+        <Tilbakemelding
+          info={tilbakemelding}
+          onClose={() => setTilbakemelding(false)}
+          onSend={(emne, tekst) => {
+            api.sendTilbakemelding(emne, tekst).then(
+              () => {
+                setTilbakemelding(false);
+                visMelding(tekster.tilbakemelding.sendt);
+              },
+              (e) => visMelding(feiltekst(e)),
+            );
+          }}
+        />
+      )}
       <main className="main">{innhold}</main>
       <ConfirmDialog
         open={bekreftSlett}

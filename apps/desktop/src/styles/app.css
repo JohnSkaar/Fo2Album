@@ -2126,3 +2126,42 @@ span.pg2__fr {
 .sky__tekst .loadbox__row {
   align-self: stretch;
 }
+
+/* Gi oss tilbakemelding */
+.dialog.tilbake {
+  width: min(620px, calc(100vw - 48px));
+  max-width: none;
+}
+.tilbake .dialog__actions .btn {
+  white-space: nowrap;
+}
+.tilbake__slag {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  margin: 0 0 var(--spacing-sm);
+  padding: 0;
+  border: 0;
+}
+.tilbake__slag legend {
+  margin-bottom: var(--spacing-xs);
+  font-weight: 700;
+}
+.tilbake__slag label,
+.tilbake__info {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+.tilbake__vis {
+  margin: var(--spacing-sm) 0;
+  font-size: 14px;
+}
+.tilbake__vis pre {
+  margin: var(--spacing-xs) 0 0;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-subtle);
+  white-space: pre-wrap;
+  font: 13px/1.5 var(--font-body);
+}

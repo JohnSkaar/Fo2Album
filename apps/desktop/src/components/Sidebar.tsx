@@ -11,6 +11,7 @@ export function Sidebar({
   onAddFolder,
   onRemoveSource,
   onDeleteAll,
+  onFeedback,
   locked,
   view,
   onView,
@@ -20,6 +21,8 @@ export function Sidebar({
   onAddFolder: () => void;
   onRemoveSource: (k: Kilde) => void;
   onDeleteAll: () => void;
+  /** «Gi oss tilbakemelding». */
+  onFeedback?: () => void;
   /** Før lagringen er åpnet vises bare logo og låsmerknad. */
   locked: boolean;
   /** Valgt visning; `null` før det finnes bildekilder. */
@@ -109,6 +112,11 @@ export function Sidebar({
             <b>{tekster.lokalt.tittel}</b> {tekster.lokalt.tekst}
           </span>
         </div>
+        {!locked && onFeedback && (
+          <button type="button" className="linkbtn" onClick={onFeedback}>
+            {tekster.tilbakemelding.knapp}
+          </button>
+        )}
         {!locked && (
           <button type="button" className="linkbtn" onClick={onDeleteAll}>
             {tekster.nav.slettAlleData}

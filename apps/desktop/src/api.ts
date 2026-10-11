@@ -10,6 +10,14 @@ export type KildeType = "pc" | "dropbox" | "icloud" | "google_disk" | "apple_pho
 export type LagringStatus = "tom" | "trenger_gjenoppretting" | "laast" | "klar";
 export type Datokilde = "exif" | "filnavn" | "endringstid";
 
+/** Appens versjon, til tilbakemeldinger kunden selv sender. */
+export interface AppInfo {
+  version: string;
+  coreVersion: string;
+  os: string;
+  feedbackEmail: string;
+}
+
 export interface Kilde {
   id: number;
   kind: KildeType;
@@ -393,6 +401,10 @@ export const api = {
     listen<{ fetched: number; failed: number; cancelled: boolean }>("skyhenting-ferdig", (e) =>
       cb(e.payload),
     ),
+  appInfo: () => invoke<AppInfo>("app_info"),
+  /** Åpner tilbakemeldingen i kundens eget e-postprogram. */
+  sendTilbakemelding: (subject: string, body: string) =>
+    invoke<void>("open_feedback_mail", { subject, body }),
   startInnlesing: () => invoke<void>("start_ingest"),
   avbrytInnlesing: () => invoke<void>("cancel_ingest"),
   innlesingPagar: () => invoke<boolean>("ingest_running"),

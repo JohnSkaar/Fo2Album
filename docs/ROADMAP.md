@@ -14,4 +14,5 @@ Rekkefølgen er valgt slik at algoritmen kan måles tidlig. Hver milepæl ender 
 | M5 | Hendelser og full målfunksjon | Hendelsesklynging, viktighet, kalender, lokal geokoding, spesielle øyeblikk og betydning (SCORING §3.6), submodulært utvalg, forklaringer | Beholdt-andel ≥ 60 % i intern test |
 | M6 | Layout og redigering | Sidevekt, maler (helside, 2, 3, 4, serie-oppslag), rytmeregler, kapitler, bildetekster, redigering, forsidevelger. Kommentarer på utkastet, oppskarping, kryptert sikkerhetskopi | Hele albumet kan finpusses i appen |
 | M7 (påbegynt) | Trykk | Trykk-PDF etter trykkeriets krav, omslag med rygg, bestilling (kun PDF sendes) med kunde-ID som nøkkelpar og minimale opplysninger hos oss | Første fysiske prøvetrykk |
-| M8 | Beta | 10–20 familier, innsamling av tilbakemelding (opt-in, uten bilder), kalibrering av vekter | Beholdt-andel ≥ 70 %, «alle er med» |
+| M7a | Adminsiden (A1) | Bestillinger, leverandører og fakturering, se `docs/ADMIN.md` | Første ordre kan følges fra betaling til levering |
+| M8 | Beta | 10–20 familier, innsamling av tilbakemelding (opt-in, uten bilder; «Gi oss tilbakemelding» finnes i appen), tilbakemeldinger og forbedringslogg i adminsiden (A2), kalibrering av vekter | Beholdt-andel ≥ 70 %, «alle er med» |

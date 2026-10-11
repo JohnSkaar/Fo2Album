@@ -275,6 +275,31 @@ export const tekster = {
     malValgt: "Rammene er valgt, og siden er merket «Fornøyd»",
     bildePaaSiden: (dato: string) => `Bilde fra ${dato} på siden`,
   },
+  tilbakemelding: {
+    knapp: "Gi oss tilbakemelding",
+    tittel: "Gi oss tilbakemelding",
+    ingress:
+      "Fortell oss hva som fungerer, hva som er vanskelig, eller hva du savner. Vi leser alt.",
+    hvaGjelder: "Hva gjelder det?",
+    slag: {
+      forslag: "Et forslag",
+      feil: "Noe fungerer ikke",
+      ros: "Noe jeg liker",
+    },
+    tekstEtikett: "Din melding",
+    ikkeBilder:
+      "Bildene dine sendes aldri. Skriv gjerne hva du gjorde, så vi forstår hva som skjedde.",
+    medInfo: "Ta med appversjon og operativsystem (hjelper oss å finne feil)",
+    seHva: (adresse: string) => `Se nøyaktig hva som sendes til ${adresse}`,
+    send: "Åpne i e-postprogrammet",
+    kopier: "Kopier teksten",
+    kopiert: (adresse: string) => `Teksten er kopiert. Lim den inn i en e-post til ${adresse}.`,
+    sendt: "E-postprogrammet ditt åpnes med meldingen. Trykk «Send» der.",
+    emne: (slag: string) => `Tilbakemelding fra Fo2Album: ${slag.toLowerCase()}`,
+    typeEtikett: "Gjelder",
+    versjonEtikett: "Appversjon",
+    systemEtikett: "System",
+  },
   sky: {
     tittel: (n: number, aar: number) =>
       `${antall(n, "bilde", "bilder")} fra ${aar} ligger bare i skyen`,
@@ -630,6 +655,8 @@ export const tekster = {
     ferdig: "Alle data er slettet",
   },
   feil: {
+    ingen_epost:
+      "Fant ikke noe e-postprogram. Trykk «Kopier teksten» og lim den inn i en e-post i stedet.",
     finnes_ikke: "Fant ikke originalfilen. Er disken eller mappen koblet fra?",
     feil_nokkel: "Nøkkelen passer ikke. Sjekk at du har skrevet den riktig.",
     ugyldig_kode: "Det ser ut som det er en skrivefeil i nøkkelen. Sjekk tegnene og prøv igjen.",
