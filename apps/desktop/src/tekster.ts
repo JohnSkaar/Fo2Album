@@ -275,6 +275,25 @@ export const tekster = {
     malValgt: "Rammene er valgt, og siden er merket «Fornøyd»",
     bildePaaSiden: (dato: string) => `Bilde fra ${dato} på siden`,
   },
+  lupe: {
+    henter: "Henter bildet i full størrelse …",
+    feil: "Fant ikke originalfilen. Viser miniatyren.",
+    punkter: (w: number, h: number) => `${fmt(w)} × ${fmt(h)} punkter`,
+    zoom: (p: number) => `${fmt(p)} %`,
+    mindre: "Zoom ut",
+    storre: "Zoom inn",
+    tilpass: "Hele bildet",
+    full: "100 %",
+    aapne: "Åpne originalen",
+    aapneHjelp: "Åpner originalfilen i maskinens egen bildeviser",
+    hjelp:
+      "Klikk i bildet for å se det i 100 %, og klikk igjen for hele bildet. Dra i rullefeltene eller bruk musehjulet for å flytte deg rundt. Tastene + og − zoomer.",
+    tittel: "Bildet i full størrelse",
+    ansikt: "Se hele bildet",
+    ansiktI: (n: number) => `Se ansikt ${fmt(n)} i hele bildet`,
+    seFullt: "Full størrelse",
+    seFulltHjelp: "Se bildet i full oppløsning, for å sjekke om det er skarpt",
+  },
   fyll: {
     tittel: (n: number) => `Fyll rammen med ${antall(n, "bilde", "bilder")}`,
     hjelp:
@@ -592,6 +611,7 @@ export const tekster = {
     ferdig: "Alle data er slettet",
   },
   feil: {
+    finnes_ikke: "Fant ikke originalfilen. Er disken eller mappen koblet fra?",
     feil_nokkel: "Nøkkelen passer ikke. Sjekk at du har skrevet den riktig.",
     ugyldig_kode: "Det ser ut som det er en skrivefeil i nøkkelen. Sjekk tegnene og prøv igjen.",
     innlesing_pagar: "Vent til appen er ferdig med å lese bildene.",

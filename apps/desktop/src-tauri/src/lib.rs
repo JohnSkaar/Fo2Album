@@ -76,6 +76,7 @@ pub fn run() {
             commands::photos_in_year,
             commands::make_album_draft,
             commands::draft_without_waiting,
+            commands::open_original,
             commands::choose_photo,
             commands::answer_why,
             commands::album_choice,

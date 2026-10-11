@@ -250,6 +250,15 @@ export function App() {
     await endreAlbum(c, tekster.sider.rammeFylt);
   };
 
+  /** Åpner originalfilen i maskinens bildeviser. */
+  const aapneOriginal = async (id: string) => {
+    try {
+      await api.aapneOriginal(id);
+    } catch (e) {
+      visMelding(feiltekst(e));
+    }
+  };
+
   /** Tar med eller tar bort mange markerte bilder på en gang. */
   const velgFlere = async (action: "ta_med" | "ta_bort", ids: string[]) => {
     if (!utkast || ids.length === 0) return;
@@ -496,6 +505,8 @@ export function App() {
             onIgnore={(g) => void ignorer(g)}
             onMove={(f) => void flytt(f)}
             onLoadAll={api.alleAnsikter}
+            fulltUrl={api.fulltUrl}
+            onOpenOriginal={(id) => void aapneOriginal(id)}
             onSplit={(g, ids) => void skillUt(g, ids)}
           />
         ) : visning === "utkast" ? (
@@ -518,6 +529,8 @@ export function App() {
             onAnswer={(id, r) => void svarHvorfor(id, r)}
             thumbUrl={api.miniatyrUrl}
             stortUrl={api.stortUrl}
+            fulltUrl={api.fulltUrl}
+            onOpenOriginal={(id) => void aapneOriginal(id)}
             hentTekst={api.albumtekst}
             rammer={rammer}
           />

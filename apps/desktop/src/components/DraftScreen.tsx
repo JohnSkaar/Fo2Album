@@ -21,6 +21,7 @@ import { datoSpenn, HVORFOR_VALG, oppdaterSider, spoerOmHvorfor } from "../utkas
 import { Bla } from "./Bla";
 import { type Dra, RammeIkon, Sidebilde } from "./Side";
 import { FyllRamme, type Kandidat, type Rest } from "./FyllRamme";
+import { Lupe } from "./Lupe";
 import { StorVisning } from "./StorVisning";
 
 const t = tekster.utkast;
@@ -961,6 +962,8 @@ export function DraftScreen({
   onFillFrame,
   thumbUrl,
   stortUrl = thumbUrl,
+  fulltUrl,
+  onOpenOriginal,
   hentTekst,
 }: {
   /** Året albumet lages for (til tittelen mens gjennomgangen pågår). */
@@ -999,12 +1002,17 @@ export function DraftScreen({
   thumbUrl: (id: string) => string;
   /** Stor visning fra originalfilen (faller tilbake til miniatyren). */
   stortUrl?: (id: string) => string;
+  /** Bildet i full oppløsning, til «Full størrelse». */
+  fulltUrl?: (id: string) => string;
+  /** Åpner originalfilen i maskinens egen bildeviser. */
+  onOpenOriginal?: (id: string) => void;
   /** Tekstene i albumet, til «Bla i albumet». */
   hentTekst?: (year: number) => Promise<Albumtekst>;
 }) {
   const [valgt, setValgt] = useState<Valgt | null>(null);
   const [markert, setMarkert] = useState<Set<string>>(new Set());
   const [stor, setStor] = useState<{ id: string; utsnitt: boolean } | null>(null);
+  const [lupe, setLupe] = useState<string | null>(null);
   const [bla, setBla] = useState(false);
   const [tekst, setTekst] = useState<Albumtekst | null>(null);
   const [spm, setSpm] = useState<Spørsmål | null>(null);
@@ -1160,6 +1168,7 @@ export function DraftScreen({
   const rotasjon = new Map(draft.photos.filter((b) => b.rotation).map((b) => [b.id, b.rotation]));
   const hendelserMed = draft.events.filter((e) => e.included > 0).length;
   const storBilde = stor ? alleBilder.get(stor.id) : undefined;
+  const lupeBilde = lupe ? alleBilder.get(lupe) : undefined;
   const checks = draft.checks ?? [];
   const varsel = new Set(checks.filter((c) => c.place === "side").map((c) => c.photo));
   const valgtSjekk = valgtBilde ? checks.find((c) => c.photo === valgtBilde.id) : undefined;
@@ -1487,6 +1496,16 @@ export function DraftScreen({
                 >
                   {r.visStort}
                 </button>
+                {fulltUrl && (
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    title={tekster.lupe.seFulltHjelp}
+                    onClick={() => setLupe(valgtBilde.id)}
+                  >
+                    🔍 {tekster.lupe.seFullt}
+                  </button>
+                )}
                 {valgtFelt && (valgtFelt.fill || valgtBilde.whole) && (
                   <button
                     type="button"
@@ -1538,8 +1557,20 @@ export function DraftScreen({
           startUtsnitt={stor.utsnitt}
           stortUrl={stortUrl}
           thumbUrl={thumbUrl}
+          fulltUrl={fulltUrl}
+          onOpenOriginal={onOpenOriginal}
           onChange={onChange}
           onClose={() => setStor(null)}
+        />
+      )}
+      {lupeBilde && fulltUrl && (
+        <Lupe
+          src={fulltUrl(lupeBilde.id)}
+          reserve={thumbUrl(lupeBilde.id)}
+          rotation={lupeBilde.rotation}
+          tittel={`${tekster.lupe.tittel}, ${datoTekst(lupeBilde.takenAt)}`}
+          onOpenOriginal={onOpenOriginal && (() => onOpenOriginal(lupeBilde.id))}
+          onClose={() => setLupe(null)}
         />
       )}
       {bla && (

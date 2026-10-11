@@ -15,6 +15,9 @@ pub const SCHEME: &str = "miniatyr";
 pub const LARGE_SCHEME: &str = "stort";
 /// Lengste side i stor visning.
 const LARGE_PX: u32 = 1800;
+/// «Full størrelse» (`stort://localhost/<hash>?full`): bildets egen oppløsning, men høyst så
+/// mange punkter på lengste side, så et svært panorama ikke fyller minnet.
+const FULL_PX: u32 = 12_000;
 
 fn not_found() -> Response<Vec<u8>> {
     Response::builder()
@@ -31,11 +34,20 @@ pub fn handle_large<R: Runtime>(
 ) {
     let app = ctx.app_handle().clone();
     let path = req.uri().path().to_string();
-    std::thread::spawn(move || responder.respond(large(&app, &path).unwrap_or_else(not_found)));
+    let full = wants_full(req.uri().query());
+    std::thread::spawn(move || {
+        responder.respond(large(&app, &path, full).unwrap_or_else(not_found))
+    });
 }
 
-fn large<R: Runtime>(app: &AppHandle<R>, path: &str) -> Option<Response<Vec<u8>>> {
+/// Om spørringen ber om full størrelse (`?full`).
+fn wants_full(query: Option<&str>) -> bool {
+    query.is_some_and(|q| q.split('&').any(|p| p == "full" || p.starts_with("full=")))
+}
+
+fn large<R: Runtime>(app: &AppHandle<R>, path: &str, full: bool) -> Option<Response<Vec<u8>>> {
     let hash = parse_hash(path)?;
+    let (px, quality) = if full { (FULL_PX, 92) } else { (LARGE_PX, 85) };
     let file = {
         let state = app.state::<AppState>();
         let guard = state.store.lock().unwrap_or_else(|e| e.into_inner());
@@ -45,10 +57,10 @@ fn large<R: Runtime>(app: &AppHandle<R>, path: &str) -> Option<Response<Vec<u8>>
         &file.path,
         file.format.as_deref(),
         file.orientation,
-        LARGE_PX,
+        px,
     )
     .ok()?;
-    let bytes = p2a_ingest::decode::preview_jpeg(&decoded, LARGE_PX, 85);
+    let bytes = p2a_ingest::decode::preview_jpeg(&decoded, px, quality);
     Some(
         Response::builder()
             .header("Content-Type", "image/jpeg")
@@ -98,5 +110,7 @@ mod tests {
         );
         assert_eq!(parse_hash("/abc"), None);
         assert_eq!(parse_hash(&format!("/{}", "zz".repeat(32))), None);
+        assert!(wants_full(Some("full")) && wants_full(Some("a=1&full=1")));
+        assert!(!wants_full(None) && !wants_full(Some("fullt")));
     }
 }

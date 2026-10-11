@@ -109,3 +109,28 @@ describe("skille ut søsken", () => {
     expect(screen.queryByRole("button", { name: t.skillUt(1) })).toBeNull();
   });
 });
+
+describe("ansiktet i hele bildet", () => {
+  it("klikk på et ansikt viser hele bildet i full størrelse, med ansiktet merket", async () => {
+    const onOpenOriginal = vi.fn();
+    render(
+      <PeopleScreen
+        people={personer}
+        thumbUrl={(id) => `miniatyr://${id}`}
+        fulltUrl={(id) => `stort://${id}?full`}
+        onOpenOriginal={onOpenOriginal}
+        onName={vi.fn()}
+        onIgnore={vi.fn()}
+        onMove={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getAllByRole("button", { name: tekster.lupe.ansikt })[0]!);
+    const d = screen.getByRole("dialog", { name: tekster.lupe.tittel });
+    expect(d.querySelector(`img[src="stort://${"ab".repeat(32)}?full"]`)).not.toBeNull();
+    expect(d.querySelector(".lupe__boks")).toHaveStyle({ left: "30%", width: "20%" });
+    await userEvent.click(within(d).getByRole("button", { name: tekster.lupe.aapne }));
+    expect(onOpenOriginal).toHaveBeenCalledWith("ab".repeat(32));
+    await userEvent.click(within(d).getByRole("button", { name: tekster.utkast.lukk }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});

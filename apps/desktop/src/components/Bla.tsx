@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Albumtekst, Side, Utkast, UtkastBilde } from "../api";
 import { tekster } from "../tekster";
+import { Lukk } from "./Lukk";
 import { bildeStil, Sidebilde } from "./Side";
 
 const t = tekster.redigering;
@@ -223,11 +224,9 @@ export function Bla({
       }}
     >
       <div className="bla__top">
+        <Lukk onClick={onClose} />
         <span role="status">{t.oppslag(n + 1, alle.length)}</span>
         <span className="bla__hjelp">{t.blaHjelp}</span>
-        <button type="button" className="btn btn--secondary btn--sm" onClick={onClose}>
-          {tekster.utkast.lukk}
-        </button>
       </div>
       <div className="bla__opp">{(alle[n] ?? []).map(blad)}</div>
       {!skriv && tekstside && onSaveText && (

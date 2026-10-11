@@ -1,6 +1,7 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import type { Ramme, UtkastBilde } from "../api";
 import { datoTekst, tekster } from "../tekster";
+import { Lukk } from "./Lukk";
 import { bildeStil, RammeIkon, SIDE_FORHOLD } from "./Side";
 
 const t = tekster.fyll;
@@ -119,6 +120,7 @@ export function FyllRamme({
         onClose();
       }}
     >
+      <Lukk onClick={onClose} label={tekster.trykk.avbryt} fast />
       <div className="fyll__side">
         <div className="fyll__ark" style={{ aspectRatio: SIDE_FORHOLD.toFixed(4) }}>
           {ramme.frames.map((f, i) => {
@@ -237,9 +239,6 @@ export function FyllRamme({
           </fieldset>
         )}
         <div className="dialog__actions">
-          <button type="button" className="btn btn--secondary" onClick={onClose}>
-            {tekster.trykk.avbryt}
-          </button>
           <button
             type="button"
             className="btn btn--primary"

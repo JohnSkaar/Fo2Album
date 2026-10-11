@@ -5,6 +5,7 @@ import { oppslag } from "./components/Bla";
 import { DraftScreen, nyStorrelse } from "./components/DraftScreen";
 import { bildeStil, utsnittFoerRotering } from "./components/Side";
 import { bytt, plasser } from "./components/FyllRamme";
+import { nesteZoom, zoomFor } from "./components/Lupe";
 import { nyttUtsnitt } from "./components/StorVisning";
 import { tekster } from "./tekster";
 
@@ -389,5 +390,20 @@ describe("utkastet venter på innlesingen", () => {
     expect(screen.getByText(tekster.utkast.jobber(0))).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: tekster.utkast.ikkeVent }));
     expect(onSkipWait).toHaveBeenCalled();
+  });
+});
+
+describe("lupe", () => {
+  it("zoomtrinn og tilpasning", () => {
+    expect(nesteZoom(0.3, 1)).toBe(0.5);
+    expect(nesteZoom(1, 1)).toBe(1.5);
+    expect(nesteZoom(1, -1)).toBe(0.75);
+    expect(nesteZoom(4, 1)).toBe(4);
+    // 4000 × 3000 i et vindu på 1000 × 1000: en fjerdedel.
+    expect(zoomFor(4000, 3000, 1000, 1000)).toBe(0.25);
+    // Små bilder forstørres ikke.
+    expect(zoomFor(800, 600, 1000, 1000)).toBe(1);
+    // Ansiktet (en tidel av bildet) fyller vinduet: 100 % er nok.
+    expect(zoomFor(4000, 3000, 1000, 1000, 0.1)).toBe(1);
   });
 });

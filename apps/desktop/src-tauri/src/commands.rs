@@ -932,6 +932,37 @@ pub fn draft_without_waiting(state: State<'_, AppState>) {
     state.skip_wait.store(true, Ordering::Relaxed);
 }
 
+/// Åpner originalfilen i maskinens egen bildeviser. Filen sendes ingen steder.
+#[tauri::command]
+pub fn open_original(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    let hash = parse_id(&id)?;
+    let file = {
+        let guard = state.store()?;
+        let store = guard.as_ref().expect("sjekket");
+        store
+            .photo_files(&[hash])?
+            .remove(&hash)
+            .ok_or_else(|| CommandError::new("finnes_ikke", id.clone()))?
+    };
+    if !file.path.is_file() {
+        return Err(CommandError::new(
+            "finnes_ikke",
+            file.path.display().to_string(),
+        ));
+    }
+    #[cfg(target_os = "macos")]
+    let mut cmd = std::process::Command::new("open");
+    // Utforskeren åpner filen i programmet som er valgt for bilder.
+    #[cfg(target_os = "windows")]
+    let mut cmd = std::process::Command::new("explorer");
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let mut cmd = std::process::Command::new("xdg-open");
+    cmd.arg(&file.path)
+        .spawn()
+        .map_err(|e| CommandError::new("ukjent", e.to_string()))?;
+    Ok(())
+}
+
 fn parse_id(id: &str) -> CmdResult<ContentHash> {
     ContentHash::from_hex(id).ok_or_else(|| CommandError::new("ukjent_bilde", id.to_string()))
 }

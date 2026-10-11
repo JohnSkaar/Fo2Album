@@ -1887,9 +1887,9 @@ span.pg2__fr {
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
   gap: var(--spacing-xs);
-  max-height: 360px;
+  max-height: 420px;
   overflow-y: auto;
 }
 .split__face {
@@ -1921,6 +1921,141 @@ span.pg2__fr {
 .split__face[aria-pressed="true"] .split__mark {
   display: block;
 }
+.split__faces li {
+  position: relative;
+}
+.split__zoom {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-full);
+  background: var(--color-bg-surface);
+  font-size: 12px;
+  line-height: 1;
+  cursor: zoom-in;
+  opacity: 0.85;
+}
+.split__zoom:hover,
+.split__zoom:focus-visible {
+  opacity: 1;
+}
+.pgroup__zoom {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  cursor: zoom-in;
+}
+.pgroup__zoom:hover .face {
+  outline: 3px solid var(--color-border-brand);
+}
+
+/* Lupe: bildet i full størrelse */
+.lupe {
+  border: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  background: var(--color-bg-inverse);
+  color: var(--color-text-inverse);
+}
+.lupe[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.lupe::backdrop {
+  background: var(--color-bg-inverse);
+}
+.lupe__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+.lupe__info {
+  font: 600 14px/20px var(--font-body);
+}
+.lupe__knapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+.lupe__vindu {
+  position: relative;
+  overflow: auto;
+  min-height: 0;
+}
+.lupe__reserve {
+  position: absolute;
+  inset: 16px;
+  width: calc(100% - 32px);
+  height: calc(100% - 32px);
+  object-fit: contain;
+  filter: blur(2px);
+}
+.lupe__lerret {
+  position: relative;
+  margin: 16px auto;
+  cursor: zoom-in;
+}
+.lupe__lerret img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: none;
+  image-rendering: auto;
+}
+.lupe__boks {
+  position: absolute;
+  border: 3px solid var(--color-border-brand);
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--color-bg-surface);
+  pointer-events: none;
+}
+.lupe__hjelp {
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-md) var(--spacing-sm);
+  font-size: 13px;
+  opacity: 0.8;
+}
+.lb__whole--zoom {
+  cursor: zoom-in;
+}
 .pgroup__split {
   align-self: flex-start;
+}
+
+/* Veien ut av store visninger: alltid øverst til venstre */
+.lukk {
+  flex: none;
+}
+.lukk--fast {
+  position: absolute;
+  top: var(--spacing-sm);
+  left: var(--spacing-sm);
+  z-index: 5;
+  box-shadow: var(--shadow-md);
+}
+.lb,
+.fyll {
+  position: fixed;
+}
+.bla__top {
+  justify-content: flex-start;
+}
+.bla__top [role="status"] {
+  margin-left: auto;
+}
+.fyll__side {
+  padding-top: calc(var(--spacing-lg) + 32px);
 }

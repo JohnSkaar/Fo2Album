@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Albumvalg, Felt, UtkastBilde } from "../api";
 import { datoTekst, tekster } from "../tekster";
+import { Lukk } from "./Lukk";
+import { Lupe } from "./Lupe";
 import { bildeStil, SIDE_FORHOLD } from "./Side";
 
 const t = tekster.redigering;
@@ -42,6 +44,8 @@ export function StorVisning({
   startUtsnitt,
   stortUrl,
   thumbUrl,
+  fulltUrl,
+  onOpenOriginal,
   onChange,
   onClose,
 }: {
@@ -51,6 +55,9 @@ export function StorVisning({
   startUtsnitt?: boolean;
   stortUrl: (id: string) => string;
   thumbUrl: (id: string) => string;
+  /** Bildet i full oppløsning (til «Full størrelse»). */
+  fulltUrl?: (id: string) => string;
+  onOpenOriginal?: (id: string) => void;
   onChange: (c: Albumvalg, melding?: string) => void;
   onClose: () => void;
 }) {
@@ -58,6 +65,7 @@ export function StorVisning({
   const [utsnitt, setUtsnitt] = useState(!!startUtsnitt);
   const [fokus, setFokus] = useState<[number, number]>(b.focus);
   const [stortFeilet, setStortFeilet] = useState(false);
+  const [lupe, setLupe] = useState(false);
   useEffect(() => {
     const d = ref.current;
     if (!d || d.open) return;
@@ -81,6 +89,7 @@ export function StorVisning({
         onClose();
       }}
     >
+      <Lukk onClick={onClose} fast />
       <div className="lb__img">
         {utsnitt && felt ? (
           <button
@@ -105,6 +114,22 @@ export function StorVisning({
               alt=""
               onError={() => setStortFeilet(true)}
               style={bildeStil({ ...b, focus: fokus }, !b.whole, rammeForhold)}
+            />
+          </button>
+        ) : fulltUrl ? (
+          <button
+            type="button"
+            className="lb__whole lb__whole--zoom"
+            style={{ aspectRatio: bildeForhold(b).toFixed(4) }}
+            aria-label={tekster.lupe.seFullt}
+            title={tekster.lupe.seFulltHjelp}
+            onClick={() => setLupe(true)}
+          >
+            <img
+              src={src}
+              alt=""
+              onError={() => setStortFeilet(true)}
+              style={bildeStil(b, false, bildeForhold(b))}
             />
           </button>
         ) : (
@@ -154,6 +179,16 @@ export function StorVisning({
             >
               ↻ {tekster.utkast.roter}
             </button>
+            {fulltUrl && (
+              <button
+                type="button"
+                className="btn btn--secondary btn--sm"
+                title={tekster.lupe.seFulltHjelp}
+                onClick={() => setLupe(true)}
+              >
+                🔍 {tekster.lupe.seFullt}
+              </button>
+            )}
             {kanUtsnitt && (
               <button
                 type="button"
@@ -166,12 +201,17 @@ export function StorVisning({
           </div>
         )}
         <p className="lb__note">{t.forhaand}</p>
-        {!utsnitt && (
-          <button type="button" className="btn btn--primary" onClick={onClose} autoFocus>
-            {tekster.utkast.lukk}
-          </button>
-        )}
       </div>
+      {lupe && fulltUrl && (
+        <Lupe
+          src={fulltUrl(b.id)}
+          reserve={thumbUrl(b.id)}
+          rotation={b.rotation}
+          tittel={`${tekster.lupe.tittel}, ${datoTekst(b.takenAt)}`}
+          onOpenOriginal={onOpenOriginal && (() => onOpenOriginal(b.id))}
+          onClose={() => setLupe(false)}
+        />
+      )}
     </dialog>
   );
 }

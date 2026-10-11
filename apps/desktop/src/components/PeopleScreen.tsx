@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Ansikt, Ansiktsgruppe, Person, Personer, Rolle } from "../api";
 import { tekster } from "../tekster";
+import { Lupe } from "./Lupe";
 
 const t = tekster.personer;
 const ROLLER = Object.keys(t.roller) as Rolle[];
@@ -51,9 +52,11 @@ function SkillUt({
   onLoadAll,
   onSplit,
   onClose,
+  onZoom,
 }: {
   g: Ansiktsgruppe;
   thumbUrl: (id: string) => string;
+  onZoom?: (a: Ansikt) => void;
   onLoadAll: (group: number) => Promise<Ansikt[]>;
   onSplit: (group: number, faceIds: number[]) => void;
   onClose: () => void;
@@ -99,6 +102,17 @@ function SkillUt({
                   ✓
                 </span>
               </button>
+              {onZoom && (
+                <button
+                  type="button"
+                  className="split__zoom"
+                  title={tekster.lupe.ansikt}
+                  aria-label={tekster.lupe.ansiktI(i + 1)}
+                  onClick={() => onZoom(a)}
+                >
+                  🔍
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -129,6 +143,7 @@ function Gruppe({
   onMove,
   onLoadAll,
   onSplit,
+  onZoom,
 }: {
   g: Ansiktsgruppe;
   persons: Person[];
@@ -138,6 +153,8 @@ function Gruppe({
   onMove: (faceId: number) => void;
   onLoadAll?: (group: number) => Promise<Ansikt[]>;
   onSplit?: (group: number, faceIds: number[]) => void;
+  /** Viser ansiktet i hele bildet, i full oppløsning. */
+  onZoom?: (a: Ansikt) => void;
 }) {
   const [endrer, setEndrer] = useState(g.personId === null);
   const [skiller, setSkiller] = useState(false);
@@ -151,7 +168,19 @@ function Gruppe({
       <ul className="pgroup__faces">
         {g.samples.map((a) => (
           <li key={a.faceId} className="pgroup__face">
-            <Ansiktsutsnitt a={a} thumbUrl={thumbUrl} />
+            {onZoom ? (
+              <button
+                type="button"
+                className="pgroup__zoom"
+                title={tekster.lupe.ansikt}
+                aria-label={tekster.lupe.ansikt}
+                onClick={() => onZoom(a)}
+              >
+                <Ansiktsutsnitt a={a} thumbUrl={thumbUrl} />
+              </button>
+            ) : (
+              <Ansiktsutsnitt a={a} thumbUrl={thumbUrl} />
+            )}
             {g.name && g.samples.length > 1 && (
               <button
                 type="button"
@@ -266,6 +295,7 @@ function Gruppe({
           <SkillUt
             g={g}
             thumbUrl={thumbUrl}
+            onZoom={onZoom}
             onLoadAll={onLoadAll}
             onSplit={(grp, ids) => {
               onSplit(grp, ids);
@@ -295,6 +325,8 @@ export function PeopleScreen({
   onMove,
   onLoadAll,
   onSplit,
+  fulltUrl,
+  onOpenOriginal,
 }: {
   people: Personer | null;
   thumbUrl: (id: string) => string;
@@ -305,7 +337,11 @@ export function PeopleScreen({
   onLoadAll?: (group: number) => Promise<Ansikt[]>;
   /** De markerte ansiktene blir en egen person. */
   onSplit?: (group: number, faceIds: number[]) => void;
+  /** Bildet i full oppløsning, så brukeren ser hvem ansiktet er. */
+  fulltUrl?: (id: string) => string;
+  onOpenOriginal?: (id: string) => void;
 }) {
+  const [lupe, setLupe] = useState<Ansikt | null>(null);
   const named = people?.groups.filter((g) => g.personId !== null) ?? [];
   const unknown = people?.groups.filter((g) => g.personId === null) ?? [];
   const props = {
@@ -316,6 +352,7 @@ export function PeopleScreen({
     onMove,
     onLoadAll,
     onSplit,
+    onZoom: fulltUrl ? setLupe : undefined,
   };
   return (
     <section className="people" aria-labelledby="personer-tittel">
@@ -348,6 +385,16 @@ export function PeopleScreen({
             ))}
           </ul>
         </>
+      )}
+      {lupe && fulltUrl && (
+        <Lupe
+          src={fulltUrl(lupe.id)}
+          reserve={thumbUrl(lupe.id)}
+          boks={lupe}
+          tittel={tekster.lupe.tittel}
+          onOpenOriginal={onOpenOriginal && (() => onOpenOriginal(lupe.id))}
+          onClose={() => setLupe(null)}
+        />
       )}
     </section>
   );

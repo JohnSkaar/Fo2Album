@@ -386,6 +386,10 @@ export const api = {
   miniatyrUrl: (id: string) => convertFileSrc(id, "miniatyr"),
   /** Stor visning, lest fra originalfilen og skalert i minnet. */
   stortUrl: (id: string) => convertFileSrc(id, "stort"),
+  /** Bildet i full oppløsning, fra originalfilen. */
+  fulltUrl: (id: string) => `${convertFileSrc(id, "stort")}?full`,
+  /** Åpner originalfilen i maskinens egen bildeviser. */
+  aapneOriginal: (id: string) => invoke<void>("open_original", { id }),
   rammer: () => invoke<Ramme[]>("page_templates"),
 
   /** `quiet`: lag utkastet på nytt uten gjennomgangen på skjermen (etter en endring). */
