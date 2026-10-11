@@ -90,6 +90,13 @@ pub struct DraftConfig {
     /// To stemningsbilder (ting uten personer) med pHash-avstand høyst dette regnes som samme
     /// ting, uansett når de er tatt: bare ett av dem kommer med i albumet.
     pub same_thing_hamming: u32,
+    /// Når bildet har ansikter som teller, veier skarpheten i hovedansiktet så mye i bildets
+    /// skarphet (resten er hele bildet): et portrett med uskarp bakgrunn er skarpt, et bilde
+    /// med uskarpe ansikter og skarp bakgrunn er det ikke.
+    pub face_sharp_weight: f32,
+    /// … men bare når hovedansiktet er minst så høyt (andel av bildehøyden). Små ansikter
+    /// forstørres før skarpheten måles, og ser da uskarpe ut selv når de ikke er det.
+    pub face_sharp_min_h: f32,
 }
 
 impl Default for DraftConfig {
@@ -125,6 +132,8 @@ impl Default for DraftConfig {
             min_photos_grandparents: 2,
             min_photos_other: 1,
             same_thing_hamming: 20,
+            face_sharp_weight: 0.65,
+            face_sharp_min_h: 0.12,
         }
     }
 }
@@ -332,10 +341,26 @@ pub fn make_draft(
 ) -> Draft {
     progress(Phase::Hendelser);
     let dated: Vec<&PhotoMeta> = photos.iter().filter(|p| p.taken_at.is_some()).collect();
-    let mut sharp_sorted: Vec<f32> = dated
-        .iter()
-        .filter_map(|p| p.quality.map(|q| q.sharp))
-        .collect();
+    // Skarpheten som teller: hovedansiktet (det største som teller) veier tyngst når bildet
+    // har personer, ellers hele bildet.
+    let sharp_of = |p: &PhotoMeta| -> Option<f32> {
+        let q = p.quality?;
+        let main = hints
+            .faces
+            .get(&p.hash)
+            .into_iter()
+            .flatten()
+            .filter(|f| f.counts())
+            .max_by(|a, b| a.h.total_cmp(&b.h))
+            .filter(|f| f.h >= cfg.face_sharp_min_h);
+        Some(match main {
+            Some(f) => {
+                cfg.face_sharp_weight * f.sharpness + (1.0 - cfg.face_sharp_weight) * q.sharp
+            }
+            None => q.sharp,
+        })
+    };
+    let mut sharp_sorted: Vec<f32> = dated.iter().filter_map(|p| sharp_of(p)).collect();
     sharp_sorted.sort_by(f32::total_cmp);
     let rank = |v: f32| {
         let below = sharp_sorted.partition_point(|&x| x < v);
@@ -348,7 +373,10 @@ pub fn make_draft(
     let mut items: Vec<Item> = dated
         .into_iter()
         .map(|p| {
-            let raw = p.quality;
+            let raw = p.quality.map(|q| BasicQuality {
+                sharp: sharp_of(p).unwrap_or(q.sharp),
+                ..q
+            });
             // Bilder brukeren har gjort større eller lagt i en egen historie, er med.
             let wanted = hints.sizes.get(&p.hash).is_some_and(|&s| s >= 1)
                 || hints.own_stories.iter().any(|s| s.contains(&p.hash));
@@ -2425,6 +2453,37 @@ mod tests {
     }
 
     #[test]
+    fn sharp_faces_count_more_than_a_sharp_background() {
+        let mut photos = day(0, 8, 8, 30);
+        // Portrett med uskarp bakgrunn: hele bildet er mykt, men ansiktet er skarpt.
+        photos[10].quality.as_mut().unwrap().sharp = 0.1;
+        // Skarp bakgrunn, men ansiktet er uskarpt (bevegelse).
+        photos[20].quality.as_mut().unwrap().sharp = 0.95;
+        let mut faces: HashMap<ContentHash, Vec<FaceInfo>> =
+            photos.iter().map(|p| (p.hash, vec![face(1)])).collect();
+        faces.get_mut(&photos[10].hash).unwrap()[0].sharpness = 0.95;
+        faces.get_mut(&photos[20].hash).unwrap()[0].sharpness = 0.05;
+        let hints = DraftHints {
+            faces,
+            ..DraftHints::default()
+        };
+        let d = with(&photos, &hints);
+        assert!(
+            !get(&d, &photos[10]).blurry,
+            "portrettet er skarpt der det teller"
+        );
+        assert!(
+            get(&d, &photos[20]).blurry,
+            "uskarpe ansikter gjør bildet uskarpt"
+        );
+
+        // Uten ansikter: bare hele bildet teller, som før.
+        let d = draft(&photos, &HashMap::new());
+        assert!(get(&d, &photos[10]).blurry);
+        assert!(!get(&d, &photos[20]).blurry);
+    }
+
+    #[test]
     fn everyone_named_is_in_the_album_at_least_once() {
         let photos = day(0, 8, 8, 60);
         let auto = draft(&photos, &HashMap::new());
@@ -2439,8 +2498,9 @@ mod tests {
         let mut faces: HashMap<ContentHash, Vec<FaceInfo>> =
             photos.iter().map(|p| (p.hash, vec![face(1)])).collect();
         faces.insert(out[0], vec![face(42)]);
+        // Større ansikt av mormor (like skarpt som de andre, så bildet ikke er bedre ellers).
         let mut sharper = face(42);
-        sharper.sharpness = 0.9;
+        sharper.h = 0.3;
         faces.insert(out[1], vec![face(1), sharper]);
         let hints = DraftHints {
             faces,
@@ -2448,7 +2508,7 @@ mod tests {
         };
         let d = with(&photos, &hints);
         let got = |h: ContentHash| d.photos.iter().find(|p| p.hash == h).unwrap();
-        assert!(got(out[1]).included, "det skarpeste ansiktet av mormor");
+        assert!(got(out[1]).included, "det beste ansiktet av mormor");
         assert_eq!(got(out[1]).reason, Reason::AlleErMed);
         assert!(!got(out[0]).included, "ett bilde er nok");
         assert!(d.events[0].layout.iter().any(|p| p
