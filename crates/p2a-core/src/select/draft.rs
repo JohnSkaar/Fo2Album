@@ -87,6 +87,9 @@ pub struct DraftConfig {
     pub min_photos_family: usize,
     pub min_photos_grandparents: usize,
     pub min_photos_other: usize,
+    /// To stemningsbilder (ting uten personer) med pHash-avstand høyst dette regnes som samme
+    /// ting, uansett når de er tatt: bare ett av dem kommer med i albumet.
+    pub same_thing_hamming: u32,
 }
 
 impl Default for DraftConfig {
@@ -121,6 +124,7 @@ impl Default for DraftConfig {
             min_photos_family: 6,
             min_photos_grandparents: 2,
             min_photos_other: 1,
+            same_thing_hamming: 20,
         }
     }
 }
@@ -178,6 +182,8 @@ pub enum Reason {
     Gjenstand,
     /// Et stemningsbilde herfra er allerede med.
     EnStemningHolder,
+    /// Et stemningsbilde av samme ting (ligner) er allerede med i albumet.
+    SammeTing,
     /// Det er ikke plass til flere fra hendelsen; `med` bilder herfra er med.
     IkkePlass {
         med: usize,
@@ -470,6 +476,8 @@ pub fn make_draft(
     }
 
     progress(Phase::Velger);
+    // Stemningsbilder som er med så langt i albumet, så samme ting ikke kommer igjen.
+    let mut album_moods: Vec<usize> = Vec::new();
     let mut included = vec![false; items.len()];
     let mut first_pick: Vec<Option<usize>> = vec![None; groups.len()];
     let mut out_of_order = vec![false; items.len()];
@@ -526,9 +534,17 @@ pub fn make_draft(
             &items,
             quota,
             mood_max,
+            &album_moods,
             &hints.children,
             prefs,
             cfg,
+        );
+        album_moods.extend(
+            already
+                .iter()
+                .chain(&picked)
+                .copied()
+                .filter(|&i| items[i].mood),
         );
         // Tur uten barn: alle personene får ett bilde hver, det beste ansiktet de har.
         if group.adult_trip {
@@ -684,6 +700,9 @@ pub fn make_draft(
         })
         .collect();
 
+    let mood_in: Vec<usize> = (0..items.len())
+        .filter(|&i| included[i] && items[i].mood)
+        .collect();
     let photos = items
         .iter()
         .enumerate()
@@ -699,7 +718,7 @@ pub fn make_draft(
                 let r = reason_in(it, chosen.len(), &burst_size, first, out_of_order[i]);
                 (r, None)
             } else {
-                match reason_out(it, &items, chosen, &burst_size, prefs, cfg) {
+                match reason_out(it, &items, chosen, &mood_in, &burst_size, prefs, cfg) {
                     // Med på fornøyde sider teller også.
                     (Reason::IkkePlass { .. }, rel) => (
                         Reason::IkkePlass {
@@ -1215,6 +1234,17 @@ fn quota(n: usize, pages: usize, scale: f32, prefs: &Preferences, cfg: &DraftCon
     (want.min(most).round() as usize).max(1)
 }
 
+/// To stemningsbilder av samme ting (ligner hverandre, uansett når de er tatt). Av ting holder
+/// det med ett bilde i albumet (eierens føring).
+fn same_thing(a: &Item, b: &Item, cfg: &DraftConfig) -> bool {
+    a.mood
+        && b.mood
+        && match (a.p.phash, b.p.phash) {
+            (Some(x), Some(y)) => (x ^ y).count_ones() <= cfg.same_thing_hamming,
+            _ => false,
+        }
+}
+
 fn similar(a: &Item, b: &Item, prefs: &Preferences, cfg: &DraftConfig) -> bool {
     match (a.p.phash, b.p.phash) {
         (Some(x), Some(y)) => {
@@ -1302,6 +1332,7 @@ fn pick(
     items: &[Item],
     quota: usize,
     mood_max: usize,
+    album_moods: &[usize],
     children: &HashSet<i64>,
     prefs: &Preferences,
     cfg: &DraftConfig,
@@ -1360,7 +1391,10 @@ fn pick(
         let blocked = |i: usize, chosen: &[usize]| {
             chosen.iter().any(|&j| {
                 items[j].burst == items[i].burst || similar(&items[i], &items[j], prefs, cfg)
-            })
+            }) || chosen
+                .iter()
+                .chain(album_moods)
+                .any(|&j| same_thing(&items[i], &items[j], cfg))
         };
         let open: Vec<usize> = cands
             .iter()
@@ -1439,6 +1473,7 @@ fn reason_out(
     it: &Item,
     items: &[Item],
     chosen: &[usize],
+    album_moods: &[usize],
     burst_size: &HashMap<usize, usize>,
     prefs: &Preferences,
     cfg: &DraftConfig,
@@ -1460,6 +1495,12 @@ fn reason_out(
     }
     if let Some(&j) = chosen.iter().find(|&&j| similar(it, &items[j], prefs, cfg)) {
         return (Reason::NestenLikt, Some(items[j].p.hash));
+    }
+    if let Some(&j) = album_moods
+        .iter()
+        .find(|&&j| same_thing(it, &items[j], cfg))
+    {
+        return (Reason::SammeTing, Some(items[j].p.hash));
     }
     if it.blurry {
         return (Reason::Uskarpt, nearest);
@@ -1764,6 +1805,97 @@ mod tests {
             .photos
             .iter()
             .any(|p| p.reason == Reason::EnStemningHolder));
+    }
+
+    #[test]
+    fn same_thing_only_once_in_the_album() {
+        // To bursdager i ulike måneder, begge med et flott bilde av samme kake (lik pHash).
+        let mut photos: Vec<PhotoMeta> = Vec::new();
+        for (month, base) in [(4u8, 0u16), (9, 300)] {
+            photos.extend((0..6u16).map(|k| photo(base + k, month, 4, 10, k as u8 * 8, 0, 0.7)));
+            let mut kake = thing(base + 100, 12, 0, 1.0);
+            kake.taken_at = TakenAt::new(2010, month, 4, 12, 0, 0);
+            kake.quality = Some(BasicQuality {
+                sharp: 1.0,
+                exposure: 1.0,
+                color: 1.0,
+                skin: 0.0,
+            });
+            // Samme ting: pHash skiller seg på noen få punkter.
+            kake.phash = Some(0xF0F0_F0F0_0F0F_0F0F ^ u64::from(month));
+            photos.push(kake);
+        }
+        let kaker = |d: &Draft| -> Vec<DraftPhoto> {
+            d.photos
+                .iter()
+                .filter(|p| [100u16, 400].contains(&u16::from_be_bytes([p.hash.0[0], p.hash.0[1]])))
+                .cloned()
+                .collect()
+        };
+        // Uten regelen ville begge vært med.
+        let uten = make_draft(
+            &photos,
+            &HashMap::new(),
+            &Preferences::default(),
+            &DraftConfig {
+                same_thing_hamming: 0,
+                ..DraftConfig::default()
+            },
+            &DraftHints::default(),
+            &mut |_| {},
+        );
+        assert_eq!(kaker(&uten).iter().filter(|p| p.included).count(), 2);
+
+        let d = draft(&photos, &HashMap::new());
+        let k = kaker(&d);
+        assert_eq!(k.iter().filter(|p| p.included).count(), 1);
+        let ute = k.iter().find(|p| !p.included).unwrap();
+        assert_eq!(ute.reason, Reason::SammeTing);
+        assert_eq!(
+            ute.related,
+            k.iter().find(|p| p.included).map(|p| p.hash),
+            "begrunnelsen peker på bildet som er med"
+        );
+    }
+
+    #[test]
+    fn a_nature_trip_shows_the_same_thing_once() {
+        // En tur uten personer: 20 ulike landskap og 6 flotte bilder av samme båt.
+        let mut photos: Vec<PhotoMeta> = (0..26u16)
+            .map(|k| thing(k, 10 + (k / 12) as u8, (k % 12) as u8 * 5, 0.6))
+            .collect();
+        for p in photos.iter_mut().skip(20) {
+            let k = u16::from_be_bytes([p.hash.0[0], p.hash.0[1]]);
+            p.phash = Some(0xAAAA_5555_AAAA_5555 ^ (1u64 << k));
+            p.quality = Some(BasicQuality {
+                sharp: 1.0,
+                exposure: 1.0,
+                color: 1.0,
+                skin: 0.0,
+            });
+        }
+        let baater = |d: &Draft| {
+            d.photos
+                .iter()
+                .filter(|p| u16::from_be_bytes([p.hash.0[0], p.hash.0[1]]) >= 20)
+                .filter(|p| p.included)
+                .count()
+        };
+        let uten = make_draft(
+            &photos,
+            &HashMap::new(),
+            &Preferences::default(),
+            &DraftConfig {
+                same_thing_hamming: 0,
+                ..DraftConfig::default()
+            },
+            &DraftHints::default(),
+            &mut |_| {},
+        );
+        assert!(baater(&uten) >= 2, "uten regelen kommer flere av båten med");
+        let d = draft(&photos, &HashMap::new());
+        assert_eq!(baater(&d), 1, "samme båt bare én gang");
+        assert!(d.included().count() > 1, "landskapene er med");
     }
 
     #[test]

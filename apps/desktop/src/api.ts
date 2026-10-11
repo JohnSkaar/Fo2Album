@@ -94,6 +94,7 @@ export type Begrunnelseskode =
   | "skjermbilde"
   | "gjenstand"
   | "en_stemning_holder"
+  | "samme_ting"
   | "ikke_plass";
 
 export interface Begrunnelse {

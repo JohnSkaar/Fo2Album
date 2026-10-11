@@ -424,6 +424,8 @@ export const tekster = {
         return "Ingen personer, og ikke et spesielt flott bilde";
       case "en_stemning_holder":
         return "Ett stemningsbilde herfra er nok";
+      case "samme_ting":
+        return "Et bilde av samme ting er alt med i albumet";
       case "ikke_plass":
         return `Ikke plass: ${antall(n, "bedre bilde", "bedre bilder")} herfra er med`;
     }

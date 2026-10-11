@@ -438,6 +438,7 @@ impl From<Reason> for ReasonDto {
             Reason::AlleErMed => ("alle_er_med", None),
             Reason::Gjenstand => ("gjenstand", None),
             Reason::EnStemningHolder => ("en_stemning_holder", None),
+            Reason::SammeTing => ("samme_ting", None),
             Reason::ValgtBortAvDeg => ("valgt_bort_av_deg", None),
             Reason::SammeSerie { antall } => ("samme_serie", Some(antall)),
             Reason::NestenLikt => ("nesten_likt", None),
