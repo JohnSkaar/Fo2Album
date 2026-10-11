@@ -164,15 +164,22 @@ struct Placed {
 }
 
 impl Placed {
-    /// Størrelsen bildet tegnes i (mm): dekker feltet når det fylles, ellers lik feltet.
+    /// Størrelsen bildet tegnes i (mm): dekker feltet når det fylles (forstørret om brukeren
+    /// har zoomet inn), ellers lik feltet.
     fn drawn(&self) -> (f32, f32) {
         let a = self.photo.aspect();
         let f = &self.frame;
-        if (f.w / f.h > a) == f.fill {
+        let (w, h) = if (f.w / f.h > a) == f.fill {
             (f.w, f.w / a)
         } else {
             (f.h * a, f.h)
-        }
+        };
+        let z = if f.fill {
+            self.photo.look.zoom.clamp(1.0, 4.0)
+        } else {
+            1.0
+        };
+        (w * z, h * z)
     }
 }
 
@@ -629,5 +636,35 @@ mod tests {
         assert!((p(90).aspect() - 2.0 / 3.0).abs() < 1e-6);
         assert!((p(180).aspect() - 1.5).abs() < 1e-6);
         assert!((p(270).aspect() - 2.0 / 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn forstorret_bilde_tegnes_storre_bare_naar_feltet_fylles() {
+        let placed = |zoom, fill| Placed {
+            photo: PhotoSource {
+                path: PathBuf::new(),
+                format: None,
+                orientation: None,
+                width: 1200,
+                height: 800,
+                rotation: 0,
+                look: Look {
+                    zoom,
+                    ..Look::default()
+                },
+                hash: None,
+            },
+            frame: Frame {
+                x: 0.0,
+                y: 0.0,
+                w: 100.0,
+                h: 100.0,
+                fill,
+            },
+        };
+        assert_eq!(placed(1.0, true).drawn(), (150.0, 100.0));
+        assert_eq!(placed(2.0, true).drawn(), (300.0, 200.0));
+        assert_eq!(placed(9.0, true).drawn(), (600.0, 400.0));
+        assert_eq!(placed(2.0, false).drawn(), (100.0, 100.0 / 1.5));
     }
 }

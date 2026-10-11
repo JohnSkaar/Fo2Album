@@ -123,6 +123,8 @@ export interface UtkastBilde {
   focus: [number, number];
   /** Hele bildet vises i rammen. */
   whole: boolean;
+  /** Forstørrelse i en ramme som fylles (1 = akkurat fyller, høyst 4). */
+  zoom?: number;
 }
 
 export interface UtkastHendelse {
@@ -259,7 +261,14 @@ export type Albumvalg =
   | { type: "bakside"; photo: string | null }
   | { type: "roter"; photo: string }
   | { type: "storrelse"; photo: string; size: number | null }
-  | { type: "utsnitt"; photo: string; focus: [number, number] | null; whole: boolean }
+  | {
+      type: "utsnitt";
+      photo: string;
+      focus: [number, number] | null;
+      whole: boolean;
+      /** Forstørrelse i prosent (100–400); `null` = ikke forstørret. */
+      zoom?: number | null;
+    }
   | { type: "samle_side"; photos: string[] }
   | { type: "egen_historie"; photos: string[] }
   | { type: "legg_tilbake"; photo: string };

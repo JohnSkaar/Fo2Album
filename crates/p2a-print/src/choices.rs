@@ -54,6 +54,9 @@ impl SavedPage {
     }
 }
 
+/// Største forstørrelse i en ramme (prosent).
+pub const MAX_ZOOM: u16 = 400;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AlbumChoices {
@@ -74,6 +77,8 @@ pub struct AlbumChoices {
     pub focus: BTreeMap<String, (u8, u8)>,
     /// Bilder som skal vises hele i rammen sin (ingen beskjæring).
     pub whole: BTreeSet<String>,
+    /// Forstørrelse i en ramme som fylles, i prosent (100–400): brukeren har zoomet inn.
+    pub zoom: BTreeMap<String, u16>,
     /// «Egen historie»: bildene i hver historie.
     pub stories: Vec<Vec<String>>,
 }
@@ -123,11 +128,14 @@ pub enum Change {
         photo: String,
         size: Option<i8>,
     },
-    /// Utsnitt: midtpunktet i prosent, eller hele bildet i rammen.
+    /// Utsnitt: midtpunktet i prosent, eller hele bildet i rammen, og hvor mye bildet er
+    /// forstørret i rammen (prosent, 100 = akkurat fyller; `None` = ikke forstørret).
     Utsnitt {
         photo: String,
         focus: Option<(u8, u8)>,
         whole: bool,
+        #[serde(default)]
+        zoom: Option<u16>,
     },
     /// «Sett på én side»: bildene samles på en ny side (flere ved over 12), merket fornøyd.
     SamleSide {
@@ -239,7 +247,12 @@ impl AlbumChoices {
                 photo,
                 focus,
                 whole,
+                zoom,
             } => {
+                match zoom.map(|z| z.clamp(100, MAX_ZOOM)) {
+                    Some(z) if z > 100 && !whole => self.zoom.insert(photo.clone(), z),
+                    _ => self.zoom.remove(&photo),
+                };
                 match focus {
                     Some((x, y)) => self.focus.insert(photo.clone(), (x.min(100), y.min(100))),
                     None => self.focus.remove(&photo),
@@ -314,6 +327,7 @@ impl AlbumChoices {
                 .get(&id)
                 .map_or((0.5, 0.5), |&(x, y)| (x as f32 / 100.0, y as f32 / 100.0)),
             whole: self.whole.contains(&id),
+            zoom: self.zoom.get(&id).map_or(1.0, |&z| f32::from(z) / 100.0),
         }
     }
 
@@ -519,16 +533,21 @@ mod tests {
             photo: hex(1),
             focus: Some((20, 150)),
             whole: false,
+            zoom: Some(900),
         });
         let look = c.look_of(&ContentHash([1; 32]));
         assert_eq!(look.focus, (0.2, 1.0));
         assert!(!look.whole);
+        assert_eq!(look.zoom, 4.0);
         c.apply(Change::Utsnitt {
             photo: hex(1),
             focus: None,
             whole: true,
+            zoom: Some(200),
         });
-        assert!(c.look_of(&ContentHash([1; 32])).whole);
+        let look = c.look_of(&ContentHash([1; 32]));
+        assert!(look.whole);
+        assert_eq!(look.zoom, 1.0, "hele bildet forstørres ikke");
 
         let mut page = SavedPage::from_kind(PageKind::Luft, vec![hex(2), hex(3)]);
         page.mal = Some("2-side".into());

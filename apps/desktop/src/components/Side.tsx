@@ -1,11 +1,11 @@
-import type { CSSProperties, DragEvent } from "react";
+import type { CSSProperties, DragEvent, PointerEvent as ReactPointerEvent } from "react";
 import type { Felt, Side as SideData, UtkastBilde } from "../api";
 import { tekster } from "../tekster";
 
 /** Siden er 21 × 28 cm; feltene er i prosent av bredden og høyden. */
 export const SIDE_FORHOLD = 210 / 280;
 
-type Utseende = Pick<UtkastBilde, "rotation" | "focus" | "whole">;
+type Utseende = Pick<UtkastBilde, "rotation" | "focus" | "whole" | "zoom">;
 
 /**
  * Utsnittet (midtpunktet slik bildet vises) som `object-position` på det uroterte bildet.
@@ -34,18 +34,46 @@ export function bildeStil(b: Utseende, fill: boolean, forhold: number): CSSPrope
     objectFit: fill ? "cover" : "contain",
     objectPosition: `${(x * 100).toFixed(1)}% ${(y * 100).toFixed(1)}%`,
   };
-  if (!b.rotation) return felles;
-  if (b.rotation % 180 === 0) return { ...felles, transform: `rotate(${b.rotation}deg)` };
-  // Kvart omdreining: bildet er like bredt som feltet er høyt, og omvendt.
+  const z = fill && !b.whole ? Math.min(4, Math.max(1, b.zoom ?? 1)) : 1;
+  if (!b.rotation && z === 1) return felles;
+  if (b.rotation % 180 === 0 && z === 1) {
+    return { ...felles, transform: `rotate(${b.rotation}deg)` };
+  }
+  // Kvart omdreining: bildet er like bredt som feltet er høyt, og omvendt. Forstørret: boksen
+  // er `z` ganger større og flyttes så utsnittet blir som i trykkfilen (der punktet `focus`
+  // ligger like langt inn i feltet som i bildet).
+  const kvart = b.rotation % 180 !== 0;
+  const [fx, fy] = b.focus;
   return {
     ...felles,
     position: "absolute",
-    left: "50%",
-    top: "50%",
-    width: `${(100 / forhold).toFixed(3)}%`,
-    height: `${(100 * forhold).toFixed(3)}%`,
-    transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+    left: `${(50 + (1 - z) * (fx - 0.5) * 100).toFixed(3)}%`,
+    top: `${(50 + (1 - z) * (fy - 0.5) * 100).toFixed(3)}%`,
+    width: `${((kvart ? 100 / forhold : 100) * z).toFixed(3)}%`,
+    height: `${((kvart ? 100 * forhold : 100) * z).toFixed(3)}%`,
+    maxWidth: "none",
+    transform: `translate(-50%, -50%)${b.rotation ? ` rotate(${b.rotation}deg)` : ""}`,
   };
+}
+
+/**
+ * Nytt utsnitt når brukeren drar bildet i et felt som fylles. `bilde` og `ramme` er
+ * bredde/høyde, `zoom` forstørrelsen og `dra` hvor langt bildet er dratt, i andeler av feltet.
+ * Bildet følger fingeren: dras det mot høyre, ser man mer av venstre side.
+ */
+export function flyttUtsnitt(
+  bilde: number,
+  ramme: number,
+  zoom: number,
+  focus: [number, number],
+  dra: [number, number],
+): [number, number] {
+  // Hvor mange ganger bredere og høyere enn feltet bildet tegnes.
+  const sx = Math.max(bilde / ramme, 1) * zoom;
+  const sy = Math.max(ramme / bilde, 1) * zoom;
+  const akse = (s: number, f: number, d: number) =>
+    s <= 1.0001 ? f : Math.min(1, Math.max(0, f + d / (1 - s)));
+  return [akse(sx, focus[0], dra[0]), akse(sy, focus[1], dra[1])];
 }
 
 const pst = (v: number) => `${v.toFixed(3)}%`;
@@ -204,4 +232,49 @@ export function RammeIkon({ felt }: { felt: Felt[] }) {
       })}
     </svg>
   );
+}
+
+/**
+ * Dra i et felt for å flytte bildet i det. Gir hendelsene feltet trenger; `onMove` kalles mens
+ * brukeren drar, `onEnd` når bildet slippes (bare om det faktisk ble flyttet).
+ */
+export function draUtsnitt(
+  start: [number, number],
+  maal: { bilde: number; ramme: number; zoom: number },
+  onMove: (f: [number, number]) => void,
+  onEnd: (f: [number, number]) => void,
+) {
+  return (e: ReactPointerEvent<HTMLElement>) => {
+    if (e.button !== 0) return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const [x0, y0] = [e.clientX, e.clientY];
+    let siste = start;
+    let flyttet = false;
+    el.setPointerCapture?.(e.pointerId);
+    const flytt = (ev: PointerEvent) => {
+      const dx = (ev.clientX - x0) / r.width;
+      const dy = (ev.clientY - y0) / r.height;
+      if (!flyttet && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return;
+      flyttet = true;
+      siste = flyttUtsnitt(maal.bilde, maal.ramme, maal.zoom, start, [dx, dy]);
+      onMove(siste);
+    };
+    const slipp = () => {
+      el.removeEventListener("pointermove", flytt);
+      el.removeEventListener("pointerup", slipp);
+      el.removeEventListener("pointercancel", slipp);
+      if (flyttet) {
+        // Klikket som følger etter et drag, skal ikke telle.
+        const stopp = (c: Event) => c.stopPropagation();
+        el.addEventListener("click", stopp, { capture: true, once: true });
+        setTimeout(() => el.removeEventListener("click", stopp, { capture: true }), 0);
+        onEnd(siste);
+      }
+    };
+    el.addEventListener("pointermove", flytt);
+    el.addEventListener("pointerup", slipp);
+    el.addEventListener("pointercancel", slipp);
+  };
 }

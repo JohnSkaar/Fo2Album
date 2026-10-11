@@ -145,6 +145,8 @@ pub struct Look {
     pub focus: (f32, f32),
     /// Vis hele bildet i rammen, uten beskjæring.
     pub whole: bool,
+    /// Forstørrelse i en ramme som fylles (1 = akkurat fyller, høyst 4).
+    pub zoom: f32,
 }
 
 impl Default for Look {
@@ -153,6 +155,7 @@ impl Default for Look {
             size: 0,
             focus: (0.5, 0.5),
             whole: false,
+            zoom: 1.0,
         }
     }
 }

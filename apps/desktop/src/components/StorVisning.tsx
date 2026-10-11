@@ -3,7 +3,7 @@ import type { Albumvalg, Felt, UtkastBilde } from "../api";
 import { datoTekst, tekster } from "../tekster";
 import { Lukk } from "./Lukk";
 import { Lupe } from "./Lupe";
-import { bildeStil, SIDE_FORHOLD } from "./Side";
+import { bildeStil, draUtsnitt, SIDE_FORHOLD } from "./Side";
 
 const t = tekster.redigering;
 
@@ -24,10 +24,11 @@ export function nyttUtsnitt(
   ramme: number,
   utsnitt: [number, number],
   klikk: [number, number],
+  zoom = 1,
 ): [number, number] {
   // Hvor stor del av bildet som synes i hver retning når det fyller rammen.
-  const synligX = bilde > ramme ? ramme / bilde : 1;
-  const synligY = bilde > ramme ? 1 : bilde / ramme;
+  const synligX = (bilde > ramme ? ramme / bilde : 1) / zoom;
+  const synligY = (bilde > ramme ? 1 : bilde / ramme) / zoom;
   const akse = (synlig: number, fokus: number, k: number) => {
     if (synlig >= 1) return fokus;
     const start = (1 - synlig) * fokus;
@@ -35,6 +36,36 @@ export function nyttUtsnitt(
     return klem((punkt - synlig / 2) / (1 - synlig));
   };
   return [akse(synligX, utsnitt[0], klikk[0]), akse(synligY, utsnitt[1], klikk[1])];
+}
+
+/** Glidebryter for hvor stort bildet er i feltet (100–400 %). */
+export function Storrelse({
+  zoom,
+  onChange,
+  onCommit,
+}: {
+  zoom: number;
+  onChange: (z: number) => void;
+  /** Når brukeren slipper glidebryteren. */
+  onCommit: (z: number) => void;
+}) {
+  return (
+    <label className="zoomfelt">
+      <span>{t.storrelseIFelt}</span>
+      <input
+        type="range"
+        min={100}
+        max={400}
+        step={5}
+        value={Math.round(zoom * 100)}
+        aria-valuetext={`${Math.round(zoom * 100)} %`}
+        onChange={(e) => onChange(Number(e.target.value) / 100)}
+        onPointerUp={(e) => onCommit(Number(e.currentTarget.value) / 100)}
+        onKeyUp={(e) => onCommit(Number(e.currentTarget.value) / 100)}
+      />
+      <output>{Math.round(zoom * 100)} %</output>
+    </label>
+  );
 }
 
 /** Stor visning av ett bilde, med rotering og utsnitt for rammen det står i. */
@@ -64,6 +95,7 @@ export function StorVisning({
   const ref = useRef<HTMLDialogElement>(null);
   const [utsnitt, setUtsnitt] = useState(!!startUtsnitt);
   const [fokus, setFokus] = useState<[number, number]>(b.focus);
+  const [zoom, setZoom] = useState(b.zoom ?? 1);
   const [stortFeilet, setStortFeilet] = useState(false);
   const [lupe, setLupe] = useState(false);
   useEffect(() => {
@@ -76,8 +108,15 @@ export function StorVisning({
   const kanUtsnitt = !!felt && (felt.fill || b.whole);
   const rammeForhold = felt ? (felt.w / felt.h) * SIDE_FORHOLD : 1;
   const src = stortFeilet ? thumbUrl(b.id) : stortUrl(b.id);
-  const lagre = (focus: [number, number] | null, whole: boolean) =>
-    onChange({ type: "utsnitt", photo: b.id, focus, whole }, t.utsnittLagret);
+  const lagre = (focus: [number, number] | null, whole: boolean, z = zoom) =>
+    onChange(
+      { type: "utsnitt", photo: b.id, focus, whole, zoom: whole ? null : Math.round(z * 100) },
+      t.utsnittLagret,
+    );
+  const somProsent = (f: [number, number]): [number, number] => [
+    Math.round(f[0] * 100),
+    Math.round(f[1] * 100),
+  ];
 
   return (
     <dialog
@@ -97,23 +136,37 @@ export function StorVisning({
             className="lb__crop"
             style={{ aspectRatio: rammeForhold.toFixed(4) }}
             aria-label={t.utsnittHjelp}
+            onPointerDown={
+              b.whole
+                ? undefined
+                : draUtsnitt(
+                    fokus,
+                    { bilde: bildeForhold(b), ramme: rammeForhold, zoom },
+                    setFokus,
+                    (f) => lagre(somProsent(f), false),
+                  )
+            }
             onClick={(e) => {
               if (b.whole) return;
               const r = e.currentTarget.getBoundingClientRect();
               if (!r.width || !r.height) return;
-              const ny = nyttUtsnitt(bildeForhold(b), rammeForhold, fokus, [
-                klem((e.clientX - r.left) / r.width),
-                klem((e.clientY - r.top) / r.height),
-              ]);
+              const ny = nyttUtsnitt(
+                bildeForhold(b),
+                rammeForhold,
+                fokus,
+                [klem((e.clientX - r.left) / r.width), klem((e.clientY - r.top) / r.height)],
+                zoom,
+              );
               setFokus(ny);
-              lagre([Math.round(ny[0] * 100), Math.round(ny[1] * 100)], false);
+              lagre(somProsent(ny), false);
             }}
           >
             <img
               src={src}
               alt=""
+              draggable={false}
               onError={() => setStortFeilet(true)}
-              style={bildeStil({ ...b, focus: fokus }, !b.whole, rammeForhold)}
+              style={bildeStil({ ...b, focus: fokus, zoom }, !b.whole, rammeForhold)}
             />
           </button>
         ) : fulltUrl ? (
@@ -148,6 +201,13 @@ export function StorVisning({
         {utsnitt ? (
           <>
             <p className="dock__help">{t.utsnittHjelp}</p>
+            {!b.whole && (
+              <Storrelse
+                zoom={zoom}
+                onChange={setZoom}
+                onCommit={(z) => lagre(somProsent(fokus), false, z)}
+              />
+            )}
             <div className="lb__acts">
               <button
                 type="button"

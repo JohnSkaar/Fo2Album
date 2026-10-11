@@ -1,9 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Ramme, Side, Utkast, UtkastBilde, UtkastHendelse } from "./api";
 import { oppslag } from "./components/Bla";
 import { DraftScreen, nyStorrelse } from "./components/DraftScreen";
-import { bildeStil, utsnittFoerRotering } from "./components/Side";
+import { bildeStil, flyttUtsnitt, utsnittFoerRotering } from "./components/Side";
 import { bytt, plasser } from "./components/FyllRamme";
 import { nesteZoom, zoomFor } from "./components/Lupe";
 import { nyttUtsnitt } from "./components/StorVisning";
@@ -405,5 +405,48 @@ describe("lupe", () => {
     expect(zoomFor(800, 600, 1000, 1000)).toBe(1);
     // Ansiktet (en tidel av bildet) fyller vinduet: 100 % er nok.
     expect(zoomFor(4000, 3000, 1000, 1000, 0.1)).toBe(1);
+  });
+});
+
+describe("flytt og forstørr i feltet", () => {
+  it("forstørret bilde: boksen er større og flyttet som i trykkfilen", () => {
+    const s = bildeStil({ rotation: 0, focus: [0, 0.5], whole: false, zoom: 2 }, true, 1);
+    expect(s).toMatchObject({ width: "200.000%", height: "200.000%", left: "100.000%" });
+    // Hele bildet forstørres ikke.
+    expect(bildeStil({ rotation: 0, focus: [0, 0.5], whole: true, zoom: 2 }, true, 1)).toEqual(
+      bildeStil({ rotation: 0, focus: [0, 0.5], whole: true }, true, 1),
+    );
+  });
+
+  it("dra følger fingeren og stopper i kanten", () => {
+    // Bredt bilde (2:1) i kvadratisk felt: dobbelt så bredt som feltet.
+    expect(flyttUtsnitt(2, 1, 1, [0.5, 0.5], [0.25, 0.25])).toEqual([0.25, 0.5]);
+    expect(flyttUtsnitt(2, 1, 1, [0.5, 0.5], [-5, 0])).toEqual([1, 0.5]);
+    // Forstørret: kan flyttes i høyden også.
+    expect(flyttUtsnitt(2, 1, 2, [0.5, 0.5], [0, 0.5])).toEqual([0.5, 0]);
+  });
+
+  it("glidebryteren i «Fyll rammen» lagrer størrelsen i feltet", async () => {
+    const { onFillFrame } = vis();
+    await userEvent.click(screen.getByRole("button", { name: `Side 1: ${tekster.sider.rammer}` }));
+    const valg = screen.getByRole("group", { name: tekster.sider.rammerTittel });
+    await userEvent.click(within(valg).getByRole("button", { name: tekster.sider.antallValg(3) }));
+    await userEvent.click(within(valg).getByRole("button", { name: /Ett stort og to små/ }));
+    const d = screen.getByRole("dialog", { name: tekster.fyll.tittel(3) });
+    await userEvent.click(
+      within(d).getByRole("button", { name: new RegExp(tekster.fyll.ikkeMed) }),
+    );
+    await userEvent.click(within(d).getAllByRole("button", { name: /^Felt / })[0]!);
+    fireEvent.change(within(d).getByRole("slider", { name: new RegExp(r.storrelseIFelt) }), {
+      target: { value: "150" },
+    });
+    await userEvent.click(within(d).getByRole("button", { name: tekster.fyll.bruk }));
+    expect(onFillFrame.mock.calls[0]![0]).toContainEqual({
+      type: "utsnitt",
+      photo: h("a"),
+      focus: [50, 50],
+      whole: false,
+      zoom: 150,
+    });
   });
 });

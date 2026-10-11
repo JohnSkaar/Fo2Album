@@ -1,8 +1,11 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
-import type { Ramme, UtkastBilde } from "../api";
+import type { Albumvalg, Ramme, UtkastBilde } from "../api";
 import { datoTekst, tekster } from "../tekster";
 import { Lukk } from "./Lukk";
-import { bildeStil, RammeIkon, SIDE_FORHOLD } from "./Side";
+import { bildeStil, draUtsnitt, RammeIkon, SIDE_FORHOLD } from "./Side";
+import { bildeForhold, Storrelse } from "./StorVisning";
+
+type Utsnitt = { focus: [number, number]; zoom: number };
 
 const t = tekster.fyll;
 
@@ -56,8 +59,11 @@ export function FyllRamme({
   kandidater: Kandidat[];
   bilder: Map<string, UtkastBilde>;
   thumbUrl: (id: string) => string;
-  /** Bildene i feltene, i rammens rekkefølge, og hva som skjer med bildene som ikke fikk plass. */
-  onDone: (photos: string[], ute: string[], rest: Rest) => void;
+  /**
+   * Bildene i feltene, i rammens rekkefølge, hva som skjer med bildene som ikke fikk plass, og
+   * utsnittene brukeren har endret (flyttet eller forstørret i feltet).
+   */
+  onDone: (photos: string[], ute: string[], rest: Rest, utsnitt: Albumvalg[]) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -68,6 +74,14 @@ export function FyllRamme({
   const [valgt, setValgt] = useState<number | null>(null);
   const [rest, setRest] = useState<Rest>("ta_med");
   const [melding, setMelding] = useState<string | null>(null);
+  // Utsnitt brukeren har endret her: midtpunkt og forstørrelse per bilde.
+  const [utsnitt, setUtsnitt] = useState<Map<string, Utsnitt>>(new Map());
+  const utseende = (id: string): Utsnitt => {
+    const b = bilder.get(id);
+    return utsnitt.get(id) ?? { focus: b?.focus ?? [0.5, 0.5], zoom: b?.zoom ?? 1 };
+  };
+  const endreUtsnitt = (id: string, u: Partial<Utsnitt>) =>
+    setUtsnitt((m) => new Map(m).set(id, { ...utseende(id), ...u }));
   useEffect(() => {
     const d = ref.current;
     if (!d || d.open) return;
@@ -142,7 +156,22 @@ export function FyllRamme({
                 }}
                 aria-pressed={valgt === i}
                 aria-label={t.felt(i + 1, n, b ? datoTekst(b.takenAt) : null)}
-                draggable={!!id}
+                // Valgt felt: dra flytter bildet i feltet. Ellers: dra bytter felt.
+                draggable={!!id && valgt !== i}
+                onPointerDown={
+                  id && valgt === i
+                    ? draUtsnitt(
+                        utseende(id).focus,
+                        {
+                          bilde: b ? bildeForhold(b) : 4 / 3,
+                          ramme: forhold,
+                          zoom: utseende(id).zoom,
+                        },
+                        (focus) => endreUtsnitt(id, { focus }),
+                        (focus) => endreUtsnitt(id, { focus }),
+                      )
+                    : undefined
+                }
                 onDragStart={(e) => e.dataTransfer.setData(DRA, String(i))}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={slipp(i)}
@@ -154,7 +183,7 @@ export function FyllRamme({
                     alt=""
                     draggable={false}
                     style={bildeStil(
-                      b ?? { rotation: 0, focus: [0.5, 0.5], whole: false },
+                      { rotation: b?.rotation ?? 0, whole: false, ...utseende(id) },
                       true,
                       forhold,
                     )}
@@ -169,6 +198,13 @@ export function FyllRamme({
         <p className="dock__help" role="status">
           {melding ?? (valgt !== null ? t.feltValgt(valgt + 1) : t.hjelp)}
         </p>
+        {valgt !== null && felt[valgt] && (
+          <Storrelse
+            zoom={utseende(felt[valgt]!).zoom}
+            onChange={(zoom) => endreUtsnitt(felt[valgt]!, { zoom })}
+            onCommit={() => {}}
+          />
+        )}
         {valgt !== null && felt[valgt] && (
           <button
             type="button"
@@ -243,7 +279,22 @@ export function FyllRamme({
             type="button"
             className="btn btn--primary"
             disabled={fylt.length < n}
-            onClick={() => onDone(fylt, ute, rest)}
+            onClick={() =>
+              onDone(
+                fylt,
+                ute,
+                rest,
+                [...utsnitt]
+                  .filter(([id]) => fylt.includes(id))
+                  .map(([id, u]) => ({
+                    type: "utsnitt",
+                    photo: id,
+                    focus: [Math.round(u.focus[0] * 100), Math.round(u.focus[1] * 100)],
+                    whole: false,
+                    zoom: Math.round(u.zoom * 100),
+                  })),
+              )
+            }
           >
             {t.bruk}
           </button>

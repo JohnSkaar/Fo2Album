@@ -1338,8 +1338,6 @@ span.pg2__fr {
 }
 .pg2__fr--valgt,
 .pg2__fr--markert {
-  outline: 3px solid var(--color-border-brand);
-  outline-offset: -3px;
   z-index: 1;
 }
 .pg2__fr:focus-visible {
@@ -1473,9 +1471,19 @@ span.pg2__fr {
   background: var(--color-bg-brand-subtle);
 }
 .fyll__felt--valgt {
-  outline: 4px solid var(--color-border-brand);
-  outline-offset: -4px;
   z-index: 1;
+  cursor: move;
+}
+/* Rammen rundt valgt felt tegnes over bildet, også når bildet er forstørret. */
+.fyll__felt--valgt::before,
+.pg2__fr--valgt::before,
+.pg2__fr--markert::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border: 4px solid var(--color-border-brand);
+  pointer-events: none;
 }
 .fyll__felt:focus-visible {
   outline: 3px solid var(--color-border-focus);

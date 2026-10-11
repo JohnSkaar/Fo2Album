@@ -472,6 +472,8 @@ pub struct DraftPhotoDto {
     focus: [f32; 2],
     /// Hele bildet vises i rammen.
     whole: bool,
+    /// Forstørrelse i rammen (1 = akkurat fyller).
+    zoom: f32,
 }
 
 #[derive(Debug, Serialize)]
@@ -865,6 +867,7 @@ fn draft_for(
                         let l = chosen.look_of(&p.hash);
                         [l.focus.0, l.focus.1]
                     },
+                    zoom: chosen.look_of(&p.hash).zoom,
                     whole: chosen.whole.contains(&p.hash.to_hex()),
                 }
             })

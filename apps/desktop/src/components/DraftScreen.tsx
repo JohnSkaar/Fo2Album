@@ -428,8 +428,8 @@ function Sider({
           bilder={bilder}
           thumbUrl={thumbUrl}
           onClose={() => setFyll(null)}
-          onDone={(photos, ute, rest) => {
-            onFyll(fyltSide(fyll.s, fyll.r, photos, vis), ute, rest);
+          onDone={(photos, ute, rest, utsnitt) => {
+            onFyll([...fyltSide(fyll.s, fyll.r, photos, vis), ...utsnitt], ute, rest);
             setFyll(null);
             setAapen(null);
           }}

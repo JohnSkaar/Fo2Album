@@ -299,7 +299,7 @@ export const tekster = {
     hjelp:
       "Trykk på et bilde til høyre for å sette det i neste ledige felt, eller dra det dit du vil ha det. Trykk på et felt og så et annet for å bytte plass.",
     feltValgt: (n: number) =>
-      `Felt ${fmt(n)} er valgt. Trykk på et bilde for å sette det der, eller på et annet felt for å bytte plass.`,
+      `Felt ${fmt(n)} er valgt. Dra i bildet for å flytte det i feltet, og gjør det større med glidebryteren. Trykk på et bilde til høyre for å sette det der, eller på et annet felt for å bytte plass.`,
     fullt: "Alle feltene er fylt. Trykk på et felt først, så byttes bildet ut.",
     felt: (i: number, n: number, dato: string | null) =>
       `Felt ${fmt(i)} av ${fmt(n)}: ${dato ? `bilde fra ${dato}` : "tomt"}`,
@@ -334,7 +334,9 @@ export const tekster = {
               : "Bildet er like stort som de andre på siden",
     visStort: "Vis stort",
     utsnitt: "Endre utsnitt",
-    utsnittHjelp: "Klikk i bildet for å velge hva som skal være i midten av rammen.",
+    utsnittHjelp:
+      "Dra i bildet for å flytte det i rammen, eller klikk på det som skal være i midten. Gjør bildet større i rammen med glidebryteren.",
+    storrelseIFelt: "Størrelse i rammen",
     fyll: "Fyll rammen",
     hele: "Vis hele bildet",
     ferdig: "Ferdig",
