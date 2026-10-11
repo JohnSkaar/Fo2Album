@@ -292,7 +292,9 @@ describe("albumutkast", () => {
   it("lager et komplett forslag med begrunnelse for det som er med og ikke med", async () => {
     render(<App />);
     // Før utkastet: kildene og muligheten til å legge til flere, på samme side.
-    expect(await screen.findByText(tekster.utkast.flereKilder)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: tekster.start.flereMapper }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("list", { name: tekster.utkast.kilderLagtTil })).toHaveTextContent(
       "Bilder",
     );

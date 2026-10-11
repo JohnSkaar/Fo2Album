@@ -2067,3 +2067,28 @@ span.pg2__fr {
 .fyll__side {
   padding-top: calc(var(--spacing-lg) + 32px);
 }
+
+/* Startsiden: én mappe først, så flere */
+.start__pick {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0 var(--spacing-lg);
+}
+.start__pick svg,
+.added__more svg {
+  width: 22px;
+  height: 22px;
+}
+.added__more {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  margin: var(--spacing-sm) 0;
+}
+.added__more .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}

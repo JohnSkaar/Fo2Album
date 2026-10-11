@@ -486,7 +486,7 @@ export function App() {
         // når gjennomgangen er i gang.
         kilder.length === 0 || (visning === "utkast" && !utkast && !analyse) ? (
           <StartScreen
-            onPickSource={(k) => void velgMappe(k)}
+            onPickSource={() => void velgMappe()}
             onFindSuggestions={() => void finnForslag()}
             onAddSuggestion={(f) => void leggTil(f.path, f.kind)}
             suggestions={forslag}

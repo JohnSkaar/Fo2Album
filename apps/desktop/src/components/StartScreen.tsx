@@ -1,35 +1,7 @@
 import { useState } from "react";
-import type { Aar, Forslag, Fremdrift, Kilde, KildeType } from "../api";
+import type { Aar, Forslag, Fremdrift, Kilde } from "../api";
 import { tekster } from "../tekster";
-import { Icon, type IconName } from "./Icon";
-
-const kort: { id: KildeType; ikon: IconName }[] = [
-  { id: "pc", ikon: "computer" },
-  { id: "dropbox", ikon: "dropbox" },
-  { id: "icloud", ikon: "cloud" },
-  { id: "google_disk", ikon: "drive" },
-];
-
-/** Kortene for å velge en bildekilde. Brukes også på utkastsiden før utkastet er laget. */
-export function Kildekort({ onPickSource }: { onPickSource: (kilde: KildeType) => void }) {
-  return (
-    <ul className="sources" aria-label={tekster.start.kilderEtikett}>
-      {kort.map(({ id, ikon }) => (
-        <li key={id}>
-          <button type="button" className="src" onClick={() => onPickSource(id)}>
-            <span className="src__icon">
-              <Icon name={ikon} />
-            </span>
-            <span>
-              <b>{tekster.kilder[id].navn}</b>
-              <span>{tekster.kilder[id].hint}</span>
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
+import { Icon } from "./Icon";
 
 export function StartScreen({
   onPickSource,
@@ -43,7 +15,8 @@ export function StartScreen({
   ingest = null,
   onMake,
 }: {
-  onPickSource: (kilde: KildeType) => void;
+  /** Velg en mappe (appen kjenner selv igjen Dropbox, iCloud og Google Disk). */
+  onPickSource: () => void;
   onFindSuggestions: () => void;
   onAddSuggestion: (f: Forslag) => void;
   /** `null` til brukeren har bedt om forslag (samtykke). */
@@ -63,7 +36,16 @@ export function StartScreen({
         {tekster.start.tittel}
       </h1>
       <p className="start__lead">{tekster.start.ingress}</p>
-      <Kildekort onPickSource={onPickSource} />
+      {sources.length === 0 && (
+        <button
+          type="button"
+          className="btn btn--primary btn--lg start__pick"
+          onClick={onPickSource}
+        >
+          <Icon name="folder" />
+          {tekster.start.velgMappe}
+        </button>
+      )}
 
       {sources.length > 0 && (
         <div className="added" aria-live="polite">
@@ -76,9 +58,13 @@ export function StartScreen({
             ))}
           </ul>
           {ingest && <p className="start__help">{tekster.utkast.venterInnlesing}</p>}
-          <p className="start__help">
-            <b>{tekster.utkast.flereKilder}</b> {tekster.utkast.flereKilderTekst}
-          </p>
+          <div className="added__more">
+            <button type="button" className="btn btn--secondary" onClick={onPickSource}>
+              <Icon name="plus" />
+              {tekster.start.flereMapper}
+            </button>
+            <p className="start__help">{tekster.start.flereHjelp}</p>
+          </div>
           <div className="added__row">
             {years.length > 1 && onYear && (
               <label className="added__year">

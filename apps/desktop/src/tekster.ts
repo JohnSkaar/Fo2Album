@@ -78,18 +78,21 @@ export const tekster = {
     hjelp: "Nøkkelen er 28 tegn i grupper på fire. Store og små bokstaver er det samme.",
   },
   start: {
-    tittel: "Velg bildemappene dere vil lage årets familiealbum av.",
+    tittel: "Velg mappen der bildene fra året ligger.",
     ingress:
-      "Bildene ligger ofte spredt: på PC-en, i Dropbox, iCloud og Google Disk. Legg til alle kildene, så blander appen dem, fjerner dubletter, finner de beste bildene fra året og lager et utkast du kan finpusse.",
+      "Start med én mappe. Etterpå kan du legge til flere, for eksempel mobilbildene til den andre forelderen, Dropbox eller iCloud. Appen blander dem, fjerner dubletter, finner de beste bildene fra året og lager et utkast du kan finpusse.",
+    velgMappe: "Velg bildemappe",
+    flereMapper: "Legg til en mappe til",
+    flereHjelp:
+      "Har dere bilder flere steder? Legg til hver mappe, så blir de ett album. Dropbox, Google Disk og iCloud for Windows er vanlige mapper på maskinen, og velges på samme måte.",
     trygt: "Alt skjer på din egen maskin. Bildene sendes ingen steder.",
     hjelp:
-      "Dropbox og Google Disk synkroniserer til en vanlig mappe på maskinen. Velg den mappen, så hentes bildene derfra. På Mac henter appen iCloud-bildene fra Bilder-biblioteket.",
-    kilderEtikett: "Velg en bildekilde",
+      "Appen leser bildene der de ligger på maskinen. Ingenting kopieres til noen server, heller ikke bilder fra Dropbox eller iCloud.",
     forslagKnapp: "Finn vanlige bildemapper",
     forslagHjelp:
       "Appen ser etter de vanlige mappene til Dropbox, iCloud og Google Disk. Ingenting leses før du velger.",
     forslagTittel: "Fant disse mappene",
-    forslagIngen: "Fant ingen av de vanlige mappene. Velg mappen selv med kortene over.",
+    forslagIngen: "Fant ingen av de vanlige mappene. Velg mappen selv med knappen over.",
     leggTil: "Legg til",
     lagtTil: "Lagt til",
   },
@@ -117,9 +120,6 @@ export const tekster = {
     ingress:
       "Appen går gjennom alle bildene fra året, finner hendelsene og lager et komplett forslag til album. Etterpå ser du hva som er med og hva som ikke er med, og hvorfor. Du bytter der du er uenig.",
     tid: "Det tar litt tid, og alt skjer på denne maskinen.",
-    flereKilder: "Har dere bilder flere steder?",
-    flereKilderTekst:
-      "Legg til alle kildene før du lager utkastet: mobilen til begge foreldrene, Dropbox, iCloud, Google Disk og mapper på PC-en. Appen blander dem og fjerner dubletter.",
     kilderLagtTil: "Lagt til",
     aar: "Album for",
     aarValg: (aar: number, n: number) => `${aar} (${antall(n, "bilde", "bilder")})`,
