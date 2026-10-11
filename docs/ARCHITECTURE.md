@@ -151,7 +151,7 @@ Status mot beslutningen (6. oktober 2026):
 
 ## Kilder
 
-- **v1:** brukeren peker på mapper. Dropbox, iCloud for Windows/Mac og Google Drive for desktop synkroniserer til lokale mapper; appen kan foreslå de vanlige stiene (med samtykke). Håndter «kun i skyen»-filer (plassholdere som ikke er lastet ned): vis antall, og la brukeren velge å laste dem ned via klienten.
+- **v1:** brukeren peker på mapper. Dropbox, iCloud for Windows/Mac og Google Drive for desktop synkroniserer til lokale mapper; appen kan foreslå de vanlige stiene (med samtykke). Håndter «kun i skyen»-filer (plassholdere som ikke er lastet ned): vis antall, og la brukeren velge å laste dem ned via klienten. **Gjort (11. oktober 2026):** «Hent bildene fra skyen» (`p2a_ingest::cloud`, kommandoen `fetch_cloud`). Året gjettes fra filnavn eller endringstid (EXIF kan ikke leses før filen er lastet ned), og bare valgt års filer hentes. Appen åpner og leser filen, så Windows Cloud Files (OneDrive, iCloud for Windows, Dropbox, Google Drive) og macOS File Provider laster den ned; gamle iCloud-plassholdere (`.navn.icloud`) hentes med `brctl download`. Appen snakker aldri med skyen selv. Etterpå leses mappene inn på nytt. Ikke prøvd på ekte Windows/Mac ennå.
 - **Mac:** vurder å lese Apple Bilder-biblioteket via PhotoKit (krever en liten native Swift-plugin for Tauri). Gir tilgang til favoritter, album og iCloud-bilder.
 - **Senere:** direkte API-integrasjoner (Dropbox API, Google). Merk at Google har strammet inn tilgangen til Google Foto-biblioteket via API; Google Takeout-eksport kan være en praktisk vei. Avklar dagens regler før arbeid starter.
 

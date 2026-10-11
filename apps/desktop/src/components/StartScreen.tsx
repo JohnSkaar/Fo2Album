@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type { Aar, Forslag, Fremdrift, Kilde } from "../api";
 import { tekster } from "../tekster";
 import { Icon } from "./Icon";
@@ -13,6 +13,7 @@ export function StartScreen({
   year = null,
   onYear,
   ingest = null,
+  sky,
   onMake,
 }: {
   /** Velg en mappe (appen kjenner selv igjen Dropbox, iCloud og Google Disk). */
@@ -27,6 +28,8 @@ export function StartScreen({
   year?: number | null;
   onYear?: (y: number) => void;
   ingest?: Fremdrift | null;
+  /** «Bilder fra året ligger bare i skyen» med knappen som henter dem. */
+  sky?: ReactNode;
   onMake?: () => void;
 }) {
   const [added, setAdded] = useState<Set<string>>(new Set());
@@ -58,6 +61,7 @@ export function StartScreen({
             ))}
           </ul>
           {ingest && <p className="start__help">{tekster.utkast.venterInnlesing}</p>}
+          {sky}
           <div className="added__more">
             <button type="button" className="btn btn--secondary" onClick={onPickSource}>
               <Icon name="plus" />

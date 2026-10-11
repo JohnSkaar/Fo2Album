@@ -30,6 +30,8 @@ pub struct AppState {
     pub undo: crate::undo::History,
     /// Brukeren vil lage utkastet med bildene som er klare, uten å vente på innlesingen.
     pub skip_wait: AtomicBool,
+    /// Satt mens bilder hentes fra skyen; `true` ber hentingen stoppe.
+    pub cloud_cancel: Mutex<Option<Arc<AtomicBool>>>,
 }
 
 impl AppState {
@@ -42,6 +44,7 @@ impl AppState {
             ingest_cancel: Mutex::new(None),
             undo: Default::default(),
             skip_wait: AtomicBool::new(false),
+            cloud_cancel: Mutex::new(None),
         }
     }
 
@@ -324,6 +327,129 @@ pub fn start_ingest(app: AppHandle, state: State<'_, AppState>) -> CmdResult<()>
         let _ = app.emit("innlesing-ferdig", done);
     });
     Ok(())
+}
+
+// ---------- Bilder som bare ligger i skyen ----------
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudYearDto {
+    year: i32,
+    count: usize,
+}
+
+/// Hvor mange bilder som bare ligger i skyen, per år (gjettet fra filnavn eller endringstid).
+#[tauri::command]
+pub fn cloud_years(state: State<'_, AppState>) -> CmdResult<Vec<CloudYearDto>> {
+    let guard = state.store()?;
+    let files = guard.as_ref().expect("sjekket").cloud_files()?;
+    let mut count: std::collections::BTreeMap<i32, usize> = Default::default();
+    for f in &files {
+        if let Some(y) = p2a_ingest::cloud::year_guess(&f.path, f.modified) {
+            *count.entry(y).or_default() += 1;
+        }
+    }
+    Ok(count
+        .into_iter()
+        .map(|(year, count)| CloudYearDto { year, count })
+        .collect())
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudProgressDto {
+    done: usize,
+    total: usize,
+    failed: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloudDoneDto {
+    fetched: usize,
+    failed: usize,
+    cancelled: bool,
+}
+
+/// Ber Dropbox, iCloud, OneDrive eller Google Disk laste ned årets bilder til maskinen.
+/// Fremdrift sendes som `skyhenting`, resultatet som `skyhenting-ferdig`. Etterpå leser
+/// grensesnittet inn på nytt, så bildene kommer med.
+#[tauri::command]
+pub fn fetch_cloud(app: AppHandle, state: State<'_, AppState>, year: i32) -> CmdResult<()> {
+    if state.ingest_running() {
+        return Err(CommandError::new(
+            "innlesing_pagar",
+            "vent til innlesingen er ferdig",
+        ));
+    }
+    let mut running = state.cloud_cancel.lock().unwrap_or_else(|e| e.into_inner());
+    if running.is_some() {
+        return Ok(());
+    }
+    let files: Vec<PathBuf> = {
+        let guard = state.store()?;
+        guard
+            .as_ref()
+            .expect("sjekket")
+            .cloud_files()?
+            .into_iter()
+            .filter(|f| p2a_ingest::cloud::year_guess(&f.path, f.modified) == Some(year))
+            .map(|f| f.path)
+            .collect()
+    };
+    let cancel = Arc::new(AtomicBool::new(false));
+    *running = Some(cancel.clone());
+    drop(running);
+    std::thread::spawn(move || {
+        use tauri::Manager;
+        let total = files.len();
+        let (mut fetched, mut failed) = (0, 0);
+        let mut cancelled = false;
+        for (i, path) in files.iter().enumerate() {
+            let _ = app.emit(
+                "skyhenting",
+                CloudProgressDto {
+                    done: i,
+                    total,
+                    failed,
+                },
+            );
+            match p2a_ingest::cloud::fetch(path, &cancel) {
+                Ok(()) => fetched += 1,
+                Err(p2a_ingest::cloud::FetchError::Cancelled) => {
+                    cancelled = true;
+                    break;
+                }
+                Err(e) => {
+                    failed += 1;
+                    eprintln!("kunne ikke hente {}: {e}", path.display());
+                }
+            }
+        }
+        let state = app.state::<AppState>();
+        *state.cloud_cancel.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        let _ = app.emit(
+            "skyhenting-ferdig",
+            CloudDoneDto {
+                fetched,
+                failed,
+                cancelled,
+            },
+        );
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cancel_cloud(state: State<'_, AppState>) {
+    if let Some(c) = state
+        .cloud_cancel
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+    {
+        c.store(true, Ordering::Relaxed);
+    }
 }
 
 #[tauri::command]

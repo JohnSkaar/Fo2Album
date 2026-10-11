@@ -382,6 +382,17 @@ export const api = {
     return typeof valgt === "string" ? valgt : null;
   },
 
+  /** Bilder som bare ligger i skyen, per år (gjettet fra filnavn eller endringstid). */
+  skyAar: () => invoke<{ year: number; count: number }[]>("cloud_years"),
+  /** Ber skytjenesten laste ned årets bilder til maskinen. */
+  hentFraSkyen: (year: number) => invoke<void>("fetch_cloud", { year }),
+  avbrytSky: () => invoke<void>("cancel_cloud"),
+  paSkyhenting: (cb: (p: { done: number; total: number; failed: number }) => void) =>
+    listen<{ done: number; total: number; failed: number }>("skyhenting", (e) => cb(e.payload)),
+  paSkyhentingFerdig: (cb: (r: { fetched: number; failed: number; cancelled: boolean }) => void) =>
+    listen<{ fetched: number; failed: number; cancelled: boolean }>("skyhenting-ferdig", (e) =>
+      cb(e.payload),
+    ),
   startInnlesing: () => invoke<void>("start_ingest"),
   avbrytInnlesing: () => invoke<void>("cancel_ingest"),
   innlesingPagar: () => invoke<boolean>("ingest_running"),

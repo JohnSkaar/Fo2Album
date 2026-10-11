@@ -29,6 +29,7 @@ import { PickScreen } from "./components/PickScreen";
 import { RecoverScreen } from "./components/RecoverScreen";
 import { RecoveryKeyScreen } from "./components/RecoveryKeyScreen";
 import { Sidebar, type Visning } from "./components/Sidebar";
+import { type Skyfremdrift, Skyhenting } from "./components/Skyhenting";
 import { StartScreen } from "./components/StartScreen";
 import { Toast } from "./components/Toast";
 import { Welcome } from "./components/Welcome";
@@ -67,6 +68,9 @@ export function App() {
   const [valgtAar, setValgtAar] = useState<number | null>(null);
   const [bilder, setBilder] = useState<Bilde[]>([]);
   const [sammendrag, setSammendrag] = useState<Sammendrag | null>(null);
+  // Bilder som bare ligger i skyen, per år, og fremdriften mens de hentes.
+  const [skyAar, setSkyAar] = useState<{ year: number; count: number }[]>([]);
+  const [skyhenting, setSkyhenting] = useState<Skyfremdrift | null>(null);
   const [fremdrift, setFremdrift] = useState<Fremdrift | null>(null);
   const [rapport, setRapport] = useState<Innlesingsrapport | null>(null);
   const [bekreftSlett, setBekreftSlett] = useState(false);
@@ -132,6 +136,7 @@ export function App() {
     setKilder(k);
     setSammendrag(s);
     setAar(a);
+    setSkyAar(s.cloud_only > 0 ? await api.skyAar().catch(() => []) : []);
     const year =
       valgtAarRef.current !== null && a.some((x) => x.year === valgtAarRef.current)
         ? valgtAarRef.current
@@ -159,6 +164,14 @@ export function App() {
           sistOppdatert = naa;
           void lastKatalog();
         }
+      }),
+      api.paSkyhenting(setSkyhenting),
+      api.paSkyhentingFerdig((r) => {
+        setSkyhenting(null);
+        visMelding(r.cancelled ? tekster.sky.stoppet : tekster.sky.ferdig(r.fetched, r.failed));
+        // Filene er lastet ned: les inn på nytt, så de kommer med.
+        if (r.fetched > 0) void startInnlesing();
+        else void lastKatalog();
       }),
       api.paFerdig((r) => {
         setFremdrift(null);
@@ -258,6 +271,32 @@ export function App() {
       visMelding(feiltekst(e));
     }
   };
+
+  /** Ber skytjenesten laste ned årets bilder som bare ligger i skyen. */
+  const hentFraSkyen = async () => {
+    if (valgtAar === null) return;
+    try {
+      setSkyhenting({
+        done: 0,
+        total: skyAar.find((s) => s.year === valgtAar)?.count ?? 0,
+        failed: 0,
+      });
+      await api.hentFraSkyen(valgtAar);
+    } catch (e) {
+      setSkyhenting(null);
+      visMelding(feiltekst(e));
+    }
+  };
+  const sky =
+    valgtAar === null ? null : (
+      <Skyhenting
+        year={valgtAar}
+        count={skyAar.find((s) => s.year === valgtAar)?.count ?? 0}
+        progress={skyhenting}
+        onFetch={() => void hentFraSkyen()}
+        onCancel={() => void api.avbrytSky()}
+      />
+    );
 
   /** Tar med eller tar bort mange markerte bilder på en gang. */
   const velgFlere = async (action: "ta_med" | "ta_bort", ids: string[]) => {
@@ -495,6 +534,7 @@ export function App() {
             year={valgtAar}
             onYear={(y) => void velgAar(y)}
             ingest={fremdrift}
+            sky={sky}
             onMake={() => void lagUtkast()}
           />
         ) : visning === "personer" ? (
@@ -543,6 +583,7 @@ export function App() {
             summary={sammendrag}
             progress={fremdrift}
             report={rapport}
+            sky={sky}
             onCancel={() => void api.avbrytInnlesing()}
             thumbUrl={api.miniatyrUrl}
           />

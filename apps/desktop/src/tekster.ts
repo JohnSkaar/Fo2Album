@@ -275,6 +275,21 @@ export const tekster = {
     malValgt: "Rammene er valgt, og siden er merket «Fornøyd»",
     bildePaaSiden: (dato: string) => `Bilde fra ${dato} på siden`,
   },
+  sky: {
+    tittel: (n: number, aar: number) =>
+      `${antall(n, "bilde", "bilder")} fra ${aar} ligger bare i skyen`,
+    forklaring:
+      "De er ikke lastet ned til maskinen ennå, så appen kan ikke se dem. Appen kan be Dropbox, iCloud, OneDrive eller Google Disk laste dem ned, akkurat som når du åpner et bilde. Ingenting sendes fra maskinen, men bildene tar plass på disken.",
+    hent: (n: number) =>
+      n === 1 ? "Hent bildet fra skyen" : `Hent de ${fmt(n)} bildene fra skyen`,
+    henter: (d: number, n: number) => `Henter bilder fra skyen … ${fmt(d)} av ${fmt(n)}`,
+    stopp: "Stopp",
+    ferdig: (n: number, feil: number) =>
+      feil > 0
+        ? `${antall(n, "bilde", "bilder")} er hentet fra skyen. ${antall(feil, "bilde", "bilder")} kunne ikke hentes. Sjekk at maskinen er på nett, og at du er logget inn i Dropbox, iCloud eller OneDrive.`
+        : `${antall(n, "bilde", "bilder")} er hentet fra skyen og leses inn nå.`,
+    stoppet: "Hentingen er stoppet. Bildene som alt er hentet, leses inn.",
+  },
   lupe: {
     henter: "Henter bildet i full størrelse …",
     feil: "Fant ikke originalfilen. Viser miniatyren.",
@@ -597,7 +612,7 @@ export const tekster = {
     dubletter: (n: number) =>
       `${antall(n, "dublett", "dubletter")} fra flere kilder er slått sammen, så hvert bilde bare kommer med én gang.`,
     bareISkyen: (n: number) =>
-      `${antall(n, "bilde", "bilder")} ligger bare i skyen og er ikke lastet ned til maskinen. Last dem ned i Dropbox, iCloud eller Google Disk, så tar appen dem med neste gang.`,
+      `${antall(n, "bilde", "bilder")} ligger bare i skyen og er ikke lastet ned til maskinen. Appen kan hente årets bilder for deg.`,
     utenMiniatyr: (n: number) =>
       `${antall(n, "bilde", "bilder")} kan ikke vises på denne maskinen ennå, ofte iPhone-bilder i HEIC-format. På Windows hjelper det å installere «HEIF Image Extensions» fra Microsoft Store.`,
     usikreDatoer: (n: number) =>

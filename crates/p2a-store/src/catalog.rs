@@ -20,6 +20,16 @@ pub struct Source {
     pub label: String,
 }
 
+/// En fil som bare ligger i skyen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CloudFile {
+    pub file_id: i64,
+    /// Der filen skal ligge på maskinen når den er lastet ned.
+    pub path: PathBuf,
+    /// Endringstid (sekunder siden 1970, UTC).
+    pub modified: i64,
+}
+
 /// Originalfilen til et bilde.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PhotoFile {
@@ -526,6 +536,30 @@ impl Store {
     }
 
     /// Unike bilder fra et år, sortert på opptakstid.
+    /// Filene som bare ligger i skyen (ikke lastet ned til maskinen), med full sti og
+    /// endringstid. Til «Hent bildene fra skyen».
+    pub fn cloud_files(&self) -> Result<Vec<CloudFile>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT f.id, s.path, f.rel_path, f.modified FROM files f
+             JOIN sources s ON s.id = f.source_id
+             WHERE f.status = 'bare_i_skyen'
+             ORDER BY f.id",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(CloudFile {
+                file_id: r.get(0)?,
+                path: r
+                    .get::<_, String>(2)?
+                    .split('/')
+                    .fold(PathBuf::from(r.get::<_, String>(1)?), |p, part| {
+                        p.join(part)
+                    }),
+                modified: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
     /// Originalfilene til bildene (første lokale fil), med format, orientering og mål etter
     /// rotering. Brukes av trykkfilen. Bilder uten lokal fil mangler i svaret.
     pub fn photo_files(

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Aar, Bilde, Fremdrift, Innlesingsrapport, Sammendrag } from "../api";
 import { datoTekst, fmt, tekster } from "../tekster";
 
@@ -72,6 +73,7 @@ export function PickScreen({
   report,
   onCancel,
   thumbUrl,
+  sky,
 }: {
   years: Aar[];
   year: number | null;
@@ -82,6 +84,8 @@ export function PickScreen({
   report: Innlesingsrapport | null;
   onCancel: () => void;
   thumbUrl: (id: string) => string;
+  /** «Bilder fra året ligger bare i skyen» med knappen som henter dem. */
+  sky?: ReactNode;
 }) {
   return (
     <section className="pick" aria-labelledby="velg-tittel">
@@ -113,6 +117,7 @@ export function PickScreen({
       )}
 
       {summary && <Merknader s={summary} report={report} />}
+      {sky}
 
       {photos.length === 0 ? (
         <p className="empty">{progress ? tekster.bilder.leserInn : tekster.bilder.tom}</p>

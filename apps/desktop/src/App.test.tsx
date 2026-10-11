@@ -27,6 +27,11 @@ vi.mock("./api", async (importOriginal) => {
       innlesingPagar: vi.fn(() => Promise.resolve(false)),
       paFremdrift: vi.fn(noop),
       paFerdig: vi.fn(noop),
+      paSkyhenting: vi.fn(noop),
+      paSkyhentingFerdig: vi.fn(noop),
+      skyAar: vi.fn(() => Promise.resolve([])),
+      hentFraSkyen: vi.fn(() => Promise.resolve()),
+      avbrytSky: vi.fn(() => Promise.resolve()),
       sammendrag: vi.fn(() => Promise.resolve(tomtSammendrag)),
       aar: vi.fn(() => Promise.resolve([])),
       bilderIAar: vi.fn(() => Promise.resolve([])),
@@ -152,6 +157,10 @@ describe("velg bilder", () => {
       cloud_only: 12,
       without_preview: 1,
     });
+    mock.skyAar.mockResolvedValue([
+      { year: 2010, count: 7 },
+      { year: 2011, count: 5 },
+    ]);
     mock.bilderIAar.mockResolvedValue([
       bilde("a".repeat(64), "2011-03-02T08:15:00"),
       bilde("b".repeat(64), "2011-03-05T10:00:00", { hasThumbnail: false }),
@@ -185,6 +194,11 @@ describe("velg bilder", () => {
     expect(merknader).toHaveTextContent(/2\s?dubletter/);
     expect(merknader).toHaveTextContent(/12\s?bilder ligger bare i skyen/);
     expect(merknader).toHaveTextContent("HEIF Image Extensions");
+
+    // 5 av skybildene er fra 2011: knappen ber skytjenesten hente dem.
+    await userEvent.click(screen.getByRole("button", { name: tekster.sky.hent(5) }));
+    expect(mock.hentFraSkyen).toHaveBeenCalledWith(2011);
+    expect(screen.getByText(tekster.sky.henter(0, 5))).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /2010/ }));
     expect(mock.bilderIAar).toHaveBeenLastCalledWith(2010);

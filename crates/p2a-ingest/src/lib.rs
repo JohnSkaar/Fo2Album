@@ -3,6 +3,7 @@
 //! Leser bare fra lokale mapper brukeren har gitt tilgang til. Ingen
 //! nettverkstilgang (håndheves av `p2a-policy` og `deny.toml`).
 
+pub mod cloud;
 pub mod dates;
 pub mod decode;
 pub mod exif;
