@@ -8,7 +8,7 @@ const info = {
   version: "0.3.0",
   coreVersion: "0.3.0",
   os: "windows x86_64",
-  feedbackEmail: "hei@fo2album.no",
+  feedbackEmail: "plussdelta@fo2album.no",
 };
 
 describe("gi oss tilbakemelding", () => {

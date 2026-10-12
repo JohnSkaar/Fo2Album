@@ -1,6 +1,6 @@
 FO2ALBUM – NETTSIDE
 
-Innhold: index.html, personvern.html, takk.html (etter påmelding), style.css, tokens.css
+Innhold: index.html, personvern.html, takk.html (etter påmelding), epost/signatur.html, style.css, tokens.css
 (kopi av design/tokens.css uten Google Fonts), fonts/ (Fraunces og Nunito Sans, SIL OFL),
 logo-symbol.svg, logo.svg og favicon.svg (fra design/logo/), img/ (og.jpg er delingsbildet).
 Mangler fortsatt: eksempelbildene «Sommer på hytta» og «Jul hos besteforeldre» (vises som
@@ -28,7 +28,25 @@ Venteliste:
 9. Påmeldinger ligger i Netlify under Forms -> venteliste.
    Slå på e-postvarsel for nye påmeldinger under varslingsinnstillingene for skjemaer.
 
+E-post på domenet (plussdelta@fo2album.no):
+10. Enklest er e-post hos Domeneshop, der domenet ligger: Mine domener -> fo2album.no ->
+    E-post -> opprett kontoen «plussdelta». Les den i Domeneshops webmail, eller legg kontoen
+    inn i Outlook, Apple Mail eller på telefonen (IMAP; innstillingene står i kontrollpanelet).
+    Sjekk prisen der. Vil du heller ha Google Workspace eller Microsoft 365 (kalender og
+    dokumenter i tillegg), følg deres veiledning for MX-poster hos Domeneshop.
+11. Viktig: behold DNS hos Domeneshop og legg bare inn A- og CNAME-postene fra Netlify
+    (punkt 5). Flytter du hele domenet (navneserverne) til Netlify, slutter e-posten å virke
+    til MX-postene er lagt inn der også.
+12. Sjekk at SPF og DKIM er slått på for e-posten (i kontrollpanelet hos e-postleverandøren),
+    og legg gjerne til en DMARC-post, så e-post fra deg ikke havner i søppelpost hos trykkerier.
+13. Send påmeldinger fra nettsiden til samme adresse: Netlify -> Forms -> venteliste ->
+    Form notifications -> Email notification -> plussdelta@fo2album.no.
+
+E-postsignatur:
+14. Åpne https://fo2album.no/epost/signatur.html når siden er publisert (filen ligger i
+    epost/signatur.html), bytt ut navn og telefon, og følg oppskriften på siden. Logoen er
+    img/signatur-logo.png og hentes fra nettsiden, så nettsiden må være publisert først.
+
 Fyll inn før lansering:
-- index.html: [PRIS]
-- personvern.html: [FIRMANAVN], [ORG.NR], [ADRESSE], [KONTAKT-EPOST], [DATO], [TIDSFRIST]
-- alle sider (bunntekst): [KONTAKT-EPOST]
+- personvern.html: [FIRMANAVN], [ORG.NR], [ADRESSE] (kontakt-e-post og dato er fylt inn)
+- Prisen er tatt ut av forsiden til den er bestemt.

@@ -4,8 +4,8 @@
 
 use crate::commands::{CmdResult, CommandError};
 
-/// Adressen tilbakemeldinger går til. Plassholder til eieren har bestemt adressen.
-pub const FEEDBACK_EMAIL: &str = "hei@fo2album.no";
+/// Adressen tilbakemeldinger går til (eierens valg 12. oktober 2026).
+pub const FEEDBACK_EMAIL: &str = "plussdelta@fo2album.no";
 
 /// Prosentkoding for `mailto:` (RFC 6068): bare bokstaver, tall og `-._~` står som de er.
 fn encode(s: &str) -> String {
@@ -67,7 +67,7 @@ mod tests {
         let url = mailto("Forslag til Fo2Album", "Hei!\nBlå & grønn?");
         assert_eq!(
             url,
-            "mailto:hei@fo2album.no?subject=Forslag%20til%20Fo2Album\
+            "mailto:plussdelta@fo2album.no?subject=Forslag%20til%20Fo2Album\
              &body=Hei%21%0D%0ABl%C3%A5%20%26%20gr%C3%B8nn%3F"
         );
     }

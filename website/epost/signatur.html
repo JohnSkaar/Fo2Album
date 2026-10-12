@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>E-postsignatur – Fo2Album</title>
+<!--
+  E-postsignaturen. E-postprogrammer forstår ikke CSS-variabler, så fargene er skrevet ut her
+  (fra design/tokens.css: sand-900 #241E18, sand-700 #5C5043, terracotta-700 #9E4529,
+  sand-200 #E4D9CA). Logoen hentes fra https://fo2album.no/img/signatur-logo.png, så nettsiden
+  må være publisert for at den skal vises hos mottakeren.
+-->
+<style>
+  body { margin: 0; padding: 32px 16px; background: #FAF6F0; color: #241E18; font: 16px/1.5 Arial, Helvetica, sans-serif; }
+  .ark { max-width: 640px; margin: 0 auto; }
+  h1 { font: 600 24px/1.3 Georgia, serif; margin: 0 0 8px; }
+  ol { padding-left: 20px; }
+  .boks { margin: 24px 0; padding: 24px; background: #FFFFFF; border: 1px solid #E4D9CA; border-radius: 12px; }
+  code { background: #FFFFFF; padding: 1px 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="ark">
+<h1>E-postsignatur for Fo2Album</h1>
+<p>Bytt ut navnet og telefonnummeret under før du kopierer. Merk så alt inne i den hvite boksen (fra logoen til nettadressen), kopier det og lim det inn i signaturinnstillingene i e-postprogrammet:</p>
+<ol>
+  <li><b>Gmail:</b> Innstillinger → Se alle innstillinger → Generelt → Signatur → Opprett ny.</li>
+  <li><b>Outlook:</b> Innstillinger → E-post → Skriv og svar → E-postsignatur.</li>
+  <li><b>Apple Mail:</b> Mail → Innstillinger → Signaturer. Slå av «Bruk alltid min standardskrift».</li>
+  <li><b>Domeneshop webmail:</b> Innstillinger → Identiteter → Signatur (velg HTML).</li>
+</ol>
+
+<div class="boks">
+<!-- Signaturen starter her -->
+<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;color:#241E18;">
+  <tr>
+    <td style="padding:0 0 10px 0;">
+      <a href="https://fo2album.no" style="text-decoration:none;"><img src="https://fo2album.no/img/signatur-logo.png" width="236" height="65" alt="Fo2Album.no" style="display:block;border:0;width:236px;height:65px;"></a>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:10px 0 0 0;border-top:2px solid #9E4529;font-size:14px;line-height:20px;">
+      <b style="font-size:15px;color:#241E18;">[Ditt navn]</b><br>
+      <span style="color:#5C5043;">Fo2Album – årets familiealbum, laget på din egen maskin</span><br>
+      <a href="mailto:plussdelta@fo2album.no" style="color:#9E4529;text-decoration:none;">plussdelta@fo2album.no</a>
+      <span style="color:#5C5043;"> · [Telefon]</span><br>
+      <a href="https://fo2album.no" style="color:#9E4529;text-decoration:none;">fo2album.no</a>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:8px 0 0 0;font-size:12px;line-height:17px;color:#5C5043;font-style:italic;">
+      Minnene blir sterkere når dere blar i dem sammen.
+    </td>
+  </tr>
+</table>
+<!-- Signaturen slutter her -->
+</div>
+
+<p>Vises ikke logoen hos mottakeren? Da er nettsiden ikke publisert ennå, eller e-postprogrammet blokkerer bilder til mottakeren tillater dem. Teksten og lenkene virker uansett.</p>
+</div>
+</body>
+</html>

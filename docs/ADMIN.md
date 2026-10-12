@@ -19,7 +19,7 @@ Adminsiden viser bare det som allerede finnes hos oss etter ARCHITECTURE.md, «H
 |---|---|---|
 | **Oversikt** | Ordrer i dag/uke/måned, omsetning, ordrer som venter på trykkeri eller er forsinket, nye tilbakemeldinger, nedlastinger siste 30 dager, siste versjon | De andre modulene |
 | **Bestillinger** | Hver ordre: status (betalt → sendt til trykkeri → trykket → sendt → levert), sporing, sletting av PDF (dato), reklamasjoner | Ordretjenesten (`p2a-order` i appen sender hit) |
-| **Fakturering og regnskap** | Betalinger og refusjoner (Vipps/Stripe), kvitteringer, eksport til regnskap (f.eks. Fiken eller Tripletex), mva-oppsummering | Betalingsleverandøren, regnskapssystemet |
+| **Fakturering og regnskap** | Betalinger og refusjoner (Vipps og Stripe), kvitteringer, overføring til Fiken, mva-oppsummering | Betalingsleverandøren, regnskapssystemet |
 | **Leverandører** | Trykkerier og andre leverandører: avtaler (inkl. databehandleravtale), priser, produksjonstid, avvik og reklamasjoner per leverandør, fakturaer fra dem, kontaktpersoner | Ordrer + manuelle notater |
 | **Apper og versjoner** | Nedlastinger per plattform og versjon, hvilke versjoner som er i bruk (fra oppdateringssjekken, bare versjonsnummer), signering og utløpsdatoer for sertifikater | Nedlastingssiden, oppdateringstjenesten |
 | **Tilbakemeldinger** | Meldinger fra appen («Gi oss tilbakemelding»), e-post og support, med status (ny, besvart, løst) og kobling til forbedringer | Appen (opt-in), e-post |
@@ -43,9 +43,9 @@ Adminsiden viser bare det som allerede finnes hos oss etter ARCHITECTURE.md, «H
 
 - «Gi oss tilbakemelding» i appen (se `docs/OVERLEVERING.md`): kunden skriver selv, ser nøyaktig hva som sendes, og det går som e-post fra kundens eget e-postprogram. Ingen bilder, ingen server ennå. Når adminsiden finnes, kan meldingene hentes inn derfra.
 
-## Spørsmål til eieren
+## Eierens valg (12. oktober 2026)
 
-1. Betaling: Vipps, Stripe eller begge?
-2. Regnskapssystem: Fiken, Tripletex eller annet?
-3. Trykkeri (første leverandør), og om det har API for ordrer og status.
-4. E-postadressen tilbakemeldinger skal gå til (nå `hei@fo2album.no` som plassholder).
+- **Betaling:** både Vipps og Stripe.
+- **Regnskap:** Fiken (eksport eller API fra Fakturering).
+- **E-post:** `plussdelta@fo2album.no` (tilbakemeldinger og kontakt på nettsiden).
+- **Trykkeri:** ikke valgt ennå. Eieren lager først nettside, e-post og signatur, og henvender seg så til trykkerier med forespørselen i `docs/LEVERANDOR-FORESPORSEL.md`.
