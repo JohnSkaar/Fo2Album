@@ -48,7 +48,13 @@ Alle funksjoner normaliseres til 0–1. Der det står «modell», velges konkret
 | Hvitbalanse/fargestikk | Avvik fra nøytral i grå områder | Lav vekt |
 | Oppløsning | Nok for planlagt utskriftsstørrelse (≥ 200 ppi for helside, ≥ 150 ppi minimum) | Hard grense per layout, se §7 |
 
-`Q_tech = 0.40·skarp + 0.25·eksponering + 0.15·(1−bevegelse) + 0.10·(1−støy) + 0.10·farge`
+`Q_tech = 0.40·skarp + 0.25·eksponering + 0.15·(1−bevegelse) + 0.10·(1−støy) + 0.10·(1−fargestikk)`
+
+**Gjort (oktober 2026, `p2a-ingest::tech`, `TechQuality` i `p2a-core`):** bevegelse, støy og fargestikk måles ved innlesing (eldre bilder måles i etterberegningen) og lagres i `photos` (skjema v7). Alle tre er 0–1, der 0 er bra. Tersklene er startverdier og skal kalibreres mot gullsettet.
+- **Bevegelse:** kvadrerte differanser i fire retninger (vannrett, loddrett og to diagonaler) i 4 × 4 ruter av et bilde nedskalert til 400 px. Per rute med tekstur: forholdet mellom svakeste og sterkeste retning i hvert vinkelrette par, og det minste av de to parene. Medianen over rutene. Fokususkarphet demper alle retninger likt og gir derfor 0; risting gjør én retning svak. 0 ved forhold ≥ 0,55, 1 ved ≤ 0,20.
+- **Støy:** Immerkærs metode (Laplace-forskjell) i 8 × 8 ruter, snitt av den flateste fjerdedelen. 0 ved σ ≤ 2, 1 ved σ ≥ 9.
+- **Fargestikk:** snittet av farge (Cb/Cr) i de 30 % minst mettede, middels lyse pikslene; avstand fra nøytral. 0 ved ≤ 5, 1 ved ≥ 16. Grovt mål, derfor bare i `Q_tech` og aldri som grunn til å utelate.
+- **I utkastet (`select::draft`):** poengene ganges med `1 − 0,35·bevegelse − 0,20·støy`. Bevegelse ≥ 0,5 merkes som uskarpt (symbolet) med begrunnelsen «Uskarpt fordi noe beveget seg», støy ≥ 0,85 gir «Kornete». Ingen av dem diskvalifiserer: er bildet det beste fra en hendelse, er det med som «Litt uskarpt, kornete eller mørkt, men det beste herfra» (helhetsvurderingen). Bilder uten målingene (`tech = None`) får ingen endring.
 
 ### 3.2 Estetikk `Q_aes`
 Estetikkmodell (f.eks. CLIP-embedding + lineær estetikk-hode trent på åpne estetikkdatasett) gir 0–1. Suppleres med komposisjon: horisont i vater, motiv nær tredjedelslinjer, ikke kuttede hoder ved kanten, rotete bakgrunn (lav vekt).

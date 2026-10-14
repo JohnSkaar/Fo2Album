@@ -390,6 +390,32 @@ pub struct PhotoMeta {
     pub phash: Option<u64>,
     /// Enkle kvalitetsmål (prototypens). Erstattes av Q_tech i M3.
     pub quality: Option<BasicQuality>,
+    /// Tekniske feil utover skarphet og lys (bevegelse, støy, fargestikk). `None` for bilder
+    /// lest inn før målene fantes; de måles ved neste innlesing.
+    pub tech: Option<TechQuality>,
+}
+
+/// Tekniske feil (SCORING.md §3.1), alle 0–1 der 0 er bra.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct TechQuality {
+    /// Bevegelsesuskarphet (kamerarystelse eller motiv i bevegelse).
+    pub motion: f32,
+    /// Bildestøy (typisk mørke innendørsbilder).
+    pub noise: f32,
+    /// Fargestikk (feil hvitbalanse).
+    pub cast: f32,
+}
+
+impl TechQuality {
+    /// `Q_tech` (SCORING.md §3.1): 0.40 skarphet + 0.25 eksponering + 0.15 (1 − bevegelse)
+    /// + 0.10 (1 − støy) + 0.10 (1 − fargestikk).
+    pub fn q_tech(&self, q: &BasicQuality) -> f32 {
+        0.40 * q.sharp
+            + 0.25 * q.exposure
+            + 0.15 * (1.0 - self.motion)
+            + 0.10 * (1.0 - self.noise)
+            + 0.10 * (1.0 - self.cast)
+    }
 }
 
 /// Et ansikt i et bilde (M4). Boksen er andeler (0–1) av bildets bredde og høyde.
@@ -455,6 +481,7 @@ impl PhotoMeta {
             gps: None,
             phash: None,
             quality: None,
+            tech: None,
         }
     }
 

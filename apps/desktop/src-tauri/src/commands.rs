@@ -569,6 +569,8 @@ impl From<Reason> for ReasonDto {
             Reason::SammeSerie { antall } => ("samme_serie", Some(antall)),
             Reason::NestenLikt => ("nesten_likt", None),
             Reason::Uskarpt => ("uskarpt", None),
+            Reason::Bevegelsesuskarpt => ("bevegelsesuskarpt", None),
+            Reason::MyeStoy => ("mye_stoy", None),
             Reason::MorktEllerUtbrent => ("morkt_eller_utbrent", None),
             Reason::Skjermbilde => ("skjermbilde", None),
             Reason::IkkePlass { med } => ("ikke_plass", Some(med)),

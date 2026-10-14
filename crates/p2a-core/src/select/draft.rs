@@ -97,6 +97,15 @@ pub struct DraftConfig {
     /// … men bare når hovedansiktet er minst så høyt (andel av bildehøyden). Små ansikter
     /// forstørres før skarpheten måles, og ser da uskarpe ut selv når de ikke er det.
     pub face_sharp_min_h: f32,
+    /// Teknisk kvalitet (SCORING.md §3.1): poengene ganges med
+    /// `1 − motion_penalty · bevegelse − noise_penalty · støy`. Fargestikk teller ikke her
+    /// (det kan rettes, og målet er for grovt til å straffe på).
+    pub motion_penalty: f32,
+    pub noise_penalty: f32,
+    /// Fra så mye bevegelse regnes bildet som bevegelsesuskarpt (vises som uskarpt).
+    pub motion_blurry: f32,
+    /// Fra så mye støy får bildet begrunnelsen «mye støy» når det ikke er med.
+    pub noisy: f32,
 }
 
 impl Default for DraftConfig {
@@ -134,6 +143,10 @@ impl Default for DraftConfig {
             same_thing_hamming: 20,
             face_sharp_weight: 0.65,
             face_sharp_min_h: 0.12,
+            motion_penalty: 0.35,
+            noise_penalty: 0.2,
+            motion_blurry: 0.5,
+            noisy: 0.85,
         }
     }
 }
@@ -185,6 +198,10 @@ pub enum Reason {
     },
     NestenLikt,
     Uskarpt,
+    /// Kameraet eller motivet beveget seg (bevegelsesuskarphet).
+    Bevegelsesuskarpt,
+    /// Mye bildestøy, typisk mørkt innendørs.
+    MyeStoy,
     MorktEllerUtbrent,
     Skjermbilde,
     /// Ingen personer, og ikke et spesielt flott bilde.
@@ -325,6 +342,9 @@ struct Item<'a> {
     /// Blant årets aller flotteste bilder (estetikk).
     exceptional: bool,
     blurry: bool,
+    /// Teknisk svakhet som ikke diskvalifiserer (bevegelse eller støy). Bildet kan fortsatt
+    /// komme med, f.eks. som eneste fra en hendelse (helhetsvurdering).
+    flaw: Option<Reason>,
     aesthetic: f32,
 }
 
@@ -414,6 +434,18 @@ pub fn make_draft(
             if people == Some(true) {
                 q += cfg.people_bonus;
             }
+            if let Some(t) = p.tech {
+                q *= (1.0 - cfg.motion_penalty * t.motion - cfg.noise_penalty * t.noise).max(0.0);
+            }
+            let flaw = p.tech.and_then(|t| {
+                if t.motion >= cfg.motion_blurry {
+                    Some(Reason::Bevegelsesuskarpt)
+                } else if t.noise >= cfg.noisy {
+                    Some(Reason::MyeStoy)
+                } else {
+                    None
+                }
+            });
             match decision {
                 Some(Decision::Demp) => q -= 0.15,
                 Some(Decision::Opp) => q += 0.25,
@@ -432,8 +464,11 @@ pub fn make_draft(
                 named,
                 mood: false,
                 exceptional: false,
-                blurry: raw
-                    .is_some_and(|r| rank(r.sharp) < cfg.blurry_rank && r.sharp < cfg.blurry_sharp),
+                blurry: flaw == Some(Reason::Bevegelsesuskarpt)
+                    || raw.is_some_and(|r| {
+                        rank(r.sharp) < cfg.blurry_rank && r.sharp < cfg.blurry_sharp
+                    }),
+                flaw,
                 aesthetic: rel.map_or(0.0, |q| 0.4 * q.color + 0.3 * q.exposure + 0.3 * q.sharp),
             }
         })
@@ -1473,7 +1508,7 @@ fn reason_in(
         return Reason::ValgtAvDeg;
     }
     let series = burst_size.get(&it.burst).copied().unwrap_or(1);
-    let weak = it.noise.is_some() || it.blurry;
+    let weak = it.noise.is_some() || it.blurry || it.flaw.is_some();
     if in_group == 1 {
         return if weak {
             Reason::SvaktMenEneste
@@ -1529,6 +1564,9 @@ fn reason_out(
         .find(|&&j| same_thing(it, &items[j], cfg))
     {
         return (Reason::SammeTing, Some(items[j].p.hash));
+    }
+    if let Some(r) = it.flaw {
+        return (r, nearest);
     }
     if it.blurry {
         return (Reason::Uskarpt, nearest);
@@ -1672,6 +1710,79 @@ mod tests {
         assert_eq!(sept.iter().filter(|p| p.included).count(), 1);
         let kept = sept.iter().find(|p| p.included).unwrap();
         assert_eq!(kept.reason, Reason::SvaktMenEneste);
+    }
+
+    fn shaken(mut p: PhotoMeta, motion: f32, noise: f32) -> PhotoMeta {
+        p.tech = Some(crate::TechQuality {
+            motion,
+            noise,
+            cast: 0.0,
+        });
+        p
+    }
+
+    #[test]
+    fn motion_blur_lowers_quality_and_gives_its_own_reason() {
+        let mut photos: Vec<PhotoMeta> = day(0, 6, 20, 40)
+            .into_iter()
+            .map(|p| shaken(p, 0.0, 0.0))
+            .collect();
+        // De skarpeste bildene er rystet: skarpe kanter i én retning, utsmurt i den andre.
+        for k in [3usize, 11, 19, 27, 35] {
+            let mut p = photos[k].clone();
+            p.quality.as_mut().unwrap().sharp = 0.9;
+            photos[k] = shaken(p, 0.9, 0.0);
+        }
+        let d = draft(&photos, &HashMap::new());
+        for k in [3usize, 11, 19, 27, 35] {
+            let x = get(&d, &photos[k]);
+            assert!(!x.included, "rystet bilde {k} er med: {x:?}");
+            assert_eq!(x.reason, Reason::Bevegelsesuskarpt);
+            assert!(x.blurry);
+        }
+        let mut calm = photos[3].clone();
+        calm.tech = None;
+        let plain = draft(
+            &photos
+                .iter()
+                .map(|p| {
+                    if p.hash == calm.hash {
+                        calm.clone()
+                    } else {
+                        p.clone()
+                    }
+                })
+                .collect::<Vec<_>>(),
+            &HashMap::new(),
+        );
+        assert!(get(&plain, &calm).quality > get(&d, &photos[3]).quality);
+    }
+
+    #[test]
+    fn shaken_photos_step_aside_but_never_empty_an_event() {
+        let mut photos = day(0, 2, 1, 10);
+        photos.extend([
+            shaken(photo(90, 9, 9, 12, 0, 0, 0.6), 0.9, 0.0),
+            shaken(photo(91, 9, 9, 12, 30, 0, 0.6), 0.8, 0.0),
+            shaken(photo(92, 9, 9, 13, 0, 0, 0.6), 0.0, 1.0),
+        ]);
+        let d = draft(&photos, &HashMap::new());
+        // Hendelsen er med, og støy straffes mindre enn bevegelse: det støyete bildet velges
+        // først, det mest rystede står over.
+        let noisy = get(&d, &photos[12]);
+        assert!(noisy.included, "{noisy:?}");
+        let shaky = get(&d, &photos[10]);
+        assert!(!shaky.included);
+        assert_eq!(shaky.reason, Reason::Bevegelsesuskarpt);
+        assert!(get(&d, &photos[12]).quality > get(&d, &photos[11]).quality);
+
+        // Alene i hendelsen: med, men merket som svakt.
+        let mut alone = day(0, 2, 1, 10);
+        alone.push(shaken(photo(90, 9, 9, 12, 0, 0, 0.6), 0.9, 0.0));
+        let d = draft(&alone, &HashMap::new());
+        let only = get(&d, &alone[10]);
+        assert!(only.included);
+        assert_eq!(only.reason, Reason::SvaktMenEneste);
     }
 
     #[test]

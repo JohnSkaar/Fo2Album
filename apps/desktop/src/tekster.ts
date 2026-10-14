@@ -435,7 +435,7 @@ export const tekster = {
           ? "Det eneste bildet herfra"
           : `Det beste av ${antall(bilderIHendelsen, "bilde", "bilder")} herfra`;
       case "svakt_men_eneste":
-        return "Litt uskarpt eller mørkt, men det beste herfra";
+        return "Litt uskarpt, kornete eller mørkt, men det beste herfra";
       case "beste_i_serie":
         return `Beste bilde i en serie på ${fmt(n)}`;
       case "annen_del_av_hendelsen":
@@ -456,6 +456,10 @@ export const tekster = {
         return "Nesten likt et bilde som er med";
       case "uskarpt":
         return "Uskarpt";
+      case "bevegelsesuskarpt":
+        return "Uskarpt fordi noe beveget seg, og et skarpere bilde er med";
+      case "mye_stoy":
+        return "Kornete (mye støy, ofte mørkt innendørs), og et bedre bilde er med";
       case "morkt_eller_utbrent":
         return "For mørkt eller for lyst";
       case "skjermbilde":

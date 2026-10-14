@@ -19,7 +19,7 @@ use p2a_store::{
 use rayon::prelude::*;
 
 use crate::decode::{self, DecodeError};
-use crate::{dates, exif, features, hash, phash, scan};
+use crate::{dates, exif, features, hash, phash, scan, tech};
 
 /// Antall filer per runde. Styrer hvor ofte fremdrift rapporteres og data lagres.
 const BATCH: usize = 64;
@@ -312,12 +312,16 @@ pub fn ingest_all(
                 report.cancelled = true;
                 break;
             }
-            let computed: Vec<(ContentHash, p2a_core::BasicQuality)> = chunk
+            let computed: Vec<(ContentHash, p2a_core::BasicQuality, p2a_core::TechQuality)> = chunk
                 .par_iter()
                 .filter_map(|(h, root, rel, format, orientation)| {
                     let path = scan::full_path(root, rel);
                     let d = decode::decode_file(&path, format.as_deref(), *orientation).ok()?;
-                    Some((*h, features::basic_quality(&d.image)))
+                    Some((
+                        *h,
+                        features::basic_quality(&d.image),
+                        tech::tech_quality(&d.image),
+                    ))
                 })
                 .collect();
             store.set_quality(&computed)?;
@@ -424,6 +428,7 @@ fn analyze(path: &Path, modified: i64, hash: ContentHash) -> Option<Analyzed> {
             meta.height = Some(decoded.height);
             meta.phash = Some(phash::phash(&decoded.image));
             meta.quality = Some(features::basic_quality(&decoded.image));
+            meta.tech = Some(tech::tech_quality(&decoded.image));
             let more = || larger(path, meta.format.as_deref(), meta.orientation);
             faces = find_faces(&decoded.image, Some(&more));
             Some(decode::thumbnail_jpeg(&decoded))

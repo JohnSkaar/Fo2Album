@@ -7,7 +7,9 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use p2a_core::{BasicQuality, ContentHash, DateSource, FileStatus, PhotoMeta, SourceKind, TakenAt};
+use p2a_core::{
+    BasicQuality, ContentHash, DateSource, FileStatus, PhotoMeta, SourceKind, TakenAt, TechQuality,
+};
 use rusqlite::{params, OptionalExtension};
 
 use crate::{now_iso, Store, StoreError};
@@ -289,8 +291,10 @@ impl Store {
                     tx.execute(
                         "INSERT OR IGNORE INTO photos (content_hash, format, width, height,
                             orientation, taken_at, taken_offset, date_source, camera_make,
-                            camera_model, gps_lat, gps_lon, phash, q_sharp, q_exposure, q_color, q_skin)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+                            camera_model, gps_lat, gps_lon, phash, q_sharp, q_exposure, q_color, q_skin,
+                            q_motion, q_noise, q_cast)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17,
+                                 ?18, ?19, ?20)",
                         params![
                             &p.hash.0[..],
                             p.format,
@@ -309,6 +313,9 @@ impl Store {
                             p.quality.map(|q| q.exposure),
                             p.quality.map(|q| q.color),
                             p.quality.map(|q| q.skin),
+                            p.tech.map(|t| t.motion),
+                            p.tech.map(|t| t.noise),
+                            p.tech.map(|t| t.cast),
                         ],
                     )?;
                     tx.execute(
@@ -353,7 +360,7 @@ impl Store {
         let sql = format!(
             "SELECT content_hash, phash, taken_at, taken_offset, date_source, width, height,
                     camera_make, camera_model, format, orientation, gps_lat, gps_lon,
-                    q_sharp, q_exposure, q_color, q_skin
+                    q_sharp, q_exposure, q_color, q_skin, q_motion, q_noise, q_cast
              FROM photos {filter}"
         );
         let mut stmt = self.conn.prepare(&sql)?;
@@ -386,6 +393,14 @@ impl Store {
                 }),
                 _ => None,
             };
+            p.tech = match (r.get(17)?, r.get(18)?, r.get(19)?) {
+                (Some(motion), Some(noise), Some(cast)) => Some(TechQuality {
+                    motion,
+                    noise,
+                    cast,
+                }),
+                _ => None,
+            };
             Ok(p)
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -403,7 +418,7 @@ impl Store {
              JOIN files f ON f.id = (SELECT id FROM files WHERE content_hash = p.content_hash
                                      AND status = 'lokal' LIMIT 1)
              JOIN sources s ON s.id = f.source_id
-             WHERE p.q_sharp IS NULL AND p.has_thumbnail = 1",
+             WHERE (p.q_sharp IS NULL OR p.q_motion IS NULL) AND p.has_thumbnail = 1",
         )?;
         let rows = stmt.query_map([], |r| {
             Ok((
@@ -417,13 +432,26 @@ impl Store {
         Ok(rows.collect::<Result<_, _>>()?)
     }
 
-    pub fn set_quality(&mut self, items: &[(ContentHash, BasicQuality)]) -> Result<(), StoreError> {
+    pub fn set_quality(
+        &mut self,
+        items: &[(ContentHash, BasicQuality, TechQuality)],
+    ) -> Result<(), StoreError> {
         let tx = self.conn.transaction()?;
-        for (h, q) in items {
+        for (h, q, t) in items {
             tx.execute(
-                "UPDATE photos SET q_sharp = ?2, q_exposure = ?3, q_color = ?4, q_skin = ?5
+                "UPDATE photos SET q_sharp = ?2, q_exposure = ?3, q_color = ?4, q_skin = ?5,
+                                   q_motion = ?6, q_noise = ?7, q_cast = ?8
                  WHERE content_hash = ?1",
-                params![&h.0[..], q.sharp, q.exposure, q.color, q.skin],
+                params![
+                    &h.0[..],
+                    q.sharp,
+                    q.exposure,
+                    q.color,
+                    q.skin,
+                    t.motion,
+                    t.noise,
+                    t.cast
+                ],
             )?;
         }
         tx.commit()?;

@@ -14,3 +14,4 @@ pub mod pipeline;
 pub mod scan;
 pub mod sources;
 pub mod synth;
+pub mod tech;

@@ -162,6 +162,13 @@ const MIGRATIONS: &[&str] = &[
     ALTER TABLE photos ADD COLUMN faces_model TEXT;
     UPDATE photos SET faces_model = 'yunet-2023mar+sface-2021dec' WHERE faces_done = 1;
     "#,
+    // 7: Tekniske feil (SCORING.md §3.1): bevegelsesuskarphet, støy og fargestikk, 0–1.
+    // Bilder lest inn før dette, måles ved neste innlesing (`photos_missing_quality`).
+    r#"
+    ALTER TABLE photos ADD COLUMN q_motion REAL;
+    ALTER TABLE photos ADD COLUMN q_noise REAL;
+    ALTER TABLE photos ADD COLUMN q_cast REAL;
+    "#,
 ];
 
 pub const CURRENT_VERSION: i64 = MIGRATIONS.len() as i64;

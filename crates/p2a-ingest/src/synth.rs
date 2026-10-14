@@ -185,3 +185,82 @@ pub fn tiff(spec: &ExifSpec) -> Vec<u8> {
     w.write(&mut out, false).expect("EXIF-skriving");
     out.into_inner()
 }
+
+/// Et teksturrikt bilde med skarpe kanter i alle retninger (sirkler og rektangler i mange
+/// størrelser over fotomønsteret). Til tester av skarphet, bevegelse og støy.
+pub fn textured(width: u32, height: u32, seed: u32) -> RgbImage {
+    let mut img = pattern(width, height, seed);
+    let mut state = seed.wrapping_mul(747_796_405).wrapping_add(2_891_336_453) | 1;
+    let mut rnd = move || {
+        state ^= state << 13;
+        state ^= state >> 17;
+        state ^= state << 5;
+        state
+    };
+    let scale = width.min(height).max(1);
+    for i in 0..400 {
+        let cx = (rnd() % width) as i64;
+        let cy = (rnd() % height) as i64;
+        let r = (scale / 80 + rnd() % (scale / 16).max(1)) as i64;
+        let col = Rgb([
+            (rnd() & 255) as u8,
+            (rnd() & 255) as u8,
+            (rnd() & 255) as u8,
+        ]);
+        for y in (cy - r).max(0)..(cy + r).min(height as i64) {
+            for x in (cx - r).max(0)..(cx + r).min(width as i64) {
+                let inside = if i % 2 == 0 {
+                    (x - cx).pow(2) + (y - cy).pow(2) <= r * r
+                } else {
+                    true
+                };
+                if inside {
+                    img.put_pixel(x as u32, y as u32, col);
+                }
+            }
+        }
+    }
+    img
+}
+
+/// Bevegelsesuskarphet: snitt langs en linje på `len` piksler i retningen (dx, dy).
+pub fn motion_blur(img: &RgbImage, len: u32, dx: i32, dy: i32) -> RgbImage {
+    let (w, h) = (img.width() as i32, img.height() as i32);
+    let half = len as i32 / 2;
+    ImageBuffer::from_fn(img.width(), img.height(), |x, y| {
+        let mut acc = [0u32; 3];
+        let mut n = 0;
+        for k in -half..=half {
+            let (sx, sy) = (x as i32 + k * dx, y as i32 + k * dy);
+            if sx >= 0 && sy >= 0 && sx < w && sy < h {
+                let p = img.get_pixel(sx as u32, sy as u32);
+                for c in 0..3 {
+                    acc[c] += p[c] as u32;
+                }
+                n += 1;
+            }
+        }
+        Rgb(acc.map(|v| (v / n.max(1)) as u8))
+    })
+}
+
+/// Legger på deterministisk støy med omtrent standardavvik `sigma` (0–255-skala).
+pub fn add_noise(img: &RgbImage, sigma: f32, seed: u32) -> RgbImage {
+    let mut state = seed | 1;
+    let mut out = img.clone();
+    for p in out.pixels_mut() {
+        // Sum av fire uniforme gir omtrent normalfordelt støy.
+        let mut v = 0.0f32;
+        for _ in 0..4 {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            v += (state as f32 / u32::MAX as f32) - 0.5;
+        }
+        let d = v * sigma * (12.0f32 / 4.0).sqrt();
+        for c in 0..3 {
+            p[c] = (p[c] as f32 + d).clamp(0.0, 255.0) as u8;
+        }
+    }
+    out
+}

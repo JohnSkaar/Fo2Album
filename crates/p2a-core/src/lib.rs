@@ -13,7 +13,7 @@ pub mod select;
 
 pub use model::{
     BasicQuality, CommentKind, ContentHash, DateSource, FaceInfo, FileStatus, PhotoMeta,
-    RelationKind, RelationStatus, Role, SourceKind, TakenAt,
+    RelationKind, RelationStatus, Role, SourceKind, TakenAt, TechQuality,
 };
 
 /// Versjonen av kjernen, vist i appen og logget i `eval/RESULTS.md`.

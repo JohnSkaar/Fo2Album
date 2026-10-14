@@ -98,6 +98,8 @@ export type Begrunnelseskode =
   | "samme_serie"
   | "nesten_likt"
   | "uskarpt"
+  | "bevegelsesuskarpt"
+  | "mye_stoy"
   | "morkt_eller_utbrent"
   | "skjermbilde"
   | "gjenstand"
